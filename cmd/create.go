@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"sync"
 
 	"github.com/gavindsouza/weg/tools"
 	"github.com/spf13/cobra"
@@ -138,9 +139,34 @@ requires-python = ">=%s"
 			}
 		}
 
-		// bench setup config
-		// bench setup redis
-		// bench setup procfile
+		// setup requirements js & python, we can do this in parallel
+		var wg sync.WaitGroup
+
+		var appArgs []string
+
+		for _, app := range apps {
+			appDir := filepath.Join(benchPath, "apps", app.Name)
+			appArgs = append(appArgs, appDir)
+		}
+
+		// Combine fixed args with dynamic ones
+		uvArgs := append([]string{"add", "--active", "--editable"}, appArgs...)
+
+		// Run uv command asynchronously
+		runCmdAsync(&wg, "uv", benchPath, uvArgs...)
+
+		// Run yarn install for each app asynchronously
+		for _, app := range apps {
+			runCmdAsync(&wg, "yarn", filepath.Join(benchPath, "apps", app.Name), "install")
+		}
+
+		// Wait for all async commands to complete
+		wg.Wait()
+
+		// Run other commands synchronously if needed
+		runCmd("bench", benchPath, "setup", "config")
+		runCmd("bench", benchPath, "setup", "redis")
+		runCmd("bench", benchPath, "setup", "procfile")
 
 		// fmt.Println("🔧 Creating .envrc file... done")
 
@@ -158,6 +184,14 @@ func runCmd(binary, dir string, args ...string) {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
-		log.Fatalf("Command failed: %s %v\n%v", binary, args, err)
+		log.Fatalf("Command failed (%s): %s %v\n%v", dir, binary, args, err)
 	}
+}
+
+func runCmdAsync(wg *sync.WaitGroup, binary, dir string, args ...string) {
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		runCmd(binary, dir, args...)
+	}()
 }
