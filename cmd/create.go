@@ -65,7 +65,8 @@ eval "$(devbox generate direnv --print-envrc -e VENV_DIR=$VENV_DIR -e UV_PYTHON=
 		fmt.Println("📦 Initializing Devbox...")
 		runCmd("devbox", benchPath, "init")
 
-		os.Setenv("PATH", fmt.Sprintf("%s/.devbox/bin:%s/.devbox/nix/profile/default/bin:%s", benchPath, benchPath, os.Getenv("PATH")))
+		ORIGINAL_PATH := os.Getenv("PATH")
+		os.Setenv("PATH", fmt.Sprintf("%s/.devbox/bin:%s/.devbox/nix/profile/default/bin:%s", benchPath, benchPath, ORIGINAL_PATH))
 
 		fmt.Println("📦 Setting up Frappe Dependencies...")
 
@@ -119,13 +120,6 @@ requires-python = ">=%s"
 		runCmd("direnv", benchPath, "allow")
 
 		runCmd("uv", benchPath, "venv", "env", "--python", benchPath+"/.devbox/nix/profile/default/bin/python")
-
-		// uv add --active --editable ./apps/*
-		// yarn install all apps
-		for _, app := range apps {
-			runCmd("uv", benchPath, "add", "--active", "--editable", fmt.Sprintf("./apps/%s", app.Name))
-			runCmd("pnpm", benchPath+"/apps/"+app.Name, "install", "--no-lockfile")
-		}
 
 		// write apps.txt file in sites
 		appsFile, err := os.Create(filepath.Join(benchPath, "sites/apps.txt"))
