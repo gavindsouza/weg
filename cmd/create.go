@@ -1,10 +1,8 @@
 package cmd
 
 import (
-	"bytes"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"sync"
@@ -29,64 +27,6 @@ func init() {
 	createCmd.Flags().StringVar(&frappeVersion, "frappe-version", "develop", "Frappe version to use")
 }
 
-// debugLog prints debug messages only when WEG_NO_PROGRESS is set
-func debugLog(format string, args ...interface{}) {
-	if os.Getenv("WEG_NO_PROGRESS") != "" {
-		fmt.Printf("DEBUG: "+format+"\n", args...)
-	}
-}
-
-// runAsync runs a command asynchronously and handles errors
-func runAsync(wg *sync.WaitGroup, errChan chan<- error, pm *tools.ProgressManager, binary, dir string, args []string, progressBar string) {
-	debugLog("Starting async command: %s %v in %s", binary, args, dir)
-	wg.Add(1)
-	go func() {
-		defer func() {
-			debugLog("Async command completed: %s %v", binary, args)
-			wg.Done()
-		}()
-
-		if err := runCmdWithError(binary, dir, args...); err != nil {
-			debugLog("Async command failed: %s %v: %v", binary, args, err)
-			errChan <- fmt.Errorf("failed to run %s: %w", binary, err)
-			return
-		}
-
-		if progressBar != "" {
-			debugLog("Incrementing progress bar: %s", progressBar)
-			pm.Increment(progressBar)
-		}
-		errChan <- nil
-	}()
-}
-
-// waitForErrors waits for all goroutines to complete and checks for errors
-func waitForErrors(wg *sync.WaitGroup, errChan chan error) error {
-	debugLog("Starting waitForErrors")
-	wg.Wait()
-	debugLog("All goroutines completed")
-	close(errChan)
-	debugLog("Error channel closed")
-
-	var errors []error
-	for err := range errChan {
-		if err != nil {
-			errors = append(errors, err)
-		}
-	}
-
-	if len(errors) > 0 {
-		debugLog("Found %d errors", len(errors))
-		for _, err := range errors {
-			debugLog("Error: %v", err)
-		}
-		return fmt.Errorf("encountered %d errors: %v", len(errors), errors)
-	}
-
-	debugLog("No errors found")
-	return nil
-}
-
 // getAppPaths returns a slice of app paths for the given apps
 func getAppPaths(benchPath string, apps []tools.FrappeApp) []string {
 	var paths []string
@@ -97,7 +37,7 @@ func getAppPaths(benchPath string, apps []tools.FrappeApp) []string {
 }
 
 func create(benchPath string) error {
-	debugLog("Starting bench creation process")
+	tools.DebugLog("Starting bench creation process")
 	pm := tools.NewProgressManager()
 
 	// Initialize progress bars for each major step
@@ -109,21 +49,21 @@ func create(benchPath string) error {
 	pm.AddBar("Installing app dependencies", 8)   // 4 apps * 2 (uv add + yarn install)
 	pm.AddBar("Setting up bench config", 3)       // config, redis, procfile
 
-	debugLog("Creating directory structure")
+	tools.DebugLog("Creating directory structure")
 	// Create directory structure
 	if err := createDirectoryStructure(benchPath, pm); err != nil {
 		return fmt.Errorf("failed to create directory structure: %w", err)
 	}
 
-	debugLog("Creating .envrc")
+	tools.DebugLog("Creating .envrc")
 	// Create .envrc
 	if err := createEnvrc(benchPath, pm); err != nil {
 		return fmt.Errorf("failed to create .envrc: %w", err)
 	}
 
-	debugLog("Initializing Devbox")
+	tools.DebugLog("Initializing Devbox")
 	// Initialize Devbox
-	if err := runCmdWithError("devbox", benchPath, "init"); err != nil {
+	if err := tools.RunCmdWithError("devbox", benchPath, "init"); err != nil {
 		return fmt.Errorf("failed to initialize devbox: %w", err)
 	}
 	pm.Increment("Setting up environment")
@@ -141,7 +81,7 @@ func create(benchPath string) error {
 		{Url: "https://github.com/The-Commit-Company/Raven.git", Name: "raven", Branch: "develop"},
 	}
 
-	debugLog("Starting parallel operations (dependencies and git clone)")
+	tools.DebugLog("Starting parallel operations (dependencies and git clone)")
 	// Start both devbox installation and git clone in parallel
 	var wg sync.WaitGroup
 	errChan := make(chan error, 2)
@@ -160,7 +100,7 @@ func create(benchPath string) error {
 			}
 		}
 
-		if err := runCmdWithError("devbox", benchPath, append([]string{"add"}, devboxArgs...)...); err != nil {
+		if err := tools.RunCmdWithError("devbox", benchPath, append([]string{"add"}, devboxArgs...)...); err != nil {
 			errChan <- fmt.Errorf("failed to install dependencies: %w", err)
 			return
 		}
@@ -181,34 +121,34 @@ func create(benchPath string) error {
 	}()
 
 	// Wait for both operations to complete and check for errors
-	if err := waitForErrors(&wg, errChan); err != nil {
+	if err := tools.WaitForErrors(&wg, errChan); err != nil {
 		return err
 	}
 
-	debugLog("Entering devbox shell")
-	if err := runCmdWithError("devbox", benchPath, "shell"); err != nil {
+	tools.DebugLog("Entering devbox shell")
+	if err := tools.RunCmdWithError("devbox", benchPath, "shell"); err != nil {
 		return fmt.Errorf("failed to enter devbox shell: %w", err)
 	}
 
-	debugLog("Creating pyproject.toml")
+	tools.DebugLog("Creating pyproject.toml")
 	// Create pyproject.toml
 	if err := createPyproject(benchPath, packages, pm); err != nil {
 		return fmt.Errorf("failed to create pyproject.toml: %w", err)
 	}
 
-	debugLog("Allowing direnv")
-	if err := runCmdWithError("direnv", benchPath, "allow"); err != nil {
+	tools.DebugLog("Allowing direnv")
+	if err := tools.RunCmdWithError("direnv", benchPath, "allow"); err != nil {
 		return fmt.Errorf("failed to allow direnv: %w", err)
 	}
 
-	debugLog("Creating virtual environment")
-	if err := runCmdWithError("uv", benchPath, "venv", "env", "--python", benchPath+"/.devbox/nix/profile/default/bin/python"); err != nil {
+	tools.DebugLog("Creating virtual environment")
+	if err := tools.RunCmdWithError("uv", benchPath, "venv", "env", "--python", benchPath+"/.devbox/nix/profile/default/bin/python"); err != nil {
 		return fmt.Errorf("failed to create virtual environment: %w", err)
 	}
 	pm.Increment("Setting up Python environment")
 	pm.Finish("Setting up Python environment")
 
-	debugLog("Creating apps.txt")
+	tools.DebugLog("Creating apps.txt")
 	// Write apps.txt
 	if err := createAppsTxt(benchPath, apps); err != nil {
 		return fmt.Errorf("failed to create apps.txt: %w", err)
@@ -220,20 +160,20 @@ func create(benchPath string) error {
 	appErrChan := make(chan error, 8)   // 4 apps * 2 operations
 	setupErrChan := make(chan error, 2) // 2 setup commands (redis and procfile)
 
-	debugLog("Setting up bench config")
+	tools.DebugLog("Setting up bench config")
 	// First run bench setup config
-	if err := runCmdWithError("bench", benchPath, "setup", "config"); err != nil {
+	if err := tools.RunCmdWithError("bench", benchPath, "setup", "config"); err != nil {
 		return fmt.Errorf("failed to setup bench config: %w", err)
 	}
 	pm.Increment("Setting up bench config")
 
-	debugLog("Starting parallel bench setup commands")
+	tools.DebugLog("Starting parallel bench setup commands")
 	// Now start the remaining bench setup commands in parallel
 	// setupWg.Add(2)
-	runAsync(&setupWg, setupErrChan, pm, "bench", benchPath, []string{"setup", "redis"}, "Setting up bench config")
-	runAsync(&setupWg, setupErrChan, pm, "bench", benchPath, []string{"setup", "procfile"}, "Setting up bench config")
+	tools.RunAsync(&setupWg, setupErrChan, pm, "bench", benchPath, []string{"setup", "redis"}, "Setting up bench config")
+	tools.RunAsync(&setupWg, setupErrChan, pm, "bench", benchPath, []string{"setup", "procfile"}, "Setting up bench config")
 
-	debugLog("Setting up app dependencies")
+	tools.DebugLog("Setting up app dependencies")
 	// Setup requirements js & python
 	appPaths := getAppPaths(benchPath, apps)
 	uvArgs := append([]string{"add", "--active", "--editable"}, appPaths...)
@@ -242,7 +182,7 @@ func create(benchPath string) error {
 	appWg.Add(1)
 	go func() {
 		defer appWg.Done()
-		if err := runCmdWithError("uv", benchPath, uvArgs...); err != nil {
+		if err := tools.RunCmdWithError("uv", benchPath, uvArgs...); err != nil {
 			appErrChan <- fmt.Errorf("failed to install Python dependencies: %w", err)
 			return
 		}
@@ -255,24 +195,24 @@ func create(benchPath string) error {
 
 	// Run yarn install for each app asynchronously
 	for _, app := range apps {
-		runAsync(&appWg, appErrChan, pm, "yarn", filepath.Join(benchPath, "apps", app.Name), []string{"install"}, "Installing app dependencies")
+		tools.RunAsync(&appWg, appErrChan, pm, "yarn", filepath.Join(benchPath, "apps", app.Name), []string{"install"}, "Installing app dependencies")
 	}
 
-	debugLog("Waiting for app dependencies to complete")
+	tools.DebugLog("Waiting for app dependencies to complete")
 	// Wait for all async commands to complete and check for errors
-	if err := waitForErrors(&appWg, appErrChan); err != nil {
+	if err := tools.WaitForErrors(&appWg, appErrChan); err != nil {
 		return err
 	}
 	pm.Finish("Installing app dependencies")
 
-	debugLog("Waiting for bench setup to complete")
+	tools.DebugLog("Waiting for bench setup to complete")
 	// Wait for bench setup commands to complete and check for errors
-	if err := waitForErrors(&setupWg, setupErrChan); err != nil {
+	if err := tools.WaitForErrors(&setupWg, setupErrChan); err != nil {
 		return err
 	}
 	pm.Finish("Setting up bench config")
 
-	debugLog("Bench creation completed successfully")
+	tools.DebugLog("Bench creation completed successfully")
 	fmt.Printf("\n\n✅ Bench created successfully at %s\n", benchPath)
 	return nil
 }
@@ -368,35 +308,5 @@ func createAppsTxt(benchPath string, apps []tools.FrappeApp) error {
 			return fmt.Errorf("failed to write to apps.txt file: %w", err)
 		}
 	}
-	return nil
-}
-
-func runCmdWithError(binary, dir string, args ...string) error {
-	debugLog("Running command: %s %v in %s", binary, args, dir)
-	cmd := exec.Command(binary, args...)
-	cmd.Dir = dir
-
-	// For bench commands, capture stderr for debugging
-	if binary == "bench" {
-		var stderr bytes.Buffer
-		cmd.Stderr = &stderr
-		err := cmd.Run()
-		if err != nil {
-			return fmt.Errorf("command failed: %w\nstderr: %s", err, stderr.String())
-		}
-		debugLog("Command completed successfully: %s %v", binary, args)
-		return nil
-	}
-
-	// For other commands, suppress output only if progress bars are enabled
-	if os.Getenv("WEG_NO_PROGRESS") == "" {
-		cmd.Stdout = nil
-		cmd.Stderr = nil
-	}
-	err := cmd.Run()
-	if err != nil {
-		return fmt.Errorf("command failed: %w", err)
-	}
-	debugLog("Command completed successfully: %s %v", binary, args)
 	return nil
 }
