@@ -24,7 +24,7 @@ var createCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(createCmd)
-	createCmd.Flags().StringVar(&frappeVersion, "frappe-version", "develop", "Frappe version to use")
+	createCmd.Flags().StringVarP(&frappeVersion, "version", "v", "develop", "Frappe version to use")
 }
 
 // getAppPaths returns a slice of app paths for the given apps
