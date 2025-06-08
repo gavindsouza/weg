@@ -22,6 +22,7 @@ var benchCmd = &cobra.Command{
 		execArgs := append([]string{"bench"}, args...)
 		syscall.Exec(benchCli, execArgs, os.Environ())
 	},
+	DisableFlagParsing: true,
 }
 
 func init() {
