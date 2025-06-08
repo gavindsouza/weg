@@ -177,11 +177,9 @@ func CloneRepos(repos []FrappeApp, baseDir string) error {
 
 			// Skip if already cloned
 			if _, err := os.Stat(target); err == nil {
-				fmt.Printf("[skip] %s already exists\n", r.Name)
 				return
 			}
 
-			fmt.Printf("Cloning %s into %s...\n", r.Url, target)
 			cmd := exec.Command("git", "clone", "--depth=1", r.Url, target)
 			output, err := cmd.CombinedOutput()
 			if err != nil {
