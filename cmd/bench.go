@@ -10,8 +10,9 @@ import (
 )
 
 var benchCmd = &cobra.Command{
-	Use:   "bench [args]",
-	Short: "Run bench commands via weg",
+	Use:     "bench [args]",
+	Short:   "Run bench commands via weg",
+	Aliases: []string{"b"},
 	Run: func(cmd *cobra.Command, args []string) {
 		benchCli, err := exec.LookPath("bench")
 		if err != nil {
