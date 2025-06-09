@@ -53,7 +53,7 @@ func (pm *ProgressManager) AddBar(name string, total int) {
 	}
 
 	bar := progressbar.NewOptions(total,
-		progressbar.OptionSetDescription(name),
+		progressbar.OptionSetDescription("[cyan]["+fmt.Sprint(pm.barCount+1)+"/7][reset] "+name),
 		progressbar.OptionSetWriter(lineWriter),
 		progressbar.OptionShowCount(),
 		progressbar.OptionSetWidth(15),
@@ -63,8 +63,8 @@ func (pm *ProgressManager) AddBar(name string, total int) {
 		progressbar.OptionFullWidth(),
 		progressbar.OptionSetRenderBlankState(true),
 		progressbar.OptionSetTheme(progressbar.Theme{
-			Saucer:        "=",
-			SaucerHead:    ">",
+			Saucer:        "[green]=[reset]",
+			SaucerHead:    "[green]>[reset]",
 			SaucerPadding: " ",
 			BarStart:      "[",
 			BarEnd:        "]",
@@ -80,12 +80,12 @@ func (pm *ProgressManager) AddBar(name string, total int) {
 }
 
 func (pm *ProgressManager) Increment(name string) {
-	pm.mu.Lock()
-	defer pm.mu.Unlock()
-
 	if pm.disabled {
 		return
 	}
+
+	pm.mu.Lock()
+	defer pm.mu.Unlock()
 
 	if bar, exists := pm.bars[name]; exists {
 		bar.Add(1)
@@ -93,12 +93,12 @@ func (pm *ProgressManager) Increment(name string) {
 }
 
 func (pm *ProgressManager) Finish(name string) {
-	pm.mu.Lock()
-	defer pm.mu.Unlock()
-
 	if pm.disabled {
 		return
 	}
+
+	pm.mu.Lock()
+	defer pm.mu.Unlock()
 
 	if bar, exists := pm.bars[name]; exists {
 		bar.Finish()
