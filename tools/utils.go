@@ -2,9 +2,11 @@ package tools
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 	"sync"
 )
 
@@ -94,4 +96,58 @@ func WaitForErrors(wg *sync.WaitGroup, errChan chan error) error {
 
 	DebugLog("No errors found")
 	return nil
+}
+
+func extractAppName(url string) string {
+	// Remove .git suffix if present
+	url = strings.TrimSuffix(url, ".git")
+
+	// Handle SSH URLs (git@github.com:user/repo.git)
+	if strings.Contains(url, "@") {
+		parts := strings.Split(url, ":")
+		if len(parts) > 1 {
+			url = parts[1]
+		}
+	}
+
+	// Handle HTTP/HTTPS URLs (https://github.com/user/repo.git)
+	if strings.Contains(url, "://") {
+		parts := strings.Split(url, "/")
+		if len(parts) > 0 {
+			url = parts[len(parts)-1]
+		}
+	}
+
+	// Handle Azure DevOps URLs (https://dev.azure.com/org/project/_git/repo)
+	if strings.Contains(url, "dev.azure.com") {
+		parts := strings.Split(url, "/_git/")
+		if len(parts) > 1 {
+			url = parts[1]
+		}
+	}
+
+	return url
+}
+
+func ParseAppsJSON(jsonStr string) []FrappeApp {
+	config := []FrappeApp{}
+
+	if err := json.Unmarshal([]byte(jsonStr), &config); err != nil {
+		return config
+	}
+
+	apps := make([]FrappeApp, len(config))
+	for i, app := range config {
+		apps[i] = FrappeApp{
+			Url:    app.Url,
+			Branch: app.Branch,
+			Name: func() string {
+				if app.Name != "" {
+					return app.Name
+				}
+				return extractAppName(app.Url)
+			}(),
+		}
+	}
+	return apps
 }

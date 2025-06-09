@@ -11,20 +11,36 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var frappeVersion string
+var (
+	frappeVersion string
+	appsJSON      string
+)
 
 var createCmd = &cobra.Command{
 	Use:   "create [bench-name]",
 	Short: "Create a new Frappe bench with Devbox",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return create(args[0])
+		frappe := tools.FrappeApp{
+			Name:   "frappe",
+			Url:    "https://github.com/frappe/frappe",
+			Branch: frappeVersion,
+		}
+		otherApps := tools.ParseAppsJSON(appsJSON)
+		apps := append([]tools.FrappeApp{frappe}, otherApps...)
+		err := create(args[0], apps)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return nil
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(createCmd)
 	createCmd.Flags().StringVarP(&frappeVersion, "version", "v", "develop", "Frappe version to use")
+	createCmd.Flags().StringVar(&appsJSON, "apps", "[]", "JSON of apps to initialize bench with")
 }
 
 // getAppPaths returns a slice of app paths for the given apps
@@ -36,15 +52,22 @@ func getAppPaths(benchPath string, apps []tools.FrappeApp) []string {
 	return paths
 }
 
-func create(benchPath string) error {
+func create(benchPath string, apps []tools.FrappeApp) error {
+	success := false
+	defer func() {
+		if !success {
+			fmt.Printf("\nBench path: %s\n", benchPath)
+		}
+	}()
+
 	tools.DebugLog("Starting bench creation process")
 	pm := tools.NewProgressManager()
 
 	// Initialize progress bars for each major step
-	pm.AddBar("Creating directory structure", 4)  // apps, sites, config/pids, logs
-	pm.AddBar("Setting up environment", 2)        // .envrc, devbox init
-	pm.AddBar("Installing dependencies", 1)       // devbox add
-	pm.AddBar("Cloning Frappe apps", 4)           // frappe, erpnext, hrms, raven
+	pm.AddBar("Creating directory structure", 4) // apps, sites, config/pids, logs
+	pm.AddBar("Setting up environment", 2)       // .envrc, devbox init
+	pm.AddBar("Installing dependencies", 1)      // devbox add
+	pm.AddBar("Cloning Frappe apps", len(apps))
 	pm.AddBar("Setting up Python environment", 2) // pyproject.toml, uv venv
 	pm.AddBar("Installing app dependencies", 8)   // 4 apps * 2 (uv add + yarn install)
 	pm.AddBar("Setting up bench config", 3)       // config, redis, procfile
@@ -74,12 +97,6 @@ func create(benchPath string) error {
 
 	// Get packages and apps before starting goroutines
 	var packages, _ = tools.GetDependencies(frappeVersion)
-	var apps = []tools.FrappeApp{
-		{Url: "https://github.com/frappe/frappe.git", Name: "frappe", Branch: "develop"},
-		{Url: "https://github.com/frappe/erpnext.git", Name: "erpnext", Branch: "develop"},
-		{Url: "https://github.com/frappe/hrms.git", Name: "hrms", Branch: "develop"},
-		{Url: "https://github.com/The-Commit-Company/Raven.git", Name: "raven", Branch: "develop"},
-	}
 
 	tools.DebugLog("Starting parallel operations (dependencies and git clone)")
 	// Start both devbox installation and git clone in parallel
@@ -214,6 +231,7 @@ func create(benchPath string) error {
 
 	tools.DebugLog("Bench creation completed successfully")
 	fmt.Printf("\n\n✅ Bench created successfully at %s\n", benchPath)
+	success = true
 	return nil
 }
 
