@@ -16,4 +16,20 @@ Weg (वेग - Marathi for "fast" or German for "way") is a command-line inter
 
 ## Installation
 
+Download `weg` binary or compile from source.
+
+## Usage
+
+### Creating a new Bench
+
+Pass the versions of the apps you want
+
+```bash
+weg create $HOME/.weg-bench-$(date +%s) --apps '[{"Url": "https://github.com/The-Commit-Company/raven"}, {"Url": "https://github.com/frappe/erpnext", "Branch": "v15.64.1"}]' -v 'v15.69.3'
+```
+
+>![NOTE]
+> Branch takes vaid git tags and branches as input and handles system dependency management automatically.
+
+
 ## License

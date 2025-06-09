@@ -180,7 +180,14 @@ func CloneRepos(repos []FrappeApp, baseDir string) error {
 				return
 			}
 
-			cmd := exec.Command("git", "clone", "--depth=1", r.Url, target)
+			// Clone with branch if specified
+			args := []string{"clone", "--depth=1"}
+			if r.Branch != "" {
+				args = append(args, "-b", r.Branch)
+			}
+			args = append(args, r.Url, target)
+
+			cmd := exec.Command("git", args...)
 			output, err := cmd.CombinedOutput()
 			if err != nil {
 				errChan <- fmt.Errorf("failed to clone %s: %v\n%s", r.Url, err, string(output))

@@ -68,9 +68,9 @@ func create(benchPath string, apps []tools.FrappeApp) error {
 	pm.AddBar("Setting up environment", 2)       // .envrc, devbox init
 	pm.AddBar("Installing dependencies", 1)      // devbox add
 	pm.AddBar("Cloning Frappe apps", len(apps))
-	pm.AddBar("Setting up Python environment", 2) // pyproject.toml, uv venv
-	pm.AddBar("Installing app dependencies", 8)   // 4 apps * 2 (uv add + yarn install)
-	pm.AddBar("Setting up bench config", 3)       // config, redis, procfile
+	pm.AddBar("Setting up Python environment", 2)         // pyproject.toml, uv venv
+	pm.AddBar("Installing app dependencies", len(apps)*2) // N apps * 2 (uv add + yarn install)
+	pm.AddBar("Setting up bench config", 3)               // config, redis, procfile
 
 	tools.DebugLog("Creating directory structure")
 	// Create directory structure

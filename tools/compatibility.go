@@ -1,6 +1,9 @@
 package tools
 
-import "fmt"
+import (
+	"fmt"
+	"regexp"
+)
 
 type Dependency struct {
 	Name    string `json:"name"`
@@ -8,8 +11,9 @@ type Dependency struct {
 }
 
 type FrappeVersion struct {
-	Version      string       `json:"version"`
-	Dependencies []Dependency `json:"dependencies"`
+	Version        string       `json:"version"`
+	VersionPattern string       `json:"versionPattern"`
+	Dependencies   []Dependency `json:"dependencies"`
 }
 
 type Frappe struct {
@@ -19,7 +23,8 @@ type Frappe struct {
 var frappe = Frappe{
 	Versions: []FrappeVersion{
 		{
-			Version: "14.x.x",
+			Version:        "14.x.x",
+			VersionPattern: `^(v?14\.|version-14(-.*)?)`,
 			Dependencies: []Dependency{
 				{Name: "python", Version: "3.10"},
 				{Name: "nodejs", Version: "16"},
@@ -32,17 +37,19 @@ var frappe = Frappe{
 			},
 		},
 		{
-			Version: "15.x.x",
+			Version:        "15.x.x",
+			VersionPattern: `^(v?15\.|version-15(-.*)?)`,
 			Dependencies: []Dependency{
-				{Name: "python3.10", Version: "3.10"},
+				{Name: "python", Version: "3.10"},
 				{Name: "nodejs", Version: "18"},
-				{Name: "redis-server", Version: "6.2"},
-				{Name: "mariadb-server", Version: "10.6"},
-				{Name: "wkhtmltopdf", Version: "0.12.6-1"},
+				{Name: "redis", Version: "6.2"},
+				{Name: "mariadb", Version: "10.6"},
+				{Name: "wkhtmltopdf", Version: "0.12.6"},
 			},
 		},
 		{
-			Version: "develop",
+			Version:        "develop",
+			VersionPattern: `^develop$`,
 			Dependencies: []Dependency{
 				{Name: "python", Version: "3.13"},
 				{Name: "nodejs", Version: "22"},
@@ -57,7 +64,8 @@ var frappe = Frappe{
 
 func GetDependencies(version string) ([]Dependency, error) {
 	for _, v := range frappe.Versions {
-		if v.Version == version {
+		matched, _ := regexp.MatchString(v.VersionPattern, version)
+		if matched {
 			return v.Dependencies, nil
 		}
 	}
