@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"archive/zip"
 	"compress/gzip"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -20,7 +21,7 @@ var tools = []Tool{
 	{
 		Name:       "devbox",
 		CheckCmd:   "devbox",
-		InstallURL: "https://github.com/jetify-com/devbox/releases/latest/download/devbox_%s_%s.tar.gz",
+		InstallURL: "https://github.com/jetify-com/devbox/releases/download/%s/devbox_%s_%s_%s.tar.gz",
 		BinName:    "devbox",
 		Archive:    "tar.gz",
 	},
@@ -61,10 +62,36 @@ func EnsureToolsInstalled() {
 	}
 }
 
+func getLatestRelease(owner, repo string) (string, error) {
+	resp, err := http.Get(fmt.Sprintf("https://api.github.com/repos/%s/%s/releases/latest", owner, repo))
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		TagName string `json:"tag_name"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", err
+	}
+	return strings.TrimPrefix(result.TagName, "v"), nil
+}
+
 func installTool(tool Tool) error {
 	osType := runtime.GOOS
 	arch := runtime.GOARCH
-	url := fmt.Sprintf(tool.InstallURL, osType, arch)
+	var url string
+
+	if tool.Name == "devbox" {
+		latest, err := getLatestRelease("jetify-com", "devbox")
+		if err != nil {
+			return fmt.Errorf("failed to get latest devbox release: %w", err)
+		}
+		url = fmt.Sprintf(tool.InstallURL, latest, latest, osType, arch)
+	} else {
+		url = fmt.Sprintf(tool.InstallURL, osType, arch)
+	}
 
 	localBin := filepath.Join(os.Getenv("HOME"), ".local", "bin")
 	os.MkdirAll(localBin, 0755)
