@@ -9,6 +9,7 @@ import (
 
 	"github.com/gavindsouza/weg/tools"
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 )
 
 var (
@@ -188,7 +189,9 @@ func create(benchPath string, apps []tools.FrappeApp) error {
 	// Now start the remaining bench setup commands in parallel
 	// setupWg.Add(2)
 	tools.RunAsync(&setupWg, setupErrChan, pm, "bench", benchPath, []string{"setup", "redis"}, "Setting up bench config")
-	tools.RunAsync(&setupWg, setupErrChan, pm, "bench", benchPath, []string{"setup", "procfile"}, "Setting up bench config")
+
+	// NOTE: Remove setup procfile in favour of using devbox services
+	// tools.RunAsync(&setupWg, setupErrChan, pm, "bench", benchPath, []string{"setup", "procfile"}, "Setting up bench config")
 
 	tools.DebugLog("Setting up app dependencies")
 	// Setup requirements js & python
@@ -231,6 +234,11 @@ func create(benchPath string, apps []tools.FrappeApp) error {
 
 	tools.DebugLog("Bench creation completed successfully")
 	fmt.Printf("\n\n✅ Bench created successfully at %s\n", benchPath)
+
+	if err := writeOrUpdateDevboxServices(benchPath); err != nil {
+		return fmt.Errorf("failed to write devbox.yaml: %w", err)
+	}
+
 	success = true
 	return nil
 }
@@ -327,4 +335,49 @@ func createAppsTxt(benchPath string, apps []tools.FrappeApp) error {
 		}
 	}
 	return nil
+}
+
+func writeOrUpdateDevboxServices(benchPath string) error {
+	devboxFile := filepath.Join(benchPath, "process-compose.yaml")
+
+	// Define the services
+	services := map[string]map[string]any{
+		"redis":       {"disabled": true},
+		"redis_cache": {"command": "redis-server config/redis_cache.conf"},
+		"redis_queue": {"command": "redis-server config/redis_queue.conf"},
+		"web":         {"command": "bench serve --port 8000"},
+		"socketio":    {"command": filepath.Join(benchPath, ".devbox/nix/profile/default/bin/node") + " apps/frappe/socketio.js"},
+		"watch":       {"command": "bench watch"},
+		"schedule":    {"command": "bench schedule"},
+		"worker":      {"command": "bench worker 1>> logs/worker.log 2>> logs/worker.error.log"},
+	}
+
+	var devboxConfig map[string]any
+
+	// If devbox.yaml exists, read and unmarshal it
+	if _, err := os.Stat(devboxFile); err == nil {
+		f, err := os.Open(devboxFile)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		if err := yaml.NewDecoder(f).Decode(&devboxConfig); err != nil {
+			return err
+		}
+	} else {
+		devboxConfig = make(map[string]any)
+	}
+
+	// Set or update the services
+	devboxConfig["processes"] = services
+
+	// Write back to devbox.yaml
+	f, err := os.Create(devboxFile)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	enc := yaml.NewEncoder(f)
+	defer enc.Close()
+	return enc.Encode(devboxConfig)
 }
