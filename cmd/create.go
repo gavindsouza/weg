@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"slices"
 	"sync"
+	"time"
 
 	"github.com/gavindsouza/weg/tools"
 	"github.com/spf13/cobra"
@@ -54,6 +55,7 @@ func getAppPaths(benchPath string, apps []tools.FrappeApp) []string {
 }
 
 func create(benchPath string, apps []tools.FrappeApp) error {
+	startTime := time.Now()
 	success := false
 	defer func() {
 		if !success {
@@ -233,7 +235,8 @@ func create(benchPath string, apps []tools.FrappeApp) error {
 	pm.Finish("Setting up bench config")
 
 	tools.DebugLog("Bench creation completed successfully")
-	fmt.Printf("\n\n✅ Bench created successfully at %s\n", benchPath)
+	duration := time.Since(startTime)
+	fmt.Printf("\n✅ Bench created in %v at %s\n", duration.Round(time.Second), benchPath)
 
 	if err := writeOrUpdateDevboxServices(benchPath); err != nil {
 		return fmt.Errorf("failed to write devbox.yaml: %w", err)
@@ -345,11 +348,15 @@ func writeOrUpdateDevboxServices(benchPath string) error {
 		"redis":       {"disabled": true},
 		"redis_cache": {"command": "redis-server config/redis_cache.conf"},
 		"redis_queue": {"command": "redis-server config/redis_queue.conf"},
-		"web":         {"command": "bench serve --port 8000"},
-		"socketio":    {"command": filepath.Join(benchPath, ".devbox/nix/profile/default/bin/node") + " apps/frappe/socketio.js"},
-		"watch":       {"command": "bench watch"},
-		"schedule":    {"command": "bench schedule"},
-		"worker":      {"command": "bench worker 1>> logs/worker.log 2>> logs/worker.error.log"},
+		"mariadb": {
+			"command":  "mysqld_safe --socket=" + filepath.Join(benchPath, "data/mariadb.sock") + " --skip-networking --port=0 --console",
+			"disabled": false, // Disabled by default, user can enable manually
+		},
+		"web":      {"command": "bench serve --port 8000"},
+		"socketio": {"command": filepath.Join(benchPath, ".devbox/nix/profile/default/bin/node") + " apps/frappe/socketio.js"},
+		"watch":    {"command": "bench watch"},
+		"schedule": {"command": "bench schedule"},
+		"worker":   {"command": "bench worker 1>> logs/worker.log 2>> logs/worker.error.log"},
 	}
 
 	var devboxConfig map[string]any

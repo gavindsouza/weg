@@ -26,7 +26,7 @@ var doctorCmd = &cobra.Command{
 	},
 }
 
-var updateCmd = &cobra.Command{
+var selfUpdateCmd = &cobra.Command{
 	Use:   "update",
 	Short: "Update weg to the latest version",
 	Run: func(cmd *cobra.Command, args []string) {
@@ -37,6 +37,6 @@ var updateCmd = &cobra.Command{
 func init() {
 	selfCmd.AddCommand(installCmd)
 	selfCmd.AddCommand(doctorCmd)
-	selfCmd.AddCommand(updateCmd)
+	selfCmd.AddCommand(selfUpdateCmd)
 	rootCmd.AddCommand(selfCmd)
 }

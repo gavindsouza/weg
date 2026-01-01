@@ -1,0 +1,129 @@
+package app
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"text/tabwriter"
+
+	"github.com/gavindsouza/weg/internal/apps"
+	"github.com/gavindsouza/weg/internal/config"
+	"github.com/gavindsouza/weg/internal/state"
+	"github.com/spf13/cobra"
+)
+
+var listCmd = &cobra.Command{
+	Use:     "list",
+	Aliases: []string{"ls"},
+	Short:   "List apps in the project",
+	Long: `List all apps configured in the project.
+
+Shows both configured apps (from weg.toml or pyproject.toml) and
+their installation status.
+
+Examples:
+  weg app list
+  weg app ls`,
+	RunE: runList,
+}
+
+func runList(cmd *cobra.Command, args []string) error {
+	path := "."
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return fmt.Errorf("invalid path: %w", err)
+	}
+
+	result, err := config.DetectContext(absPath)
+	if err != nil {
+		return fmt.Errorf("failed to detect context: %w", err)
+	}
+
+	var benchPath, appsDir string
+	var configuredApps map[string]config.AppSettings
+
+	switch result.Context {
+	case config.ContextWegBench:
+		benchPath = absPath
+		appsDir = filepath.Join(benchPath, "apps")
+		benchConfig, err := config.ParseWegToml(absPath)
+		if err != nil {
+			return fmt.Errorf("failed to parse weg.toml: %w", err)
+		}
+		configuredApps = benchConfig.Apps
+
+	case config.ContextWegApp:
+		benchPath = filepath.Join(absPath, ".weg")
+		appsDir = filepath.Join(benchPath, "apps")
+		// For app-centric, show the main app and dependencies
+		appConfig, err := config.ParsePyproject(absPath)
+		if err != nil {
+			return fmt.Errorf("failed to parse pyproject.toml: %w", err)
+		}
+		configuredApps = make(map[string]config.AppSettings)
+		configuredApps["frappe"] = config.AppSettings{
+			URL:    "https://github.com/frappe/frappe",
+			Branch: "version-" + appConfig.Dev.Frappe,
+		}
+		configuredApps[filepath.Base(absPath)] = config.AppSettings{
+			Path: absPath,
+		}
+		for _, dep := range appConfig.Dependencies.Apps {
+			configuredApps[dep.Name] = config.AppSettings{
+				URL:    dep.URL,
+				Branch: dep.Branch,
+			}
+		}
+
+	default:
+		return fmt.Errorf("not a weg-managed project")
+	}
+
+	// Load state
+	st, err := state.Load(absPath)
+	if err != nil {
+		st = state.NewState()
+	}
+
+	// Print table
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(w, "NAME\tBRANCH\tSTATUS\tSOURCE")
+
+	for name, appCfg := range configuredApps {
+		branch := appCfg.Branch
+		if branch == "" && appCfg.Path != "" {
+			branch = "(local)"
+		}
+
+		status := "not installed"
+		if st.HasApp(name) {
+			appPath := filepath.Join(appsDir, name)
+			if apps.IsGitRepo(appPath) {
+				status = "installed"
+				// Get actual branch
+				if actualBranch, err := apps.GetCurrentBranch(appPath); err == nil {
+					if branch != "" && actualBranch != branch {
+						status = fmt.Sprintf("installed (%s)", actualBranch)
+					}
+				}
+			}
+		}
+
+		source := appCfg.URL
+		if appCfg.Path != "" {
+			source = appCfg.Path
+		}
+		if len(source) > 50 {
+			source = "..." + source[len(source)-47:]
+		}
+
+		if appCfg.Excluded {
+			status = "excluded"
+		}
+
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", name, branch, status, source)
+	}
+
+	w.Flush()
+	return nil
+}
