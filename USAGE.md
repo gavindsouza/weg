@@ -4,6 +4,28 @@
 
 Weg is a modern CLI for managing Frappe development environments. It replaces the traditional `bench` CLI with faster, declarative tooling.
 
+## Creating a New App
+
+```bash
+# Create new app in new directory
+weg new my-awesome-app
+
+# Create app in current directory (existing content preserved)
+weg new .
+
+# With options
+weg new my-app --version 15 --database mariadb
+
+# Non-interactive (use defaults)
+weg new my-app -y
+```
+
+This creates:
+- `my_app/` module with hooks.py, __init__.py
+- `pyproject.toml` with [tool.weg] config
+- `.weg/` development environment
+- README.md, .gitignore
+
 ## Quick Reference
 
 ```bash
