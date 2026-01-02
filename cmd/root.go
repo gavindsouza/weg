@@ -10,6 +10,7 @@ import (
 	"github.com/gavindsouza/weg/cmd/api"
 	"github.com/gavindsouza/weg/cmd/app"
 	"github.com/gavindsouza/weg/cmd/bench"
+	"github.com/gavindsouza/weg/cmd/cache"
 	"github.com/gavindsouza/weg/cmd/cloud"
 	"github.com/gavindsouza/weg/cmd/config"
 	"github.com/gavindsouza/weg/cmd/docker"
@@ -79,12 +80,13 @@ func init() {
 	// Add subcommand groups
 	rootCmd.AddCommand(api.ApiCmd)
 	rootCmd.AddCommand(app.AppCmd)
-	rootCmd.AddCommand(site.SiteCmd)
 	rootCmd.AddCommand(bench.BenchCmd)
-	rootCmd.AddCommand(image.ImageCmd)
-	rootCmd.AddCommand(docker.DockerCmd)
+	rootCmd.AddCommand(cache.CacheCmd)
 	rootCmd.AddCommand(cloud.CloudCmd)
 	rootCmd.AddCommand(config.ConfigCmd)
+	rootCmd.AddCommand(docker.DockerCmd)
+	rootCmd.AddCommand(image.ImageCmd)
+	rootCmd.AddCommand(site.SiteCmd)
 }
 
 // initConfig reads in config file and ENV variables if set
