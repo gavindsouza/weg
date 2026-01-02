@@ -1,0 +1,96 @@
+package cmd
+
+import (
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+
+	"github.com/gavindsouza/weg/internal/config"
+	"github.com/gavindsouza/weg/internal/runtime"
+	"github.com/spf13/cobra"
+)
+
+var browseCmd = &cobra.Command{
+	Use:   "browse [site]",
+	Short: "Open site in browser with auto-login",
+	Long: `Opens the site in browser, automatically logging in as Administrator.
+
+Examples:
+  weg browse                    # Open default site as Administrator
+  weg browse --user hr@test.com # Open as specific user
+  weg browse mysite.localhost   # Open specific site`,
+	RunE:         runBrowse,
+	SilenceUsage: true,
+}
+
+var browseUser string
+
+func init() {
+	rootCmd.AddCommand(browseCmd)
+	browseCmd.Flags().StringVarP(&browseUser, "user", "u", "Administrator", "User to login as")
+}
+
+func runBrowse(cmd *cobra.Command, args []string) error {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	result, err := config.DetectContext(cwd)
+	if err != nil {
+		return fmt.Errorf("failed to detect context: %w", err)
+	}
+
+	var benchPath string
+	switch result.Context {
+	case config.ContextWegBench:
+		benchPath = cwd
+	case config.ContextWegApp:
+		benchPath = filepath.Join(cwd, ".weg")
+	default:
+		return fmt.Errorf("not a weg-managed project")
+	}
+
+	// Get site
+	var site string
+	if len(args) > 0 {
+		site = args[0]
+	} else {
+		site = getDefaultSite(benchPath, result)
+		if site == "" {
+			return fmt.Errorf("no site found. Create one with 'weg sync'")
+		}
+	}
+
+	// Check for runtime config to get correct port
+	rtConfig, err := runtime.Load(benchPath)
+	if err != nil {
+		// Fall back to default port if runtime config doesn't exist
+		rtConfig = &runtime.Config{
+			Ports: runtime.DefaultPorts(),
+		}
+	}
+
+	// Run frappe browse via devbox
+	sitesDir := filepath.Join(benchPath, "sites")
+	shellCmd := fmt.Sprintf("cd %s && ../.venv/bin/python -m frappe.utils.bench_helper frappe --site %s browse --user %s",
+		sitesDir, site, browseUser)
+
+	execCmd := exec.Command("devbox", "run", "-c", benchPath, "--", "sh", "-c", shellCmd)
+	execCmd.Stdout = os.Stdout
+	execCmd.Stderr = os.Stderr
+	execCmd.Stdin = os.Stdin
+
+	if err := execCmd.Run(); err != nil {
+		// Check if it's just stderr output (not a real error)
+		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() != 0 {
+			return fmt.Errorf("browse failed: %w", err)
+		}
+	}
+
+	// Also print the URL for convenience
+	PrintInfo("Site URL: http://%s:%d", site, rtConfig.Ports.Web)
+
+	return nil
+}

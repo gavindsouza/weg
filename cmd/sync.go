@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -393,8 +394,14 @@ func applyAppChanges(path string, cfg *config.AppConfig, st *state.State, diff *
 		PrintVerbose("Warning: failed to update apps.txt: %v", err)
 	}
 
+	// Setup asset symlinks for static files
+	if err := setupAssets(wegDir); err != nil {
+		PrintVerbose("Warning: failed to setup assets: %v", err)
+	}
+
 	// Ensure common_site_config.json exists with redis config
-	if err := ensureCommonSiteConfig(wegDir); err != nil {
+	// For pyproject.toml based projects, use defaults (nil config)
+	if err := ensureCommonSiteConfig(wegDir, nil); err != nil {
 		PrintVerbose("Warning: failed to create common_site_config.json: %v", err)
 	}
 
@@ -492,8 +499,13 @@ func applyBenchChanges(path string, cfg *config.BenchConfig, st *state.State, di
 		return fmt.Errorf("failed to update apps.txt: %w", err)
 	}
 
-	// Ensure common_site_config.json exists with redis config
-	if err := ensureCommonSiteConfig(path); err != nil {
+	// Setup asset symlinks for static files
+	if err := setupAssets(path); err != nil {
+		PrintVerbose("Warning: failed to setup assets: %v", err)
+	}
+
+	// Ensure common_site_config.json exists with settings from weg.toml
+	if err := ensureCommonSiteConfig(path, cfg); err != nil {
 		PrintVerbose("Warning: failed to create common_site_config.json: %v", err)
 	}
 
@@ -611,24 +623,99 @@ func updateAppsTxt(benchPath string, st *state.State) error {
 	return os.WriteFile(appsTxtPath, []byte(content), 0644)
 }
 
-// ensureCommonSiteConfig creates common_site_config.json with redis URLs for devbox
-func ensureCommonSiteConfig(benchPath string) error {
+// setupAssets creates symlinks for app assets in sites/assets/
+// This is required for Frappe to serve static files (images, css, js, etc.)
+func setupAssets(benchPath string) error {
+	appsDir := filepath.Join(benchPath, "apps")
+	assetsDir := filepath.Join(benchPath, "sites", "assets")
+
+	// Ensure assets directory exists
+	if err := os.MkdirAll(assetsDir, 0755); err != nil {
+		return fmt.Errorf("failed to create assets directory: %w", err)
+	}
+
+	// Read apps directory
+	entries, err := os.ReadDir(appsDir)
+	if err != nil {
+		return fmt.Errorf("failed to read apps directory: %w", err)
+	}
+
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+
+		appName := entry.Name()
+		// App's public directory: apps/{app}/{app}/public/
+		publicDir := filepath.Join(appsDir, appName, appName, "public")
+
+		if _, err := os.Stat(publicDir); os.IsNotExist(err) {
+			// Try without nested directory (some apps have public at root)
+			publicDir = filepath.Join(appsDir, appName, "public")
+			if _, err := os.Stat(publicDir); os.IsNotExist(err) {
+				continue // No public directory
+			}
+		}
+
+		// Create symlink: sites/assets/{app} -> apps/{app}/{app}/public/
+		assetLink := filepath.Join(assetsDir, appName)
+
+		// Remove existing link/directory if it exists
+		if info, err := os.Lstat(assetLink); err == nil {
+			if info.Mode()&os.ModeSymlink != 0 {
+				// It's a symlink, check if it points to the right place
+				target, _ := os.Readlink(assetLink)
+				if target == publicDir {
+					continue // Already correct
+				}
+			}
+			os.RemoveAll(assetLink)
+		}
+
+		// Create relative symlink
+		relPath, err := filepath.Rel(assetsDir, publicDir)
+		if err != nil {
+			relPath = publicDir // Fall back to absolute
+		}
+
+		if err := os.Symlink(relPath, assetLink); err != nil {
+			PrintVerbose("Warning: failed to create asset symlink for %s: %v", appName, err)
+		}
+	}
+
+	return nil
+}
+
+// ensureCommonSiteConfig creates common_site_config.json from weg.toml config
+// If benchConfig is nil, uses defaults
+func ensureCommonSiteConfig(benchPath string, benchConfig *config.BenchConfig) error {
 	sitesDir := filepath.Join(benchPath, "sites")
 	configPath := filepath.Join(sitesDir, "common_site_config.json")
 
-	// Only create if it doesn't exist
-	if _, err := os.Stat(configPath); err == nil {
-		return nil
+	var cfg map[string]interface{}
+
+	if benchConfig != nil {
+		// Generate config from weg.toml settings
+		cfg = benchConfig.GenerateCommonSiteConfig(nil)
+	} else {
+		// Use defaults
+		cfg = map[string]interface{}{
+			"redis_cache":    "redis://localhost:6379/0",
+			"redis_queue":    "redis://localhost:6379/1",
+			"redis_socketio": "redis://localhost:6379/2",
+			"webserver_port": 8000,
+			"socketio_port":  9000,
+			"developer_mode": 1,
+		}
 	}
 
-	// For devbox projects, use single redis instance with different DBs
-	config := `{
-    "redis_cache": "redis://localhost:6379/0",
-    "redis_queue": "redis://localhost:6379/1",
-    "redis_socketio": "redis://localhost:6379/2"
-}
-`
-	return os.WriteFile(configPath, []byte(config), 0644)
+	// Write config
+	data, err := json.MarshalIndent(cfg, "", "    ")
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(configPath, data, 0644)
 }
 
 // Real implementations using internal/apps package
@@ -765,13 +852,8 @@ func createSite(sitesDir string, cfg *config.SiteConfig, appsToInstall []string)
 		return fmt.Errorf("failed to create site: %w", err)
 	}
 
-	// Set as default site if configured
-	if cfg.DefaultSite {
-		currentSitePath := filepath.Join(sitesDir, "currentsite.txt")
-		if err := os.WriteFile(currentSitePath, []byte(cfg.Name), 0644); err != nil {
-			PrintVerbose("Warning: could not set default site: %v", err)
-		}
-	}
+	// Note: currentsite.txt is deprecated in Frappe v15+
+	// Users should pass --site explicitly or use 'bench use <site>'
 
 	return nil
 }

@@ -185,11 +185,38 @@ func IsInsideApp(path string) bool {
 	return found
 }
 
-// hasHooksPy checks if hooks.py exists in the directory
+// hasHooksPy checks if hooks.py exists in the directory or a subdirectory module
 func hasHooksPy(path string) bool {
+	// Check direct hooks.py
 	hooksPath := filepath.Join(path, "hooks.py")
-	_, err := os.Stat(hooksPath)
-	return err == nil
+	if _, err := os.Stat(hooksPath); err == nil {
+		return true
+	}
+
+	// Check for hooks.py in a subdirectory (app module)
+	// For app-centric projects, hooks.py is in <project>/<module>/hooks.py
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		return false
+	}
+
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		// Skip hidden directories and common non-app directories
+		name := entry.Name()
+		if name[0] == '.' || name == "node_modules" || name == "docs" || name == "tests" {
+			continue
+		}
+
+		moduleHooksPath := filepath.Join(path, name, "hooks.py")
+		if _, err := os.Stat(moduleHooksPath); err == nil {
+			return true
+		}
+	}
+
+	return false
 }
 
 // dirExists checks if a directory exists

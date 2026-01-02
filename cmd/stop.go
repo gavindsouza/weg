@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/gavindsouza/weg/internal/config"
+	"github.com/gavindsouza/weg/internal/runtime"
 	"github.com/gavindsouza/weg/internal/services"
 	"github.com/spf13/cobra"
 )
@@ -52,6 +53,11 @@ func runStop(cmd *cobra.Command, args []string) error {
 	PrintInfo("Stopping services...")
 	if err := mgr.Stop(); err != nil {
 		return err
+	}
+
+	// Clean up runtime config
+	if err := runtime.Remove(benchPath); err != nil {
+		PrintVerbose("Warning: failed to remove runtime config: %v", err)
 	}
 
 	PrintInfo("Services stopped.")

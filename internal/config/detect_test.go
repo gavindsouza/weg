@@ -138,11 +138,14 @@ func TestFindBenchRoot(t *testing.T) {
 func TestFindAppRoot(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	// Create app structure
-	appDir := filepath.Join(tmpDir, "myapp")
+	// Create an isolated parent directory to test "outside app" scenario
+	// This avoids the subdirectory detection in hasHooksPy
+	parentDir := filepath.Join(tmpDir, "parent")
+	appDir := filepath.Join(parentDir, "myapp")
 	subDir := filepath.Join(appDir, "myapp", "doctype")
 
 	os.MkdirAll(subDir, 0755)
+	os.MkdirAll(parentDir, 0755)
 	os.WriteFile(filepath.Join(appDir, "hooks.py"), []byte("# hooks"), 0644)
 
 	// Test from subdirectory
@@ -163,7 +166,11 @@ func TestFindAppRoot(t *testing.T) {
 		t.Errorf("expected app root %s, got %s", appDir, appRoot)
 	}
 
-	// Test from outside app
+	// Test from outside app (parentDir has no hooks.py and no subdir with hooks.py)
+	// Note: hasHooksPy checks subdirectories, so we need to ensure parentDir/myapp/hooks.py
+	// exists, which means parentDir WILL be detected as app root due to app-centric detection.
+	// To truly test "outside", use tmpDir which has parentDir as subdir but parentDir doesn't
+	// have hooks.py at its top level - only in myapp subdirectory which is nested.
 	_, found = FindAppRoot(tmpDir)
 	if found {
 		t.Error("expected not to find app root from outside")

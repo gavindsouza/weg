@@ -18,7 +18,7 @@ var installCmd = &cobra.Command{
 	},
 }
 
-var doctorCmd = &cobra.Command{
+var selfDoctorCmd = &cobra.Command{
 	Use:   "doctor",
 	Short: "Check system setup and environment compatibility",
 	Run: func(cmd *cobra.Command, args []string) {
@@ -36,7 +36,7 @@ var selfUpdateCmd = &cobra.Command{
 
 func init() {
 	selfCmd.AddCommand(installCmd)
-	selfCmd.AddCommand(doctorCmd)
+	selfCmd.AddCommand(selfDoctorCmd)
 	selfCmd.AddCommand(selfUpdateCmd)
 	rootCmd.AddCommand(selfCmd)
 }

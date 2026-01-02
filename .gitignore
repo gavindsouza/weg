@@ -1,1 +1,10 @@
+# Built binaries
 weg
+weg-test
+weg-*
+
+# IDE/Editor
+.claude/
+.specify/
+.idea/
+.vscode/

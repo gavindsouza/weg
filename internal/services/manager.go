@@ -5,13 +5,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"syscall"
 )
 
 // Manager handles service lifecycle
 type Manager struct {
-	BenchPath string
-	Verbose   bool
+	BenchPath          string
+	Verbose            bool
+	ProcessComposePort int
 }
 
 // NewManager creates a new service manager
@@ -57,25 +57,17 @@ func (m *Manager) startWithDevbox() error {
 		return fmt.Errorf("process-compose.yaml not found. Run 'weg sync' first")
 	}
 
-	// Build the command: devbox run -- process-compose up -f process-compose.yaml
-	devboxPath, err := exec.LookPath("devbox")
-	if err != nil {
-		return fmt.Errorf("devbox not found. Install it from https://www.jetify.com/devbox")
+	// Run process-compose via devbox
+	args := []string{"run", "-c", m.BenchPath, "--", "process-compose", "up", "-f", composePath}
+	if m.ProcessComposePort > 0 {
+		args = append(args, "-p", fmt.Sprintf("%d", m.ProcessComposePort))
 	}
-
-	// Use exec to replace current process (allows Ctrl+C handling)
-	args := []string{"devbox", "run", "-c", m.BenchPath, "--", "process-compose", "up", "-f", composePath}
-	if err := syscall.Exec(devboxPath, args, os.Environ()); err != nil {
-		// Fallback to normal execution if exec fails
-		cmd := exec.Command(devboxPath, "run", "-c", m.BenchPath, "--", "process-compose", "up", "-f", composePath)
-		cmd.Dir = m.BenchPath
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		cmd.Stdin = os.Stdin
-		return cmd.Run()
-	}
-
-	return nil
+	cmd := exec.Command("devbox", args...)
+	cmd.Dir = m.BenchPath
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Stdin = os.Stdin
+	return cmd.Run()
 }
 
 // startWithProcessCompose starts services using process-compose directly
@@ -94,19 +86,17 @@ func (m *Manager) startWithProcessCompose() error {
 	}
 
 	// Start process-compose
-	cmd := exec.Command(pcPath, "up", "-f", composePath)
+	args := []string{"up", "-f", composePath}
+	if m.ProcessComposePort > 0 {
+		args = append(args, "-p", fmt.Sprintf("%d", m.ProcessComposePort))
+	}
+	cmd := exec.Command(pcPath, args...)
 	cmd.Dir = m.BenchPath
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
 
-	// Use exec to replace current process (allows Ctrl+C handling)
-	if err := syscall.Exec(pcPath, []string{"process-compose", "up", "-f", composePath}, os.Environ()); err != nil {
-		// Fallback to normal execution if exec fails
-		return cmd.Run()
-	}
-
-	return nil
+	return cmd.Run()
 }
 
 // StartDetached starts services in the background
@@ -127,7 +117,11 @@ func (m *Manager) StartDetached() error {
 
 		// Start Frappe services via process-compose in background
 		composePath := filepath.Join(m.BenchPath, "process-compose.yaml")
-		cmd := exec.Command("devbox", "run", "-c", m.BenchPath, "--", "process-compose", "up", "-f", composePath, "-d")
+		args := []string{"run", "-c", m.BenchPath, "--", "process-compose", "up", "-f", composePath, "-D", "-t=false"}
+		if m.ProcessComposePort > 0 {
+			args = append(args, "-p", fmt.Sprintf("%d", m.ProcessComposePort))
+		}
+		cmd := exec.Command("devbox", args...)
 		cmd.Dir = m.BenchPath
 		output, err := cmd.CombinedOutput()
 		if err != nil {
@@ -142,7 +136,11 @@ func (m *Manager) StartDetached() error {
 		return fmt.Errorf("process-compose.yaml not found. Run 'weg sync' first")
 	}
 
-	cmd := exec.Command("process-compose", "up", "-f", composePath, "-d")
+	args := []string{"up", "-f", composePath, "-D", "-t=false"}
+	if m.ProcessComposePort > 0 {
+		args = append(args, "-p", fmt.Sprintf("%d", m.ProcessComposePort))
+	}
+	cmd := exec.Command("process-compose", args...)
 	cmd.Dir = m.BenchPath
 
 	output, err := cmd.CombinedOutput()
@@ -165,10 +163,11 @@ func (m *Manager) Stop() error {
 		// Stop devbox services
 		cmd := exec.Command("devbox", "services", "stop", "-c", m.BenchPath)
 		cmd.Dir = m.BenchPath
-		output, err := cmd.CombinedOutput()
-		if err != nil {
-			return fmt.Errorf("failed to stop services: %w\n%s", err, string(output))
-		}
+		cmd.CombinedOutput() // Ignore errors
+
+		// Kill any orphaned processes from this bench
+		m.killOrphanedProcesses()
+
 		return nil
 	}
 
@@ -176,13 +175,27 @@ func (m *Manager) Stop() error {
 
 	cmd := exec.Command("process-compose", "down", "-f", composePath)
 	cmd.Dir = m.BenchPath
+	cmd.CombinedOutput() // Ignore errors
 
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("failed to stop services: %w\n%s", err, string(output))
-	}
+	// Kill any orphaned processes
+	m.killOrphanedProcesses()
 
 	return nil
+}
+
+// killOrphanedProcesses kills any remaining frappe processes for this bench
+func (m *Manager) killOrphanedProcesses() {
+	sitesDir := filepath.Join(m.BenchPath, "sites")
+
+	// Kill processes that have the sites directory in their command line
+	// This catches gunicorn workers, bench commands, etc.
+	cmd := exec.Command("pkill", "-f", sitesDir)
+	cmd.Run() // Ignore errors - may have nothing to kill
+
+	// Also kill any node processes running socketio from this bench
+	socketioPath := filepath.Join(m.BenchPath, "apps/frappe/socketio.js")
+	cmd = exec.Command("pkill", "-f", socketioPath)
+	cmd.Run() // Ignore errors
 }
 
 // Status shows the status of running services

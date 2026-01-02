@@ -8,6 +8,11 @@ import (
 	"os"
 
 	"github.com/gavindsouza/weg/cmd/app"
+	"github.com/gavindsouza/weg/cmd/bench"
+	"github.com/gavindsouza/weg/cmd/cloud"
+	"github.com/gavindsouza/weg/cmd/config"
+	"github.com/gavindsouza/weg/cmd/docker"
+	"github.com/gavindsouza/weg/cmd/image"
 	"github.com/gavindsouza/weg/cmd/site"
 	"github.com/spf13/cobra"
 )
@@ -72,6 +77,11 @@ func init() {
 	// Add subcommand groups
 	rootCmd.AddCommand(app.AppCmd)
 	rootCmd.AddCommand(site.SiteCmd)
+	rootCmd.AddCommand(bench.BenchCmd)
+	rootCmd.AddCommand(image.ImageCmd)
+	rootCmd.AddCommand(docker.DockerCmd)
+	rootCmd.AddCommand(cloud.CloudCmd)
+	rootCmd.AddCommand(config.ConfigCmd)
 }
 
 // initConfig reads in config file and ENV variables if set

@@ -68,9 +68,9 @@ type DatabaseConfig struct {
 
 // WebConfig contains web server configuration
 type WebConfig struct {
-	Port       int  `toml:"port,omitempty"`
-	SocketPort int  `toml:"socket_port,omitempty"`
-	DevMode    bool `toml:"dev_mode,omitempty"`
+	Port          int   `toml:"port,omitempty"`
+	SocketPort    int   `toml:"socket_port,omitempty"`
+	DeveloperMode *bool `toml:"developer_mode,omitempty"` // nil = default (true), explicit false = disabled
 }
 
 // ParseWegToml reads and parses a weg.toml file
@@ -135,6 +135,51 @@ func applyBenchDefaults(config *BenchConfig, path string) {
 	if config.Services.Web.SocketPort == 0 {
 		config.Services.Web.SocketPort = 9000
 	}
+	// Developer mode defaults to true for dev environments
+	// Note: We can't distinguish "not set" from "set to false" with bool,
+	// so we default to true. Users must explicitly set to false to disable.
+	// This is handled by checking if the entire Services.Web section is empty.
+}
+
+// GenerateCommonSiteConfig generates the common_site_config.json content from BenchConfig
+func (c *BenchConfig) GenerateCommonSiteConfig(runtimePorts *RuntimePorts) map[string]interface{} {
+	cfg := make(map[string]interface{})
+
+	// Redis configuration - for devbox, use single redis with different DBs
+	cfg["redis_cache"] = "redis://localhost:6379/0"
+	cfg["redis_queue"] = "redis://localhost:6379/1"
+	cfg["redis_socketio"] = "redis://localhost:6379/2"
+
+	// Web port - use runtime port if available, otherwise config default
+	if runtimePorts != nil && runtimePorts.Web > 0 {
+		cfg["webserver_port"] = runtimePorts.Web
+	} else {
+		cfg["webserver_port"] = c.Services.Web.Port
+	}
+
+	// SocketIO port - use runtime port if available, otherwise config default
+	if runtimePorts != nil && runtimePorts.SocketIO > 0 {
+		cfg["socketio_port"] = runtimePorts.SocketIO
+	} else {
+		cfg["socketio_port"] = c.Services.Web.SocketPort
+	}
+
+	// Developer mode - default true for dev environments
+	// nil = not set, default to enabled
+	// explicit false = disabled
+	if c.Services.Web.DeveloperMode == nil || *c.Services.Web.DeveloperMode {
+		cfg["developer_mode"] = 1
+	} else {
+		cfg["developer_mode"] = 0
+	}
+
+	return cfg
+}
+
+// RuntimePorts holds the actual ports allocated at runtime
+type RuntimePorts struct {
+	Web      int
+	SocketIO int
 }
 
 // resolveVersionBranch converts a version number to a branch name
