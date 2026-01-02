@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -888,9 +889,21 @@ func createSite(sitesDir string, cfg *config.SiteConfig, appsToInstall []string)
 
 func removeSite(sitesDir, name string) error {
 	sitePath := filepath.Join(sitesDir, name)
+	benchPath := filepath.Dir(sitesDir)
 
-	// TODO: Drop database before removing directory
 	PrintVerbose("Removing site: %s", sitePath)
+
+	// Try to drop database using bench drop-site first
+	// This properly removes the database before removing the directory
+	dropArgs := []string{"drop-site", name, "--force", "--no-backup"}
+	dropCmd := exec.Command("bench", dropArgs...)
+	dropCmd.Dir = benchPath
+
+	if err := dropCmd.Run(); err != nil {
+		// bench drop-site failed (maybe bench not available or database already gone)
+		// Fall back to just removing the directory
+		PrintVerbose("bench drop-site failed: %v, removing directory only", err)
+	}
 
 	return os.RemoveAll(sitePath)
 }
