@@ -45,19 +45,33 @@ func init() {
 }
 
 // getNextVersion returns the next Frappe version in the upgrade path
-func getNextVersion(current string) (string, error) {
-	switch current {
-	case "14":
-		return "15", nil
-	case "15":
-		return "16", nil
-	case "16":
-		return "develop", nil
-	case "develop":
+// Checks if version-{n+1} exists, otherwise returns develop
+func getNextVersion(current string, frappePath string) (string, error) {
+	if current == "develop" {
 		return "", fmt.Errorf("already on develop (bleeding edge)")
-	default:
+	}
+
+	// Parse current version number
+	var currentNum int
+	if _, err := fmt.Sscanf(current, "%d", &currentNum); err != nil {
 		return "", fmt.Errorf("unknown version '%s'", current)
 	}
+
+	// Check if next version branch exists
+	nextNum := currentNum + 1
+	nextBranch := fmt.Sprintf("version-%d", nextNum)
+
+	// Check if branch exists on remote
+	cmd := exec.Command("git", "ls-remote", "--heads", "origin", nextBranch)
+	cmd.Dir = frappePath
+	output, err := cmd.Output()
+	if err == nil && len(output) > 0 {
+		// Branch exists, upgrade to it
+		return fmt.Sprintf("%d", nextNum), nil
+	}
+
+	// Next version doesn't exist, go to develop
+	return "develop", nil
 }
 
 func runUpgrade(cmd *cobra.Command, args []string) error {
@@ -93,9 +107,10 @@ func runUpgrade(cmd *cobra.Command, args []string) error {
 	}
 
 	currentVersion := benchConfig.Frappe.Version
+	frappePath := filepath.Join(benchPath, "apps", "frappe")
 
-	// Determine next version automatically
-	targetVersion, err := getNextVersion(currentVersion)
+	// Determine next version automatically (checks if version-{n+1} exists)
+	targetVersion, err := getNextVersion(currentVersion, frappePath)
 	if err != nil {
 		return err
 	}
@@ -161,7 +176,6 @@ func runUpgrade(cmd *cobra.Command, args []string) error {
 
 	// Step 3: Checkout frappe branch
 	PrintInfo("[3/6] Checking out %s branch for frappe...", targetVersion)
-	frappePath := filepath.Join(benchPath, "apps", "frappe")
 	if err := checkoutFrappeBranch(frappePath, tools.NormalizeFrappeVersion(targetVersion)); err != nil {
 		return fmt.Errorf("failed to checkout frappe: %w", err)
 	}
