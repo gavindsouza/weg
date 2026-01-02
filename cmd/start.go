@@ -73,6 +73,15 @@ func runStart(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("not a weg-managed project. Run 'weg init' first")
 	}
 
+	// Check if services are already running for this project
+	existingRuntime, err := runtime.LoadIfRunning(benchPath)
+	if err != nil {
+		PrintVerbose("Warning: failed to check existing runtime: %v", err)
+	}
+	if existingRuntime != nil {
+		return fmt.Errorf("services already running on port %d. Run 'weg stop' first, or use 'weg status' to check", existingRuntime.Ports.Web)
+	}
+
 	// Check if sync is needed (unless --no-sync)
 	if !noSync {
 		st, err := state.Load(absPath)

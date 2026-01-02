@@ -126,3 +126,30 @@ func AllocatePorts(preferred Ports) (*Ports, error) {
 func (c *Config) GetWebURL(siteName string) string {
 	return fmt.Sprintf("http://%s:%d", siteName, c.Ports.Web)
 }
+
+// IsRunning checks if services are still running based on the runtime config
+// It checks if the web port from the config is in use
+func (c *Config) IsRunning() bool {
+	// Check if web port is in use (indicates services are running)
+	return !IsPortAvailable(c.Ports.Web)
+}
+
+// LoadIfRunning loads the runtime config and returns it only if services appear to be running
+// Returns nil, nil if no runtime config exists or services aren't running
+func LoadIfRunning(benchPath string) (*Config, error) {
+	cfg, err := Load(benchPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	if cfg.IsRunning() {
+		return cfg, nil
+	}
+
+	// Runtime config exists but services aren't running - clean up stale config
+	Remove(benchPath)
+	return nil, nil
+}
