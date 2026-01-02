@@ -142,6 +142,85 @@ weg exec backup           # bench --site <default> backup
 weg exec --site mysite.localhost migrate
 ```
 
+## API Commands
+
+Make API calls to Frappe sites directly without HTTP. Executes as Administrator by default.
+
+### Get Documents
+
+```bash
+# List all documents of a doctype
+weg api get User
+weg api get "Sales Invoice"
+
+# Get specific document
+weg api get User/Administrator
+weg api get "Sales Invoice/INV-001"
+
+# With filters and field selection
+weg api get User --filters '{"enabled":1}' --fields '["name","email"]'
+weg api get User --limit 10 --order-by "creation desc"
+```
+
+### Create Documents
+
+```bash
+# Create a new document
+weg api post User -d '{"email":"test@example.com","first_name":"Test"}'
+weg api post ToDo -d '{"description":"My task","priority":"High"}'
+```
+
+### Update Documents
+
+```bash
+# Update an existing document
+weg api put User/test@example.com -d '{"first_name":"Updated Name"}'
+weg api put "Sales Invoice/INV-001" -d '{"status":"Paid"}'
+```
+
+### Delete Documents
+
+```bash
+# Delete a document
+weg api delete User/test@example.com
+weg api delete "Sales Invoice/INV-001"
+```
+
+### Call Methods
+
+```bash
+# Call any frappe method
+weg api call frappe.ping
+weg api call frappe.utils.now
+
+# With arguments (key=value or --args JSON)
+weg api call frappe.client.get_count doctype=User
+weg api call myapp.api.custom_function --args '{"param1":"value1"}'
+```
+
+### Run Document Methods
+
+```bash
+# Execute methods on specific documents (like doc.submit())
+weg api run "Sales Invoice/INV-001" submit
+weg api run "Sales Invoice/INV-001" cancel
+weg api run User/Administrator get_fullname
+weg api run ToDo/TODO-001 custom_method arg1=value1
+```
+
+### API Options
+
+```bash
+# Execute as different user
+weg api get User --user Guest
+
+# Target specific site
+weg api get User --site mysite.localhost
+
+# Raw JSON output (no formatting)
+weg api get User --raw
+```
+
 ## Sync Configuration
 
 ```bash
@@ -170,6 +249,29 @@ weg update --pull
 # Skip asset rebuild
 weg update --no-build
 ```
+
+## Upgrade Frappe Version
+
+Upgrade to the next Frappe major version (e.g., 15 → 16 or 16 → develop).
+
+```bash
+# Upgrade to next version (auto-detected)
+weg upgrade
+
+# Skip database migrations
+weg upgrade --no-migrate
+
+# Auto-confirm
+weg upgrade -y
+```
+
+The upgrade process:
+1. Updates weg.toml configuration
+2. Regenerates devbox environment (Python, Node versions)
+3. Checks out new branch for frappe
+4. Reinstalls Python dependencies
+5. Reinstalls Node dependencies
+6. Runs database migrations
 
 ## Global Flags
 
