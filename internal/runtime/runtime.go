@@ -8,6 +8,8 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+
+	"github.com/gavindsouza/weg/internal/fsutil"
 )
 
 // GenerateRunID creates a unique ID for this run
@@ -72,7 +74,7 @@ func (c *Config) Save(benchPath string) error {
 		return fmt.Errorf("failed to marshal runtime config: %w", err)
 	}
 
-	return os.WriteFile(path, data, 0644)
+	return fsutil.AtomicWrite(path, data, 0644)
 }
 
 // Remove deletes the runtime config file

@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/gavindsouza/weg/internal/fsutil"
 )
 
 const (
@@ -90,7 +92,7 @@ func (c *Client) SaveToken(token *Token) error {
 		return err
 	}
 
-	return os.WriteFile(tokenPath, data, 0600)
+	return fsutil.AtomicWrite(tokenPath, data, 0600)
 }
 
 // ClearToken removes the stored token
@@ -215,7 +217,7 @@ func SaveCredentials(homeDir, apiKey string) error {
 		return err
 	}
 
-	return os.WriteFile(filepath.Join(configDir, "cloud-token.json"), data, 0600)
+	return fsutil.AtomicWrite(filepath.Join(configDir, "cloud-token.json"), data, 0600)
 }
 
 // LoadCredentials loads the API key from disk

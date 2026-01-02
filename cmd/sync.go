@@ -11,6 +11,7 @@ import (
 
 	"github.com/gavindsouza/weg/internal/apps"
 	"github.com/gavindsouza/weg/internal/config"
+	"github.com/gavindsouza/weg/internal/fsutil"
 	"github.com/gavindsouza/weg/internal/state"
 	"github.com/spf13/cobra"
 )
@@ -645,9 +646,9 @@ func updateAppsTxt(benchPath string, st *state.State) error {
 	}
 	orderedApps = append(orderedApps, apps...)
 
-	// Write apps.txt
+	// Write apps.txt atomically
 	content := strings.Join(orderedApps, "\n") + "\n"
-	return os.WriteFile(appsTxtPath, []byte(content), 0644)
+	return fsutil.AtomicWriteString(appsTxtPath, content, 0644)
 }
 
 // setupAssets creates symlinks for app assets in sites/assets/
@@ -736,13 +737,13 @@ func ensureCommonSiteConfig(benchPath string, benchConfig *config.BenchConfig) e
 		}
 	}
 
-	// Write config
+	// Write config atomically
 	data, err := json.MarshalIndent(cfg, "", "    ")
 	if err != nil {
 		return err
 	}
 
-	return os.WriteFile(configPath, data, 0644)
+	return fsutil.AtomicWrite(configPath, data, 0644)
 }
 
 // Real implementations using internal/apps package
