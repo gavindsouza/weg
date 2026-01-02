@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/gavindsouza/weg/cmd/api"
 	"github.com/gavindsouza/weg/cmd/app"
 	"github.com/gavindsouza/weg/cmd/bench"
 	"github.com/gavindsouza/weg/cmd/cloud"
@@ -76,6 +77,7 @@ func init() {
 	rootCmd.MarkFlagsMutuallyExclusive("verbose", "quiet")
 
 	// Add subcommand groups
+	rootCmd.AddCommand(api.ApiCmd)
 	rootCmd.AddCommand(app.AppCmd)
 	rootCmd.AddCommand(site.SiteCmd)
 	rootCmd.AddCommand(bench.BenchCmd)
