@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/gavindsouza/weg/internal/apps"
 	"github.com/gavindsouza/weg/internal/config"
@@ -33,7 +34,8 @@ Examples:
   weg sync           # Interactive sync with confirmation
   weg sync -y        # Apply changes without confirmation
   weg sync --dry-run # Preview changes without applying`,
-	RunE: runSync,
+	RunE:         runSync,
+	SilenceUsage: true, // Don't print usage on runtime errors
 }
 
 var (
@@ -73,10 +75,81 @@ func runSync(cmd *cobra.Command, args []string) error {
 func syncApp(path string, result *config.DetectionResult) error {
 	PrintInfo("Syncing app-centric environment...")
 
-	// Parse config
+	wegDir := filepath.Join(path, ".weg")
+	wegTomlPath := filepath.Join(wegDir, "weg.toml")
+
+	// For app-centric projects, use .weg/weg.toml for sync
+	// This contains the full bench configuration
+	if _, err := os.Stat(wegTomlPath); err == nil {
+		// Use bench-style sync with .weg/weg.toml
+		// ParseWegToml expects directory path, not file path
+		benchConfig, err := config.ParseWegToml(wegDir)
+		if err != nil {
+			return fmt.Errorf("failed to parse .weg/weg.toml: %w", err)
+		}
+
+		// Validate config
+		if err := config.ValidateBenchConfig(benchConfig); err != nil {
+			return fmt.Errorf("invalid configuration: %w", err)
+		}
+
+		// Load state from project root (state module adds .weg internally)
+		st, err := state.Load(path)
+		if err != nil {
+			st = state.NewState()
+		}
+
+		// Compute diff
+		diff := state.ComputeDiffFromBenchConfig(benchConfig, st)
+
+		if diff.IsEmpty() {
+			PrintInfo("Environment is up to date. Nothing to sync.")
+			return nil
+		}
+
+		// Show changes
+		showDiff(diff)
+
+		if dryRun {
+			PrintInfo("\nDry run - no changes applied.")
+			return nil
+		}
+
+		// Confirm
+		if !AssumeYes() {
+			fmt.Print("\nApply these changes? [y/N]: ")
+			reader := bufio.NewReader(os.Stdin)
+			answer, _ := reader.ReadString('\n')
+			answer = strings.TrimSpace(strings.ToLower(answer))
+			if answer != "y" && answer != "yes" {
+				PrintInfo("Cancelled.")
+				return nil
+			}
+		}
+
+		// Apply changes using .weg as the bench path
+		if err := applyBenchChanges(wegDir, benchConfig, st, diff); err != nil {
+			return fmt.Errorf("failed to apply changes: %w", err)
+		}
+
+		// Update state
+		configHash, _ := state.ComputeConfigHash(wegTomlPath)
+		st.UpdateConfigHash(configHash)
+		st.Frappe.Version = benchConfig.Frappe.Version
+		st.Frappe.Database = benchConfig.Frappe.Database
+
+		if err := st.Save(path); err != nil {
+			return fmt.Errorf("failed to save state: %w", err)
+		}
+
+		PrintInfo("\nSync complete!")
+		return nil
+	}
+
+	// Fallback: Try pyproject.toml
 	appConfig, err := config.ParsePyproject(path)
 	if err != nil {
-		return fmt.Errorf("failed to parse pyproject.toml: %w", err)
+		return fmt.Errorf("failed to parse config: no .weg/weg.toml or pyproject.toml found")
 	}
 
 	// Validate config
@@ -87,7 +160,7 @@ func syncApp(path string, result *config.DetectionResult) error {
 	// Load state
 	st, err := state.Load(path)
 	if err != nil {
-		return fmt.Errorf("failed to load state: %w", err)
+		st = state.NewState()
 	}
 
 	// Compute diff
@@ -125,7 +198,8 @@ func syncApp(path string, result *config.DetectionResult) error {
 	}
 
 	// Update state
-	configHash, _ := state.ComputeConfigHash(filepath.Join(path, "pyproject.toml"))
+	pyprojectPath := filepath.Join(path, "pyproject.toml")
+	configHash, _ := state.ComputeConfigHash(pyprojectPath)
 	st.UpdateConfigHash(configHash)
 	st.Frappe.Version = appConfig.Dev.Frappe
 	st.Frappe.Database = appConfig.Dev.Database
@@ -142,7 +216,8 @@ func syncBench(path string, result *config.DetectionResult) error {
 	PrintInfo("Syncing bench environment...")
 
 	// Parse config
-	benchConfig, err := config.ParseWegToml(path)
+	wegTomlPath := filepath.Join(path, "weg.toml")
+	benchConfig, err := config.ParseWegToml(wegTomlPath)
 	if err != nil {
 		return fmt.Errorf("failed to parse weg.toml: %w", err)
 	}
@@ -270,6 +345,11 @@ func applyAppChanges(path string, cfg *config.AppConfig, st *state.State, diff *
 	// For app-centric, we need to create/update the .weg directory
 	wegDir := filepath.Join(path, ".weg")
 
+	// Ensure the environment is initialized before installing apps
+	if err := ensureEnvironment(wegDir, cfg.Dev.Frappe); err != nil {
+		return fmt.Errorf("failed to initialize environment: %w", err)
+	}
+
 	// Install new apps
 	for _, appName := range diff.AppsToAdd {
 		PrintInfo("Installing %s...", appName)
@@ -306,6 +386,37 @@ func applyAppChanges(path string, cfg *config.AppConfig, st *state.State, diff *
 			PrintVerbose("Warning: failed to remove %s: %v", appName, err)
 		}
 		st.RemoveApp(appName)
+	}
+
+	// Update apps.txt - required for bench to recognize apps
+	if err := updateAppsTxt(wegDir, st); err != nil {
+		PrintVerbose("Warning: failed to update apps.txt: %v", err)
+	}
+
+	// Create sites
+	sitesDir := filepath.Join(wegDir, "sites")
+	for _, siteName := range diff.SitesToAdd {
+		PrintInfo("Creating site %s...", siteName)
+
+		siteCfg := &config.SiteConfig{
+			Name:        siteName,
+			DefaultSite: true, // First site is default for app-centric
+		}
+
+		// Get list of all installed apps to install on the site
+		var appsToInstall []string
+		for appName := range st.Apps {
+			appsToInstall = append(appsToInstall, appName)
+		}
+
+		if err := createSite(sitesDir, siteCfg, appsToInstall); err != nil {
+			return fmt.Errorf("failed to create site %s: %w", siteName, err)
+		}
+
+		st.AddSite(state.SiteState{
+			Name:        siteName,
+			DefaultSite: siteCfg.DefaultSite,
+		})
 	}
 
 	return nil
@@ -370,6 +481,12 @@ func applyBenchChanges(path string, cfg *config.BenchConfig, st *state.State, di
 		}
 	}
 
+	// Update apps.txt - required for bench to recognize apps
+	// Must be done BEFORE site creation since new-site needs apps.txt
+	if err := updateAppsTxt(path, st); err != nil {
+		return fmt.Errorf("failed to update apps.txt: %w", err)
+	}
+
 	// Handle sites
 	sitesDir := filepath.Join(path, "sites")
 
@@ -386,7 +503,7 @@ func applyBenchChanges(path string, cfg *config.BenchConfig, st *state.State, di
 		}
 
 		if siteCfg != nil {
-			if err := createSite(sitesDir, siteCfg); err != nil {
+			if err := createSite(sitesDir, siteCfg, siteCfg.Apps); err != nil {
 				return fmt.Errorf("failed to create site %s: %w", siteName, err)
 			}
 		}
@@ -405,7 +522,83 @@ func applyBenchChanges(path string, cfg *config.BenchConfig, st *state.State, di
 		st.RemoveSite(siteName)
 	}
 
+	// Update sites (install/uninstall apps)
+	for _, update := range diff.SitesToUpdate {
+		for _, appName := range update.AppsToAdd {
+			PrintInfo("Installing %s on site %s...", appName, update.Name)
+			if err := installAppOnSite(path, update.Name, appName); err != nil {
+				return fmt.Errorf("failed to install %s on site %s: %w", appName, update.Name, err)
+			}
+
+			// Update site state
+			for name, site := range st.Sites {
+				if name == update.Name {
+					site.Apps = append(site.Apps, appName)
+					st.Sites[name] = site
+					break
+				}
+			}
+		}
+
+		for _, appName := range update.AppsToRemove {
+			PrintInfo("Uninstalling %s from site %s...", appName, update.Name)
+			if err := uninstallAppFromSite(path, update.Name, appName); err != nil {
+				PrintVerbose("Warning: failed to uninstall %s from %s: %v", appName, update.Name, err)
+			}
+
+			// Update site state
+			for name, site := range st.Sites {
+				if name == update.Name {
+					for j, a := range site.Apps {
+						if a == appName {
+							site.Apps = append(site.Apps[:j], site.Apps[j+1:]...)
+							st.Sites[name] = site
+							break
+						}
+					}
+					break
+				}
+			}
+		}
+	}
+
 	return nil
+}
+
+// updateAppsTxt writes the apps.txt file with installed apps
+// This file is required by frappe/bench to recognize which apps are installed
+// Note: apps.txt goes in sites/ directory (frappe uses sites_path=".")
+// App names must use underscores (Python module format)
+func updateAppsTxt(benchPath string, st *state.State) error {
+	sitesDir := filepath.Join(benchPath, "sites")
+	if err := os.MkdirAll(sitesDir, 0755); err != nil {
+		return fmt.Errorf("failed to create sites directory: %w", err)
+	}
+	appsTxtPath := filepath.Join(sitesDir, "apps.txt")
+
+	// Get app names in order (frappe first)
+	var apps []string
+	hasFramework := false
+	for name := range st.Apps {
+		// Convert to Python module name (hyphens to underscores)
+		moduleName := strings.ReplaceAll(name, "-", "_")
+		if moduleName == "frappe" {
+			hasFramework = true
+		} else {
+			apps = append(apps, moduleName)
+		}
+	}
+
+	// Sort and prepend frappe
+	var orderedApps []string
+	if hasFramework {
+		orderedApps = append(orderedApps, "frappe")
+	}
+	orderedApps = append(orderedApps, apps...)
+
+	// Write apps.txt
+	content := strings.Join(orderedApps, "\n") + "\n"
+	return os.WriteFile(appsTxtPath, []byte(content), 0644)
 }
 
 // Real implementations using internal/apps package
@@ -457,6 +650,12 @@ func installApp(appsDir, name, url, branch string) error {
 
 func linkLocalApp(appsDir, name, localPath string) error {
 	benchPath := filepath.Dir(appsDir)
+
+	// Resolve relative paths from bench directory, not CWD
+	if !filepath.IsAbs(localPath) {
+		localPath = filepath.Join(benchPath, localPath)
+	}
+
 	opts := apps.InstallOptions{
 		BenchPath: benchPath,
 		AppsDir:   appsDir,
@@ -481,17 +680,56 @@ func checkoutBranch(appPath, branch string) error {
 	return apps.Checkout(appPath, branch)
 }
 
-func createSite(sitesDir string, cfg *config.SiteConfig) error {
-	// Create site directory
-	sitePath := filepath.Join(sitesDir, cfg.Name)
-	if err := os.MkdirAll(sitePath, 0755); err != nil {
-		return fmt.Errorf("failed to create site directory: %w", err)
+func createSite(sitesDir string, cfg *config.SiteConfig, appsToInstall []string) error {
+	benchPath := filepath.Dir(sitesDir)
+	mysqlSocket := filepath.Join(benchPath, ".devbox/virtenv/mariadb/run/mysql.sock")
+
+	// Start mariadb service first
+	PrintVerbose("Starting MariaDB...")
+	if err := runCmdInDir(benchPath, "devbox", "services", "start", "mariadb"); err != nil {
+		PrintVerbose("Warning: could not start mariadb: %v", err)
 	}
 
-	// TODO: Run actual site creation via frappe
-	// For now, just create the directory structure
-	PrintVerbose("Created site directory: %s", sitePath)
-	PrintVerbose("Note: Run 'bench new-site %s' to complete site setup", cfg.Name)
+	// Wait for mariadb socket to be available (up to 30 seconds)
+	PrintVerbose("Waiting for MariaDB to be ready...")
+	for i := 0; i < 30; i++ {
+		if _, err := os.Stat(mysqlSocket); err == nil {
+			break
+		}
+		time.Sleep(1 * time.Second)
+	}
+
+	// Build install-app flags for non-frappe apps
+	var installAppFlags string
+	for _, app := range appsToInstall {
+		if app != "frappe" {
+			// Convert to module name (hyphens to underscores)
+			moduleName := strings.ReplaceAll(app, "-", "_")
+			installAppFlags += fmt.Sprintf(" --install-app=%s", moduleName)
+		}
+	}
+
+	// Create the site using bench new-site via the venv Python
+	// Use the devbox mariadb socket and empty root password
+	// NOTE: frappe commands must run from the sites directory (where apps.txt is)
+	// Pipe empty password via stdin since frappe prompts if --db-root-password is empty
+	PrintVerbose("Running new-site for %s...", cfg.Name)
+	shellCmd := fmt.Sprintf(
+		`cd %s && echo "" | ../.venv/bin/python -m frappe.utils.bench_helper frappe new-site %s --admin-password=admin --db-socket=%s%s`,
+		sitesDir, cfg.Name, mysqlSocket, installAppFlags,
+	)
+
+	if err := runCmdInDir(benchPath, "devbox", "run", "--", "sh", "-c", shellCmd); err != nil {
+		return fmt.Errorf("failed to create site: %w", err)
+	}
+
+	// Set as default site if configured
+	if cfg.DefaultSite {
+		currentSitePath := filepath.Join(sitesDir, "currentsite.txt")
+		if err := os.WriteFile(currentSitePath, []byte(cfg.Name), 0644); err != nil {
+			PrintVerbose("Warning: could not set default site: %v", err)
+		}
+	}
 
 	return nil
 }
@@ -503,4 +741,76 @@ func removeSite(sitesDir, name string) error {
 	PrintVerbose("Removing site: %s", sitePath)
 
 	return os.RemoveAll(sitePath)
+}
+
+func installAppOnSite(benchPath, siteName, appName string) error {
+	opts := apps.InstallOptions{
+		BenchPath: benchPath,
+		AppsDir:   filepath.Join(benchPath, "apps"),
+		Verbose:   IsVerbose(),
+	}
+
+	return apps.InstallAppOnSite(siteName, appName, opts)
+}
+
+func uninstallAppFromSite(benchPath, siteName, appName string) error {
+	opts := apps.InstallOptions{
+		BenchPath: benchPath,
+		AppsDir:   filepath.Join(benchPath, "apps"),
+		Verbose:   IsVerbose(),
+	}
+
+	return apps.UninstallAppFromSite(siteName, appName, opts)
+}
+
+// ensureEnvironment ensures the .weg directory has devbox and venv set up
+func ensureEnvironment(wegDir, frappeVersion string) error {
+	// Create required directories
+	dirs := []string{
+		wegDir,
+		filepath.Join(wegDir, "apps"),
+		filepath.Join(wegDir, "sites"),
+		filepath.Join(wegDir, "config"),
+		filepath.Join(wegDir, "logs"),
+	}
+	for _, dir := range dirs {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return fmt.Errorf("failed to create directory %s: %w", dir, err)
+		}
+	}
+
+	// Check if devbox is initialized
+	devboxJSON := filepath.Join(wegDir, "devbox.json")
+	if _, err := os.Stat(devboxJSON); os.IsNotExist(err) {
+		PrintInfo("Initializing development environment...")
+
+		// Create .envrc
+		envrc := `VENV_DIR=$PWD/env
+export UV_PYTHON=$PWD/.devbox/nix/profile/default/bin/python
+export UV_VENV_PATH=$VENV_DIR
+export VIRTUAL_ENV=$VENV_DIR
+eval "$(devbox generate direnv --print-envrc -e VENV_DIR=$VENV_DIR -e UV_PYTHON=$UV_PYTHON -e UV_VENV_PATH=$UV_VENV_PATH -e VIRTUAL_ENV=$VIRTUAL_ENV)"
+`
+		if err := os.WriteFile(filepath.Join(wegDir, ".envrc"), []byte(envrc), 0644); err != nil {
+			return fmt.Errorf("failed to write .envrc: %w", err)
+		}
+
+		// Initialize devbox
+		PrintVerbose("Initializing devbox...")
+		if err := runCmdInDir(wegDir, "devbox", "init"); err != nil {
+			return fmt.Errorf("devbox init failed: %w", err)
+		}
+
+		// Add required packages via devbox
+		PrintVerbose("Installing dependencies via devbox...")
+		packages := getDevboxPackages(frappeVersion)
+		args := append([]string{"add"}, packages...)
+		if err := runCmdInDir(wegDir, "devbox", args...); err != nil {
+			return fmt.Errorf("devbox add failed: %w", err)
+		}
+	}
+
+	// Devbox's Python plugin automatically creates .venv, no need to create env/
+
+	return nil
 }

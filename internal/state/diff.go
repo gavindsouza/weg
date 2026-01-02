@@ -1,8 +1,26 @@
 package state
 
 import (
+	"sort"
+	"strings"
+
 	"github.com/gavindsouza/weg/internal/config"
 )
+
+// sortAppsToAdd ensures frappe is always first in the install order
+func sortAppsToAdd(apps []string) {
+	sort.Slice(apps, func(i, j int) bool {
+		// frappe always comes first
+		if apps[i] == "frappe" {
+			return true
+		}
+		if apps[j] == "frappe" {
+			return false
+		}
+		// Otherwise alphabetical
+		return apps[i] < apps[j]
+	})
+}
 
 // Diff represents the differences between desired config and current state
 type Diff struct {
@@ -140,6 +158,9 @@ func ComputeDiffFromBenchConfig(cfg *config.BenchConfig, state *State) *Diff {
 		}
 	}
 
+	// Sort apps to ensure frappe is always installed first
+	sortAppsToAdd(diff.AppsToAdd)
+
 	return diff
 }
 
@@ -179,7 +200,31 @@ func ComputeDiffFromAppConfig(cfg *config.AppConfig, appName string, state *Stat
 		}
 	}
 
+	// Handle default site for app-centric projects
+	defaultSiteName := toModuleName(appName) + ".localhost"
+	if !state.HasSite(defaultSiteName) {
+		diff.SitesToAdd = append(diff.SitesToAdd, defaultSiteName)
+	} else {
+		// Check if apps need to be installed on the site
+		siteState := state.Sites[defaultSiteName]
+		var desiredSiteApps []string
+		for app := range desiredApps {
+			desiredSiteApps = append(desiredSiteApps, app)
+		}
+		if update := computeSiteUpdate(defaultSiteName, desiredSiteApps, siteState.Apps); update != nil {
+			diff.SitesToUpdate = append(diff.SitesToUpdate, *update)
+		}
+	}
+
+	// Sort apps to ensure frappe is always installed first
+	sortAppsToAdd(diff.AppsToAdd)
+
 	return diff
+}
+
+// toModuleName converts an app name to its Python module name
+func toModuleName(name string) string {
+	return strings.ReplaceAll(name, "-", "_")
 }
 
 // computeSiteUpdate checks if a site needs app updates

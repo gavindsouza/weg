@@ -17,23 +17,13 @@ var execCmd = &cobra.Command{
 	Short: "Run a command in the bench context",
 	Long: `Run a command in the bench environment context.
 
-This ensures the command runs with the correct Python environment,
-site configuration, and bench variables set.
-
-Common shortcuts are available:
-  weg exec migrate        → bench --site <default> migrate
-  weg exec console        → bench --site <default> console
-  weg exec mariadb        → bench --site <default> mariadb
-  weg exec backup         → bench --site <default> backup
-
 Examples:
   weg exec -- bench migrate
-  weg exec --site mysite.localhost -- python -c "import frappe"
-  weg exec migrate
-  weg exec console`,
+  weg exec --site mysite.localhost -- python -c "import frappe"`,
 	Args:               cobra.MinimumNArgs(1),
 	DisableFlagParsing: false,
 	RunE:               runExec,
+	SilenceUsage:       true,
 }
 
 var execSite string
@@ -72,60 +62,29 @@ func runExec(cmd *cobra.Command, args []string) error {
 		if err == nil {
 			site = st.GetDefaultSite()
 		}
-		if site == "" {
-			// Try to read from currentsite.txt
-			currentSitePath := filepath.Join(benchPath, "sites", "currentsite.txt")
-			if data, err := os.ReadFile(currentSitePath); err == nil {
-				site = string(data)
-			}
-		}
 	}
 
-	// Handle shortcut commands
 	command := args[0]
-	cmdArgs := args[1:]
 
-	shortcutCommands := map[string][]string{
-		"migrate":  {"bench", "--site", site, "migrate"},
-		"console":  {"bench", "--site", site, "console"},
-		"mariadb":  {"bench", "--site", site, "mariadb"},
-		"backup":   {"bench", "--site", site, "backup"},
-		"restore":  {"bench", "--site", site, "restore"},
-		"set-config": {"bench", "--site", site, "set-config"},
-		"clear-cache": {"bench", "--site", site, "clear-cache"},
-		"scheduler": {"bench", "--site", site, "scheduler"},
+	// For bench commands, use RunBench
+	if command == "bench" && len(args) > 1 {
+		return RunBench(args[1:])
 	}
 
-	var execArgs []string
-	if shortcut, ok := shortcutCommands[command]; ok {
-		execArgs = append(shortcut, cmdArgs...)
-		command = shortcut[0]
-	} else if command == "bench" {
-		// Direct bench command
-		execArgs = args
-	} else {
-		// Other command - just run it
-		execArgs = args
-	}
-
-	// Find the command
+	// For other commands, run in the bench context
 	cmdPath, err := exec.LookPath(command)
 	if err != nil {
 		return fmt.Errorf("command not found: %s", command)
 	}
 
-	// Set up environment
 	env := os.Environ()
 	env = append(env, fmt.Sprintf("FRAPPE_BENCH_ROOT=%s", benchPath))
 	if site != "" {
 		env = append(env, fmt.Sprintf("FRAPPE_SITE=%s", site))
 	}
 
-	// Execute using syscall.Exec to replace the current process
-	// This ensures proper signal handling and exit codes
-	if err := syscall.Exec(cmdPath, execArgs, env); err != nil {
-		// Fallback to regular exec if syscall fails
-		execCmd := exec.Command(cmdPath, execArgs[1:]...)
+	if err := syscall.Exec(cmdPath, args, env); err != nil {
+		execCmd := exec.Command(cmdPath, args[1:]...)
 		execCmd.Dir = benchPath
 		execCmd.Stdout = os.Stdout
 		execCmd.Stderr = os.Stderr
