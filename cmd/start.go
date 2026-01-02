@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/gavindsouza/weg/internal/config"
@@ -16,6 +17,7 @@ var startCmd = &cobra.Command{
 	Long: `Start all development services for the current project.
 
 This command starts:
+  - MariaDB (database)
   - Redis (cache and queue)
   - Web server (Gunicorn)
   - Socket.io server
@@ -23,7 +25,8 @@ This command starts:
   - Scheduler
   - File watcher (for auto-rebuild)
 
-Services are managed by process-compose. Press Ctrl+C to stop all services.
+Services are managed by devbox services and process-compose.
+Press Ctrl+C to stop all services.
 
 Examples:
   weg start              # Start all services
@@ -93,6 +96,14 @@ func runStart(cmd *cobra.Command, args []string) error {
 	// Generate/update process-compose.yaml
 	opts := services.DefaultComposeOptions(benchPath)
 	opts.IncludeWatch = !noWatch
+
+	// For devbox projects, don't include redis (devbox services handles it)
+	// and use .venv Python for bench commands
+	devboxJSON := filepath.Join(benchPath, "devbox.json")
+	if _, err := os.Stat(devboxJSON); err == nil {
+		opts.IncludeRedis = false
+		opts.UseVenvPython = true
+	}
 
 	if err := services.GenerateAndWrite(opts); err != nil {
 		return fmt.Errorf("failed to generate process-compose.yaml: %w", err)

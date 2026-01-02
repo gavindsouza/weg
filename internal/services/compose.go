@@ -16,12 +16,12 @@ type ProcessComposeConfig struct {
 
 // Process represents a single process in process-compose
 type Process struct {
-	Command     string            `yaml:"command"`
-	WorkingDir  string            `yaml:"working_dir,omitempty"`
-	Environment map[string]string `yaml:"environment,omitempty"`
+	Command     string               `yaml:"command"`
+	WorkingDir  string               `yaml:"working_dir,omitempty"`
+	Environment []string             `yaml:"environment,omitempty"`
 	DependsOn   map[string]DependsOn `yaml:"depends_on,omitempty"`
-	Disabled    bool              `yaml:"disabled,omitempty"`
-	ReadyProbe  *ReadyProbe       `yaml:"readiness_probe,omitempty"`
+	Disabled    bool                 `yaml:"disabled,omitempty"`
+	ReadyProbe  *ReadyProbe          `yaml:"readiness_probe,omitempty"`
 }
 
 // DependsOn specifies process dependencies
@@ -32,7 +32,7 @@ type DependsOn struct {
 // ReadyProbe defines health check for process readiness
 type ReadyProbe struct {
 	HTTPGet       *HTTPGet `yaml:"http_get,omitempty"`
-	InitialDelay  string   `yaml:"initial_delay_seconds,omitempty"`
+	InitialDelay  int      `yaml:"initial_delay_seconds,omitempty"`
 	PeriodSeconds int      `yaml:"period_seconds,omitempty"`
 }
 
@@ -55,6 +55,7 @@ type ComposeOptions struct {
 	IncludeWatch  bool
 	FrappeVersion string
 	NodePath      string // Path to node binary (for devbox)
+	UseVenvPython bool   // Use .venv/bin/python for bench commands (devbox projects)
 }
 
 // DefaultComposeOptions returns sensible defaults
@@ -77,7 +78,18 @@ func GenerateProcessCompose(opts ComposeOptions) *ProcessComposeConfig {
 		Processes: make(map[string]Process),
 	}
 
-	// Redis cache
+	// Helper to generate bench command with correct Python
+	benchCmd := func(args string) string {
+		if opts.UseVenvPython {
+			// Use explicit Python path for devbox projects
+			// Run from sites directory using bench_helper
+			// bench_helper wraps frappe commands, so we need "frappe <cmd>"
+			return fmt.Sprintf("cd sites && ../.venv/bin/python -m frappe.utils.bench_helper frappe %s", args)
+		}
+		return fmt.Sprintf("bench %s", args)
+	}
+
+	// Redis cache (only if not using external redis like devbox)
 	if opts.IncludeRedis {
 		config.Processes["redis_cache"] = Process{
 			Command: fmt.Sprintf("redis-server config/redis_cache.conf"),
@@ -88,21 +100,16 @@ func GenerateProcessCompose(opts ComposeOptions) *ProcessComposeConfig {
 	}
 
 	// Web server (gunicorn via bench serve)
-	config.Processes["web"] = Process{
-		Command: fmt.Sprintf("bench serve --port %d", opts.WebPort),
-		DependsOn: map[string]DependsOn{
+	webProcess := Process{
+		Command: benchCmd(fmt.Sprintf("serve --port %d", opts.WebPort)),
+	}
+	if opts.IncludeRedis {
+		webProcess.DependsOn = map[string]DependsOn{
 			"redis_cache": {Condition: "process_started"},
 			"redis_queue": {Condition: "process_started"},
-		},
-		ReadyProbe: &ReadyProbe{
-			HTTPGet: &HTTPGet{
-				Port: opts.WebPort,
-				Path: "/api/method/ping",
-			},
-			InitialDelay:  "5s",
-			PeriodSeconds: 5,
-		},
+		}
 	}
+	config.Processes["web"] = webProcess
 
 	// Socket.io server
 	nodePath := opts.NodePath
@@ -111,39 +118,26 @@ func GenerateProcessCompose(opts ComposeOptions) *ProcessComposeConfig {
 	}
 	config.Processes["socketio"] = Process{
 		Command: fmt.Sprintf("%s apps/frappe/socketio.js", nodePath),
-		Environment: map[string]string{
-			"PORT": fmt.Sprintf("%d", opts.SocketPort),
+		Environment: []string{
+			fmt.Sprintf("PORT=%d", opts.SocketPort),
 		},
 		DependsOn: map[string]DependsOn{
 			"web": {Condition: "process_started"},
 		},
 	}
 
-	// Background workers
-	config.Processes["worker_short"] = Process{
-		Command: "bench worker --queue short",
-		DependsOn: map[string]DependsOn{
-			"redis_queue": {Condition: "process_started"},
-		},
+	// Single background worker handling all queues (simpler for dev)
+	worker := Process{Command: benchCmd("worker --queue short,default,long")}
+	if opts.IncludeRedis {
+		worker.DependsOn = map[string]DependsOn{"redis_queue": {Condition: "process_started"}}
+	} else {
+		worker.DependsOn = map[string]DependsOn{"web": {Condition: "process_started"}}
 	}
-
-	config.Processes["worker_long"] = Process{
-		Command: "bench worker --queue long",
-		DependsOn: map[string]DependsOn{
-			"redis_queue": {Condition: "process_started"},
-		},
-	}
-
-	config.Processes["worker_default"] = Process{
-		Command: "bench worker --queue default",
-		DependsOn: map[string]DependsOn{
-			"redis_queue": {Condition: "process_started"},
-		},
-	}
+	config.Processes["worker"] = worker
 
 	// Scheduler
 	config.Processes["scheduler"] = Process{
-		Command: "bench schedule",
+		Command: benchCmd("schedule"),
 		DependsOn: map[string]DependsOn{
 			"web": {Condition: "process_started"},
 		},
@@ -152,7 +146,7 @@ func GenerateProcessCompose(opts ComposeOptions) *ProcessComposeConfig {
 	// Watch mode for development
 	if opts.IncludeWatch {
 		config.Processes["watch"] = Process{
-			Command: "bench watch",
+			Command: benchCmd("watch"),
 			DependsOn: map[string]DependsOn{
 				"web": {Condition: "process_started"},
 			},

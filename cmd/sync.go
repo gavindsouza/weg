@@ -393,6 +393,11 @@ func applyAppChanges(path string, cfg *config.AppConfig, st *state.State, diff *
 		PrintVerbose("Warning: failed to update apps.txt: %v", err)
 	}
 
+	// Ensure common_site_config.json exists with redis config
+	if err := ensureCommonSiteConfig(wegDir); err != nil {
+		PrintVerbose("Warning: failed to create common_site_config.json: %v", err)
+	}
+
 	// Create sites
 	sitesDir := filepath.Join(wegDir, "sites")
 	for _, siteName := range diff.SitesToAdd {
@@ -485,6 +490,11 @@ func applyBenchChanges(path string, cfg *config.BenchConfig, st *state.State, di
 	// Must be done BEFORE site creation since new-site needs apps.txt
 	if err := updateAppsTxt(path, st); err != nil {
 		return fmt.Errorf("failed to update apps.txt: %w", err)
+	}
+
+	// Ensure common_site_config.json exists with redis config
+	if err := ensureCommonSiteConfig(path); err != nil {
+		PrintVerbose("Warning: failed to create common_site_config.json: %v", err)
 	}
 
 	// Handle sites
@@ -601,6 +611,26 @@ func updateAppsTxt(benchPath string, st *state.State) error {
 	return os.WriteFile(appsTxtPath, []byte(content), 0644)
 }
 
+// ensureCommonSiteConfig creates common_site_config.json with redis URLs for devbox
+func ensureCommonSiteConfig(benchPath string) error {
+	sitesDir := filepath.Join(benchPath, "sites")
+	configPath := filepath.Join(sitesDir, "common_site_config.json")
+
+	// Only create if it doesn't exist
+	if _, err := os.Stat(configPath); err == nil {
+		return nil
+	}
+
+	// For devbox projects, use single redis instance with different DBs
+	config := `{
+    "redis_cache": "redis://localhost:6379/0",
+    "redis_queue": "redis://localhost:6379/1",
+    "redis_socketio": "redis://localhost:6379/2"
+}
+`
+	return os.WriteFile(configPath, []byte(config), 0644)
+}
+
 // Real implementations using internal/apps package
 
 func installFrappe(wegDir, version string) error {
@@ -684,19 +714,32 @@ func createSite(sitesDir string, cfg *config.SiteConfig, appsToInstall []string)
 	benchPath := filepath.Dir(sitesDir)
 	mysqlSocket := filepath.Join(benchPath, ".devbox/virtenv/mariadb/run/mysql.sock")
 
-	// Start mariadb service first
+	// Start mariadb service first - stop it first if it's in a bad state
 	PrintVerbose("Starting MariaDB...")
+
+	// If socket doesn't exist but service claims to be running, restart it
+	if _, err := os.Stat(mysqlSocket); os.IsNotExist(err) {
+		PrintVerbose("MariaDB socket not found, restarting service...")
+		runCmdInDir(benchPath, "devbox", "services", "stop")
+	}
+
 	if err := runCmdInDir(benchPath, "devbox", "services", "start", "mariadb"); err != nil {
 		PrintVerbose("Warning: could not start mariadb: %v", err)
 	}
 
 	// Wait for mariadb socket to be available (up to 30 seconds)
 	PrintVerbose("Waiting for MariaDB to be ready...")
+	socketFound := false
 	for i := 0; i < 30; i++ {
 		if _, err := os.Stat(mysqlSocket); err == nil {
+			socketFound = true
 			break
 		}
 		time.Sleep(1 * time.Second)
+	}
+
+	if !socketFound {
+		return fmt.Errorf("MariaDB socket not found at %s after 30 seconds. Try running 'devbox services stop' and then 'weg sync' again", mysqlSocket)
 	}
 
 	// Build install-app flags for non-frappe apps
@@ -712,10 +755,9 @@ func createSite(sitesDir string, cfg *config.SiteConfig, appsToInstall []string)
 	// Create the site using bench new-site via the venv Python
 	// Use the devbox mariadb socket and empty root password
 	// NOTE: frappe commands must run from the sites directory (where apps.txt is)
-	// Pipe empty password via stdin since frappe prompts if --db-root-password is empty
 	PrintVerbose("Running new-site for %s...", cfg.Name)
 	shellCmd := fmt.Sprintf(
-		`cd %s && echo "" | ../.venv/bin/python -m frappe.utils.bench_helper frappe new-site %s --admin-password=admin --db-socket=%s%s`,
+		`cd %s && ../.venv/bin/python -m frappe.utils.bench_helper frappe new-site %s --admin-password=admin --db-root-password= --db-socket=%s%s`,
 		sitesDir, cfg.Name, mysqlSocket, installAppFlags,
 	)
 

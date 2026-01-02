@@ -59,19 +59,10 @@ func InstallPythonDeps(appPath string, opts InstallOptions) error {
 		return nil
 	}
 
-	// Use uv pip install -e for editable install
-	cmd := exec.Command("uv", "pip", "install", "-e", appPath)
-	cmd.Dir = opts.BenchPath
-
-	if opts.Verbose {
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
+	runner := tools.NewRunnerWithOptions(opts.BenchPath, opts.Verbose)
+	if err := runner.Run("uv", "pip", "install", "-e", appPath); err != nil {
+		return fmt.Errorf("failed to install Python dependencies: %w", err)
 	}
-
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("uv pip install failed: %w", err)
-	}
-
 	return nil
 }
 
@@ -88,47 +79,32 @@ func InstallNodeDeps(appPath string, opts InstallOptions) error {
 		}
 	}
 
-	var cmd *exec.Cmd
+	// Use bench path for devbox detection, run commands in app path
+	runner := tools.NewRunnerWithOptions(opts.BenchPath, opts.Verbose)
+
+	// Try with frozen lockfile first, fall back to without
+	var err error
 	switch pm {
 	case "pnpm":
-		cmd = exec.Command("pnpm", "install", "--frozen-lockfile")
-	case "bun":
-		cmd = exec.Command("bun", "install", "--frozen-lockfile")
-	default: // yarn
-		cmd = exec.Command("yarn", "install", "--frozen-lockfile")
-	}
-
-	cmd.Dir = appPath
-
-	if opts.Verbose {
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-	}
-
-	// Don't fail if lockfile doesn't exist, just warn
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		// Try without frozen lockfile
-		switch pm {
-		case "pnpm":
-			cmd = exec.Command("pnpm", "install")
-		case "bun":
-			cmd = exec.Command("bun", "install")
-		default:
-			cmd = exec.Command("yarn", "install")
-		}
-		cmd.Dir = appPath
-		if opts.Verbose {
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stderr
-			return cmd.Run()
-		}
-		output, err = cmd.CombinedOutput()
+		err = runner.RunInDir(appPath, "pnpm", "install", "--frozen-lockfile")
 		if err != nil {
-			return fmt.Errorf("%s install failed: %w\n%s", pm, err, string(output))
+			err = runner.RunInDir(appPath, "pnpm", "install")
+		}
+	case "bun":
+		err = runner.RunInDir(appPath, "bun", "install", "--frozen-lockfile")
+		if err != nil {
+			err = runner.RunInDir(appPath, "bun", "install")
+		}
+	default: // yarn
+		err = runner.RunInDir(appPath, "yarn", "install", "--frozen-lockfile")
+		if err != nil {
+			err = runner.RunInDir(appPath, "yarn", "install")
 		}
 	}
 
+	if err != nil {
+		return fmt.Errorf("failed to install Node.js dependencies with %s: %w", pm, err)
+	}
 	return nil
 }
 
@@ -220,4 +196,36 @@ func LinkLocalApp(name, sourcePath string, opts InstallOptions) error {
 func fileExists(path string) bool {
 	info, err := os.Stat(path)
 	return err == nil && !info.IsDir()
+}
+
+// InstallAppOnSite installs an app on a Frappe site
+func InstallAppOnSite(siteName, appName string, opts InstallOptions) error {
+	// Run via bench_helper from sites directory using .venv Python
+	sitesDir := filepath.Join(opts.BenchPath, "sites")
+	shellCmd := fmt.Sprintf("cd %s && ../.venv/bin/python -m frappe.utils.bench_helper frappe --site %s install-app %s",
+		sitesDir, siteName, appName)
+
+	cmd := exec.Command("devbox", "run", "-c", opts.BenchPath, "--", "sh", "-c", shellCmd)
+	cmd.Dir = opts.BenchPath
+	if opts.Verbose {
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+	}
+	return cmd.Run()
+}
+
+// UninstallAppFromSite uninstalls an app from a Frappe site
+func UninstallAppFromSite(siteName, appName string, opts InstallOptions) error {
+	// Run via bench_helper from sites directory using .venv Python
+	sitesDir := filepath.Join(opts.BenchPath, "sites")
+	shellCmd := fmt.Sprintf("cd %s && ../.venv/bin/python -m frappe.utils.bench_helper frappe --site %s uninstall-app %s --yes",
+		sitesDir, siteName, appName)
+
+	cmd := exec.Command("devbox", "run", "-c", opts.BenchPath, "--", "sh", "-c", shellCmd)
+	cmd.Dir = opts.BenchPath
+	if opts.Verbose {
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+	}
+	return cmd.Run()
 }
