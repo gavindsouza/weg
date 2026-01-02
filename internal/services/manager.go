@@ -186,23 +186,23 @@ func (m *Manager) Stop() error {
 
 // killOrphanedProcesses kills any remaining frappe processes for this bench
 func (m *Manager) killOrphanedProcesses() {
-	// If we have a RunID, use it to precisely kill our processes
+	// Kill by RunID if available (precise matching via environment)
 	if m.RunID != "" {
 		m.killByRunID()
-		return
 	}
 
-	// Fallback to path-based matching
-	sitesDir := filepath.Join(m.BenchPath, "sites")
+	// Also kill by path patterns (catches orphaned child processes like esbuild)
+	// These may have been reparented to init and lost their WEG_RUNNER env
+	patterns := []string{
+		filepath.Join(m.BenchPath, "sites"),                      // gunicorn, bench commands
+		filepath.Join(m.BenchPath, "apps/frappe/socketio.js"),    // socketio
+		filepath.Join(m.BenchPath, "apps/frappe/node_modules"),   // esbuild, yarn
+		filepath.Join(m.BenchPath, ".devbox"),                    // devbox-spawned node/yarn
+	}
 
-	// Kill processes that have the sites directory in their command line
-	cmd := exec.Command("pkill", "-f", sitesDir)
-	cmd.Run() // Ignore errors - may have nothing to kill
-
-	// Kill node processes running socketio from this bench
-	socketioPath := filepath.Join(m.BenchPath, "apps/frappe/socketio.js")
-	cmd = exec.Command("pkill", "-f", socketioPath)
-	cmd.Run() // Ignore errors
+	for _, pattern := range patterns {
+		exec.Command("pkill", "-f", pattern).Run()
+	}
 }
 
 // killByRunID kills all processes with WEG_RUNNER=<runID> in their environment
