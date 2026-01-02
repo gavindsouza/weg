@@ -101,7 +101,7 @@ func syncApp(path string, result *config.DetectionResult) error {
 		}
 
 		// Compute diff
-		diff := state.ComputeDiffFromBenchConfig(benchConfig, st)
+		diff := state.ComputeDiffFromBenchConfig(benchConfig, st, wegDir)
 
 		if diff.IsEmpty() {
 			PrintInfo("Environment is up to date. Nothing to sync.")
@@ -235,7 +235,7 @@ func syncBench(path string, result *config.DetectionResult) error {
 	}
 
 	// Compute diff
-	diff := state.ComputeDiffFromBenchConfig(benchConfig, st)
+	diff := state.ComputeDiffFromBenchConfig(benchConfig, st, path)
 
 	if diff.IsEmpty() {
 		PrintInfo("Environment is up to date. Nothing to sync.")
@@ -307,6 +307,9 @@ func showDiff(diff *state.Diff) {
 			if update.NewURL != "" {
 				fmt.Printf("  ~ %s: URL changed\n", update.Name)
 			}
+			if update.DepsChanged {
+				fmt.Printf("  ~ %s: dependencies changed (will reinstall)\n", update.Name)
+			}
 		}
 	}
 
@@ -377,7 +380,11 @@ func applyAppChanges(path string, cfg *config.AppConfig, st *state.State, diff *
 			}
 		}
 
-		st.AddApp(state.AppState{Name: appName})
+		appPath := filepath.Join(wegDir, "apps", appName)
+		st.AddApp(state.AppState{
+			Name:          appName,
+			PyprojectHash: state.ComputePyprojectHash(appPath),
+		})
 	}
 
 	// Remove apps
@@ -458,11 +465,13 @@ func applyBenchChanges(path string, cfg *config.BenchConfig, st *state.State, di
 			}
 		}
 
+		appPath := filepath.Join(appsDir, appName)
 		st.AddApp(state.AppState{
-			Name:   appName,
-			URL:    appCfg.URL,
-			Branch: appCfg.Branch,
-			Path:   appCfg.Path,
+			Name:          appName,
+			URL:           appCfg.URL,
+			Branch:        appCfg.Branch,
+			Path:          appCfg.Path,
+			PyprojectHash: state.ComputePyprojectHash(appPath),
 		})
 	}
 
@@ -486,11 +495,29 @@ func applyBenchChanges(path string, cfg *config.BenchConfig, st *state.State, di
 			}
 		}
 
-		st.Apps[update.Name] = state.AppState{
-			Name:   update.Name,
-			URL:    update.NewURL,
-			Branch: update.NewBranch,
+		// Reinstall Python deps if pyproject.toml changed
+		if update.DepsChanged {
+			PrintInfo("  Reinstalling dependencies for %s...", update.Name)
+			opts := apps.InstallOptions{
+				BenchPath: path,
+				AppsDir:   appsDir,
+				Verbose:   IsVerbose(),
+			}
+			if err := apps.InstallPythonDeps(appPath, opts); err != nil {
+				return fmt.Errorf("failed to reinstall deps for %s: %w", update.Name, err)
+			}
 		}
+
+		// Preserve existing state fields and update changed ones
+		appState := st.Apps[update.Name]
+		if update.NewURL != "" {
+			appState.URL = update.NewURL
+		}
+		if update.NewBranch != "" {
+			appState.Branch = update.NewBranch
+		}
+		appState.PyprojectHash = state.ComputePyprojectHash(appPath)
+		st.Apps[update.Name] = appState
 	}
 
 	// Update apps.txt - required for bench to recognize apps

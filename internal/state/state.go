@@ -29,12 +29,13 @@ type State struct {
 
 // AppState represents the installed state of an app
 type AppState struct {
-	Name        string    `json:"name"`
-	URL         string    `json:"url,omitempty"`
-	Branch      string    `json:"branch,omitempty"`
-	Commit      string    `json:"commit,omitempty"`
-	Path        string    `json:"path,omitempty"`
-	InstalledAt time.Time `json:"installed_at"`
+	Name          string    `json:"name"`
+	URL           string    `json:"url,omitempty"`
+	Branch        string    `json:"branch,omitempty"`
+	Commit        string    `json:"commit,omitempty"`
+	Path          string    `json:"path,omitempty"`
+	InstalledAt   time.Time `json:"installed_at"`
+	PyprojectHash string    `json:"pyproject_hash,omitempty"` // Hash of pyproject.toml for dep change detection
 }
 
 // SiteState represents the state of a site
@@ -195,6 +196,18 @@ func ComputeConfigHash(configPath string) (string, error) {
 
 	hash := sha256.Sum256(data)
 	return hex.EncodeToString(hash[:]), nil
+}
+
+// ComputePyprojectHash computes a SHA256 hash of an app's pyproject.toml
+// Returns empty string if pyproject.toml doesn't exist
+func ComputePyprojectHash(appPath string) string {
+	pyprojectPath := filepath.Join(appPath, "pyproject.toml")
+	data, err := os.ReadFile(pyprojectPath)
+	if err != nil {
+		return ""
+	}
+	hash := sha256.Sum256(data)
+	return hex.EncodeToString(hash[:])
 }
 
 // NeedsSync checks if the config has changed since last sync

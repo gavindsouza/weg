@@ -1,6 +1,7 @@
 package state
 
 import (
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -36,11 +37,12 @@ type Diff struct {
 
 // AppUpdate represents an app that needs updating
 type AppUpdate struct {
-	Name      string
-	OldBranch string
-	NewBranch string
-	OldURL    string
-	NewURL    string
+	Name        string
+	OldBranch   string
+	NewBranch   string
+	OldURL      string
+	NewURL      string
+	DepsChanged bool // pyproject.toml changed, needs pip reinstall
 }
 
 // SiteUpdate represents a site that needs updating
@@ -77,7 +79,8 @@ func (d *Diff) TotalChanges() int {
 }
 
 // ComputeDiffFromBenchConfig computes the diff between a BenchConfig and current state
-func ComputeDiffFromBenchConfig(cfg *config.BenchConfig, state *State) *Diff {
+// benchPath is used to check pyproject.toml changes for installed apps
+func ComputeDiffFromBenchConfig(cfg *config.BenchConfig, state *State, benchPath string) *Diff {
 	diff := &Diff{}
 
 	// Get enabled apps from config
@@ -97,7 +100,7 @@ func ComputeDiffFromBenchConfig(cfg *config.BenchConfig, state *State) *Diff {
 		}
 	}
 
-	// Find apps to update (different branch or URL)
+	// Find apps to update (different branch, URL, or pyproject.toml)
 	for name, appCfg := range enabledApps {
 		if appState, ok := state.Apps[name]; ok {
 			needsUpdate := false
@@ -112,6 +115,17 @@ func ComputeDiffFromBenchConfig(cfg *config.BenchConfig, state *State) *Diff {
 				update.OldURL = appState.URL
 				update.NewURL = appCfg.URL
 				needsUpdate = true
+			}
+
+			// Check if pyproject.toml changed (deps need reinstall)
+			if benchPath != "" {
+				appPath := filepath.Join(benchPath, "apps", name)
+				currentHash := ComputePyprojectHash(appPath)
+				if currentHash != "" && currentHash != appState.PyprojectHash {
+					// Hash differs (or stored hash was empty - first time tracking)
+					update.DepsChanged = true
+					needsUpdate = true
+				}
 			}
 
 			if needsUpdate {
