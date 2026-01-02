@@ -375,6 +375,143 @@ node_modules/
 		}
 	}
 
+	// Create .pre-commit-config.yaml
+	precommitPath := filepath.Join(targetPath, ".pre-commit-config.yaml")
+	if _, err := os.Stat(precommitPath); os.IsNotExist(err) {
+		precommit := fmt.Sprintf(`# See https://pre-commit.com for more information
+# See https://pre-commit.com/hooks.html for more hooks
+fail_fast: false
+
+default_stages: [pre-commit, commit-msg]
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        files: "%s.*"
+      - id: check-yaml
+      - id: check-json
+        exclude: ".*(?:tsconfig|launch)\\.json$"
+      - id: check-toml
+      - id: check-ast
+      - id: check-merge-conflict
+      - id: debug-statements
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.7.0
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v4.0.0-alpha.8
+    hooks:
+      - id: prettier
+        types_or: [javascript, vue, scss]
+        exclude: |
+          (?x)^(
+            .*dist/.*|
+            .*node_modules/.*|
+            .*boilerplate/.*
+          )$
+
+  - repo: https://github.com/pre-commit/mirrors-eslint
+    rev: v9.11.1
+    hooks:
+      - id: eslint
+        args: [--quiet]
+        types_or: [javascript]
+        exclude: |
+          (?x)^(
+            .*dist/.*|
+            .*node_modules/.*|
+            .*boilerplate/.*
+          )$
+
+ci:
+  autoupdate_schedule: weekly
+  autoupdate_branch: develop
+`, moduleName)
+		if err := os.WriteFile(precommitPath, []byte(precommit), 0644); err != nil {
+			PrintVerbose("Warning: failed to create .pre-commit-config.yaml: %v", err)
+		}
+	}
+
+	// Create .editorconfig
+	editorconfigPath := filepath.Join(targetPath, ".editorconfig")
+	if _, err := os.Stat(editorconfigPath); os.IsNotExist(err) {
+		editorconfig := `# EditorConfig helps maintain consistent coding styles
+# https://editorconfig.org
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = tab
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.{py,rst}]
+indent_style = space
+indent_size = 4
+
+[*.{js,jsx,ts,tsx,vue,css,scss,json,yml,yaml,html}]
+indent_style = tab
+indent_size = 4
+
+[*.md]
+trim_trailing_whitespace = false
+`
+		if err := os.WriteFile(editorconfigPath, []byte(editorconfig), 0644); err != nil {
+			PrintVerbose("Warning: failed to create .editorconfig: %v", err)
+		}
+	}
+
+	// Create .eslintrc
+	eslintrcPath := filepath.Join(targetPath, ".eslintrc")
+	if _, err := os.Stat(eslintrcPath); os.IsNotExist(err) {
+		eslintrc := `{
+	"env": {
+		"browser": true,
+		"node": true,
+		"es2022": true
+	},
+	"parserOptions": {
+		"ecmaVersion": "latest",
+		"sourceType": "module"
+	},
+	"extends": "eslint:recommended",
+	"rules": {
+		"indent": ["error", "tab"],
+		"linebreak-style": ["error", "unix"],
+		"no-console": "warn",
+		"no-unused-vars": ["error", { "argsIgnorePattern": "^_" }]
+	},
+	"globals": {
+		"frappe": "readonly",
+		"$": "readonly",
+		"__": "readonly",
+		"locals": "readonly",
+		"cur_frm": "readonly",
+		"cur_dialog": "readonly",
+		"cur_page": "readonly",
+		"cur_list": "readonly"
+	}
+}
+`
+		if err := os.WriteFile(eslintrcPath, []byte(eslintrc), 0644); err != nil {
+			PrintVerbose("Warning: failed to create .eslintrc: %v", err)
+		}
+	}
+
+	// Create GitHub Actions workflows
+	if err := createGitHubWorkflows(targetPath, moduleName, version); err != nil {
+		PrintVerbose("Warning: failed to create GitHub workflows: %v", err)
+	}
+
 	PrintInfo("✓ App structure created")
 
 	// Initialize weg environment
@@ -609,4 +746,150 @@ func runCmdInDir(dir string, name string, args ...string) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
+}
+
+// createGitHubWorkflows creates CI and linter workflows
+func createGitHubWorkflows(targetPath, moduleName, version string) error {
+	workflowsDir := filepath.Join(targetPath, ".github", "workflows")
+	if err := os.MkdirAll(workflowsDir, 0755); err != nil {
+		return err
+	}
+
+	// CI workflow
+	ciWorkflow := fmt.Sprintf(`name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      mariadb:
+        image: mariadb:10.6
+        env:
+          MARIADB_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=5s --health-timeout=2s --health-retries=3
+
+      redis-cache:
+        image: redis:alpine
+        ports:
+          - 13000:6379
+      redis-queue:
+        image: redis:alpine
+        ports:
+          - 11000:6379
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install Frappe bench
+        run: pip install frappe-bench
+
+      - name: Initialize bench
+        run: |
+          bench init --skip-redis-config-generation frappe-bench
+          cd frappe-bench
+          bench get-app ${{ github.workspace }}
+
+      - name: Create test site
+        working-directory: frappe-bench
+        run: |
+          bench new-site --mariadb-root-password root --admin-password admin test.localhost
+          bench --site test.localhost install-app %s
+
+      - name: Run tests
+        working-directory: frappe-bench
+        run: bench --site test.localhost run-tests --app %s
+`, moduleName, moduleName)
+
+	if err := os.WriteFile(filepath.Join(workflowsDir, "ci.yml"), []byte(ciWorkflow), 0644); err != nil {
+		return err
+	}
+
+	// Linter workflow with semgrep
+	linterWorkflow := `name: Linters
+
+on:
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install pre-commit
+          pip install ruff
+
+      - name: Run pre-commit
+        run: pre-commit run --all-files
+
+  semgrep:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Semgrep
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: >-
+            p/python
+            p/javascript
+            p/security-audit
+            r/python.flask
+            r/python.django
+
+  security:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install pip-audit
+        run: pip install pip-audit
+
+      - name: Run pip-audit
+        run: pip-audit --strict --desc || true
+`
+	if err := os.WriteFile(filepath.Join(workflowsDir, "linters.yml"), []byte(linterWorkflow), 0644); err != nil {
+		return err
+	}
+
+	return nil
 }
