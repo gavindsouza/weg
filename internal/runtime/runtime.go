@@ -1,6 +1,8 @@
 package runtime
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -8,10 +10,18 @@ import (
 	"path/filepath"
 )
 
+// GenerateRunID creates a unique ID for this run
+func GenerateRunID() string {
+	b := make([]byte, 8)
+	rand.Read(b)
+	return hex.EncodeToString(b)
+}
+
 // Config holds runtime state for a running weg environment
 type Config struct {
-	Ports Ports `json:"ports"`
-	PID   int   `json:"pid,omitempty"`
+	Ports Ports  `json:"ports"`
+	PID   int    `json:"pid,omitempty"`
+	RunID string `json:"run_id,omitempty"` // Unique ID for this run, used to identify processes
 }
 
 // Ports holds the actual ports being used by services

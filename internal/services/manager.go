@@ -12,6 +12,7 @@ type Manager struct {
 	BenchPath          string
 	Verbose            bool
 	ProcessComposePort int
+	RunID              string // Run ID for identifying processes to kill
 }
 
 // NewManager creates a new service manager
@@ -185,17 +186,85 @@ func (m *Manager) Stop() error {
 
 // killOrphanedProcesses kills any remaining frappe processes for this bench
 func (m *Manager) killOrphanedProcesses() {
+	// If we have a RunID, use it to precisely kill our processes
+	if m.RunID != "" {
+		m.killByRunID()
+		return
+	}
+
+	// Fallback to path-based matching
 	sitesDir := filepath.Join(m.BenchPath, "sites")
 
 	// Kill processes that have the sites directory in their command line
-	// This catches gunicorn workers, bench commands, etc.
 	cmd := exec.Command("pkill", "-f", sitesDir)
 	cmd.Run() // Ignore errors - may have nothing to kill
 
-	// Also kill any node processes running socketio from this bench
+	// Kill node processes running socketio from this bench
 	socketioPath := filepath.Join(m.BenchPath, "apps/frappe/socketio.js")
 	cmd = exec.Command("pkill", "-f", socketioPath)
 	cmd.Run() // Ignore errors
+}
+
+// killByRunID kills all processes with WEG_RUNNER=<runID> in their environment
+func (m *Manager) killByRunID() {
+	pattern := fmt.Sprintf("WEG_RUNNER=%s", m.RunID)
+
+	// Find all process PIDs and check their environment
+	entries, err := os.ReadDir("/proc")
+	if err != nil {
+		return
+	}
+
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		// Check if directory name is a PID (all digits)
+		pid := entry.Name()
+		if len(pid) == 0 || pid[0] < '0' || pid[0] > '9' {
+			continue
+		}
+
+		// Read process environment
+		envPath := fmt.Sprintf("/proc/%s/environ", pid)
+		envData, err := os.ReadFile(envPath)
+		if err != nil {
+			continue
+		}
+
+		// Check if WEG_RUNNER matches
+		if containsEnvVar(envData, pattern) {
+			exec.Command("kill", pid).Run()
+		}
+	}
+}
+
+// containsEnvVar checks if envData (null-separated) contains the pattern
+func containsEnvVar(envData []byte, pattern string) bool {
+	patternBytes := []byte(pattern)
+	// Environment variables are null-separated
+	start := 0
+	for i := 0; i <= len(envData); i++ {
+		if i == len(envData) || envData[i] == 0 {
+			if i > start {
+				entry := envData[start:i]
+				if len(entry) >= len(patternBytes) {
+					match := true
+					for j := 0; j < len(patternBytes); j++ {
+						if entry[j] != patternBytes[j] {
+							match = false
+							break
+						}
+					}
+					if match {
+						return true
+					}
+				}
+			}
+			start = i + 1
+		}
+	}
+	return false
 }
 
 // Status shows the status of running services

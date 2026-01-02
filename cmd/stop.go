@@ -50,6 +50,11 @@ func runStop(cmd *cobra.Command, args []string) error {
 
 	mgr := services.NewManager(benchPath)
 
+	// Load runtime config to get RunID for precise process killing
+	if rtConfig, err := runtime.Load(benchPath); err == nil {
+		mgr.RunID = rtConfig.RunID
+	}
+
 	PrintInfo("Stopping services...")
 	if err := mgr.Stop(); err != nil {
 		return err

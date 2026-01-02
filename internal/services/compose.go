@@ -56,6 +56,7 @@ type ComposeOptions struct {
 	FrappeVersion string
 	NodePath      string // Path to node binary (for devbox)
 	UseVenvPython bool   // Use .venv/bin/python for bench commands (devbox projects)
+	RunID         string // Unique run ID for process identification
 }
 
 // DefaultComposeOptions returns sensible defaults
@@ -150,6 +151,15 @@ func GenerateProcessCompose(opts ComposeOptions) *ProcessComposeConfig {
 			DependsOn: map[string]DependsOn{
 				"web": {Condition: "process_started"},
 			},
+		}
+	}
+
+	// Add WEG_RUNNER env var to all processes for identification
+	if opts.RunID != "" {
+		wegEnv := fmt.Sprintf("WEG_RUNNER=%s", opts.RunID)
+		for name, proc := range config.Processes {
+			proc.Environment = append(proc.Environment, wegEnv)
+			config.Processes[name] = proc
 		}
 	}
 

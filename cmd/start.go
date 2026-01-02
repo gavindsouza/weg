@@ -123,10 +123,14 @@ func runStart(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to allocate ports: %w", err)
 	}
 
+	// Generate unique run ID for process identification
+	runID := runtime.GenerateRunID()
+
 	// Save runtime config
 	rtConfig := &runtime.Config{
 		Ports: *ports,
 		PID:   os.Getpid(),
+		RunID: runID,
 	}
 	if err := rtConfig.Save(benchPath); err != nil {
 		PrintVerbose("Warning: failed to save runtime config: %v", err)
@@ -145,6 +149,7 @@ func runStart(cmd *cobra.Command, args []string) error {
 	opts.IncludeWatch = !noWatch
 	opts.WebPort = ports.Web
 	opts.SocketPort = ports.SocketIO
+	opts.RunID = runID
 
 	// For devbox projects, don't include redis (devbox services handles it)
 	// and use .venv Python for bench commands
