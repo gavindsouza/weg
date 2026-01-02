@@ -13,9 +13,11 @@ import (
 )
 
 var upgradeCmd = &cobra.Command{
-	Use:          "upgrade <version>",
-	Short:        "Upgrade Frappe version",
-	Long:         `Upgrade the Frappe framework to a different version.
+	Use:          "upgrade",
+	Short:        "Upgrade Frappe to next version",
+	Long:         `Upgrade the Frappe framework to the next major version.
+
+Version progression: 14 → 15 → 16 → develop
 
 This command handles the full upgrade process:
   1. Updates weg.toml configuration
@@ -26,10 +28,9 @@ This command handles the full upgrade process:
   6. Runs database migrations
 
 Examples:
-  weg upgrade develop    # Upgrade to bleeding edge
-  weg upgrade 16         # Upgrade to version 16
-  weg upgrade 15         # Downgrade to version 15`,
-	Args:         cobra.ExactArgs(1),
+  weg upgrade            # Upgrade to next version (e.g., 15 → 16)
+  weg upgrade --hierarchyTip Shows current → next without upgrading`,
+	Args:         cobra.NoArgs,
 	RunE:         runUpgrade,
 	SilenceUsage: true,
 }
@@ -43,22 +44,23 @@ func init() {
 	upgradeCmd.Flags().BoolVar(&noMigrate, "no-migrate", false, "Skip database migrations")
 }
 
+// getNextVersion returns the next Frappe version in the upgrade path
+func getNextVersion(current string) (string, error) {
+	switch current {
+	case "14":
+		return "15", nil
+	case "15":
+		return "16", nil
+	case "16":
+		return "develop", nil
+	case "develop":
+		return "", fmt.Errorf("already on develop (bleeding edge)")
+	default:
+		return "", fmt.Errorf("unknown version '%s'", current)
+	}
+}
+
 func runUpgrade(cmd *cobra.Command, args []string) error {
-	targetVersion := args[0]
-
-	// Validate target version
-	validVersions := tools.GetSupportedVersions()
-	valid := false
-	for _, v := range validVersions {
-		if v == targetVersion {
-			valid = true
-			break
-		}
-	}
-	if !valid {
-		return fmt.Errorf("invalid version '%s'. Supported: %s", targetVersion, strings.Join(validVersions, ", "))
-	}
-
 	// Detect context
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -91,9 +93,11 @@ func runUpgrade(cmd *cobra.Command, args []string) error {
 	}
 
 	currentVersion := benchConfig.Frappe.Version
-	if currentVersion == targetVersion {
-		PrintInfo("Already on Frappe %s", targetVersion)
-		return nil
+
+	// Determine next version automatically
+	targetVersion, err := getNextVersion(currentVersion)
+	if err != nil {
+		return err
 	}
 
 	// Get version info for comparison
