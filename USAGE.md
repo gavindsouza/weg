@@ -273,6 +273,106 @@ The upgrade process:
 5. Reinstalls Node dependencies
 6. Runs database migrations
 
+## Configuration Commands
+
+View and modify weg configuration settings.
+
+```bash
+# Show current configuration
+weg config show
+
+# Get specific value
+weg config get frappe.version
+
+# Set a value
+weg config set frappe.version 15
+
+# List configured apps
+weg config list-apps
+```
+
+## Docker Commands
+
+Manage Docker Compose deployments for local development or production.
+
+```bash
+# Generate docker-compose.yml
+weg docker init
+
+# Start containers
+weg docker up
+weg docker up -d              # Detached mode
+
+# Stop containers
+weg docker down
+
+# View logs
+weg docker logs
+weg docker logs web           # Specific service
+
+# List containers
+weg docker ps
+```
+
+## Container Image Commands
+
+Build and manage container images for Frappe deployments.
+
+```bash
+# Build container image
+weg image build
+weg image build --tag myapp:latest
+
+# List images
+weg image list
+
+# Push to registry
+weg image push myapp:latest
+```
+
+## Cloud Commands
+
+Deploy and manage apps on Frappe Cloud.
+
+```bash
+# Authenticate with Frappe Cloud
+weg cloud login
+
+# List your sites
+weg cloud sites
+
+# List your benches
+weg cloud benches
+
+# Deploy to a site
+weg cloud deploy mysite.frappe.cloud
+weg cloud deploy --bench mybench
+
+# Check deployment status
+weg cloud status
+
+# View site logs
+weg cloud logs mysite.frappe.cloud
+
+# Log out
+weg cloud logout
+```
+
+## Migrate Project Structure
+
+Convert between app-centric and bench-centric project layouts.
+
+```bash
+# Convert app-centric to bench-centric
+weg migrate bench
+
+# Convert bench-centric to app-centric
+weg migrate app
+```
+
+App-centric mode keeps your app at the root with the bench hidden in `.weg/`.
+Bench-centric mode uses the traditional Frappe bench structure with `apps/` and `sites/` at the root.
+
 ## Global Flags
 
 All commands support these flags:
