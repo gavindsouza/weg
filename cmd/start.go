@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 
 	"github.com/gavindsouza/weg/internal/config"
 	"github.com/gavindsouza/weg/internal/runtime"
@@ -173,10 +175,37 @@ func runStart(cmd *cobra.Command, args []string) error {
 	mgr := services.NewManager(benchPath)
 	mgr.Verbose = IsVerbose()
 	mgr.ProcessComposePort = ports.ProcessCompose
+	mgr.RunID = runID
 
 	if foreground {
 		PrintInfo("Starting services on port %d... (Ctrl+C to stop)", ports.Web)
-		return mgr.Start()
+
+		// Set up signal handling for cleanup
+		sigChan := make(chan os.Signal, 1)
+		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+		// Run in goroutine so we can handle signals
+		errChan := make(chan error, 1)
+		go func() {
+			errChan <- mgr.Start()
+		}()
+
+		// Wait for either signal or process exit
+		select {
+		case <-sigChan:
+			PrintInfo("\nShutting down...")
+			mgr.Stop()
+		case err := <-errChan:
+			if err != nil {
+				PrintVerbose("Services exited: %v", err)
+			}
+		}
+
+		// Cleanup runtime config
+		if err := runtime.Remove(benchPath); err != nil {
+			PrintVerbose("Warning: failed to remove runtime config: %v", err)
+		}
+		return nil
 	}
 
 	// Default: run detached
