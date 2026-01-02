@@ -292,6 +292,11 @@ func (e *Executor) executeScript(script string) (*Result, error) {
 	return &result, nil
 }
 
+// ExecuteRaw executes a raw Python script and returns the result
+func (e *Executor) ExecuteRaw(script string) (*Result, error) {
+	return e.executeScript(script)
+}
+
 // FormatJSON formats data as pretty JSON
 func FormatJSON(data interface{}) (string, error) {
 	b, err := json.MarshalIndent(data, "", "  ")
