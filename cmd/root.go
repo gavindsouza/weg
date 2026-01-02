@@ -28,8 +28,9 @@ var (
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "weg",
-	Short: "Manage Frappe Deployments",
+	Use:          "weg",
+	Short:        "Manage Frappe Deployments",
+	SilenceUsage: true,
 	Long: `Weg is a modern CLI for managing Frappe development environments.
 
 It provides fast, declarative configuration for Frappe apps and benches,

@@ -14,9 +14,10 @@ import (
 )
 
 var startCmd = &cobra.Command{
-	Use:   "start",
-	Short: "Start development services",
-	Long: `Start all development services for the current project.
+	Use:          "start",
+	Short:        "Start development services",
+	SilenceUsage: true,
+	Long:         `Start all development services for the current project.
 
 This command starts:
   - MariaDB (database)
