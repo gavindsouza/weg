@@ -45,7 +45,7 @@ Quick start:
   weg sync               Apply configuration changes
 
 Learn more at https://github.com/gavindsouza/weg`,
-	Version: "0.1.0",
+	Version: Version,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		if chdir != "" {
 			if err := os.Chdir(chdir); err != nil {
