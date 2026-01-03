@@ -19,9 +19,10 @@ type Executor struct {
 
 // Result represents the result of an API call
 type Result struct {
-	Success bool        `json:"success"`
-	Data    interface{} `json:"data,omitempty"`
-	Error   string      `json:"error,omitempty"`
+	Success   bool        `json:"success"`
+	Data      interface{} `json:"data,omitempty"`
+	Error     string      `json:"error,omitempty"`
+	Traceback string      `json:"traceback,omitempty"`
 }
 
 // NewExecutor creates a new API executor
