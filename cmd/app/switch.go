@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/gavindsouza/weg/internal/apps"
+	"github.com/gavindsouza/weg/internal/completion"
 	"github.com/gavindsouza/weg/internal/config"
 	"github.com/gavindsouza/weg/internal/state"
 	"github.com/spf13/cobra"
@@ -20,8 +21,9 @@ This checks out the specified branch and reinstalls dependencies.
 Examples:
   weg app switch frappe version-15
   weg app switch erpnext develop`,
-	Args: cobra.ExactArgs(2),
-	RunE: runSwitch,
+	Args:              cobra.ExactArgs(2),
+	RunE:              runSwitch,
+	ValidArgsFunction: completion.CompleteAppNamesForArg(0),
 }
 
 func runSwitch(cmd *cobra.Command, args []string) error {

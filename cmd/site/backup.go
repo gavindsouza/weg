@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gavindsouza/weg/internal/completion"
 	"github.com/gavindsouza/weg/internal/config"
 	"github.com/gavindsouza/weg/internal/state"
 	"github.com/spf13/cobra"
@@ -34,8 +35,9 @@ Examples:
   weg site backup --with-files         # Include private files
   weg site backup --output /path/      # Custom backup location
   weg site backup --all                # Backup all sites`,
-	Args: cobra.MaximumNArgs(1),
-	RunE: runBackup,
+	Args:              cobra.MaximumNArgs(1),
+	RunE:              runBackup,
+	ValidArgsFunction: completion.CompleteSiteNamesForArg(0),
 }
 
 var (

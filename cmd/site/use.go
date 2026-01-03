@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/gavindsouza/weg/internal/completion"
 	"github.com/gavindsouza/weg/internal/config"
 	"github.com/gavindsouza/weg/internal/state"
 	"github.com/spf13/cobra"
@@ -19,8 +20,9 @@ The default site is used when no --site flag is provided.
 
 Examples:
   weg site use mysite.localhost`,
-	Args: cobra.ExactArgs(1),
-	RunE: runUse,
+	Args:              cobra.ExactArgs(1),
+	RunE:              runUse,
+	ValidArgsFunction: completion.CompleteSiteNamesForArg(0),
 }
 
 func runUse(cmd *cobra.Command, args []string) error {

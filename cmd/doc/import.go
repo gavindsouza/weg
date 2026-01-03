@@ -33,7 +33,7 @@ var (
 
 func init() {
 	DocCmd.AddCommand(importCmd)
-	importCmd.Flags().StringVar(&importSite, "site", "", "Site to import into")
+	importCmd.Flags().StringVarP(&importSite, "site", "s", "", "Site to import into")
 	importCmd.Flags().BoolVar(&importNoUpdate, "no-update", false, "Skip if document exists")
 }
 

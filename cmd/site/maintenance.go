@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/gavindsouza/weg/internal/api"
+	"github.com/gavindsouza/weg/internal/completion"
 	"github.com/gavindsouza/weg/internal/config"
 	"github.com/gavindsouza/weg/internal/state"
 	"github.com/spf13/cobra"
@@ -27,24 +28,27 @@ Examples:
 }
 
 var maintenanceOnCmd = &cobra.Command{
-	Use:   "on [site]",
-	Short: "Enable maintenance mode",
-	Args:  cobra.MaximumNArgs(1),
-	RunE:  runMaintenanceOn,
+	Use:               "on [site]",
+	Short:             "Enable maintenance mode",
+	Args:              cobra.MaximumNArgs(1),
+	RunE:              runMaintenanceOn,
+	ValidArgsFunction: completion.CompleteSiteNamesForArg(0),
 }
 
 var maintenanceOffCmd = &cobra.Command{
-	Use:   "off [site]",
-	Short: "Disable maintenance mode",
-	Args:  cobra.MaximumNArgs(1),
-	RunE:  runMaintenanceOff,
+	Use:               "off [site]",
+	Short:             "Disable maintenance mode",
+	Args:              cobra.MaximumNArgs(1),
+	RunE:              runMaintenanceOff,
+	ValidArgsFunction: completion.CompleteSiteNamesForArg(0),
 }
 
 var maintenanceStatusCmd = &cobra.Command{
-	Use:   "status [site]",
-	Short: "Check maintenance mode status",
-	Args:  cobra.MaximumNArgs(1),
-	RunE:  runMaintenanceStatus,
+	Use:               "status [site]",
+	Short:             "Check maintenance mode status",
+	Args:              cobra.MaximumNArgs(1),
+	RunE:              runMaintenanceStatus,
+	ValidArgsFunction: completion.CompleteSiteNamesForArg(0),
 }
 
 var maintenanceSite string

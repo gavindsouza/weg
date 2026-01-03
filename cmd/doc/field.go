@@ -16,23 +16,41 @@ var fieldCmd = &cobra.Command{
 	Short: "Get or set document field values",
 	Long: `Quick access to individual field values.
 
+Use this for fast operations on single fields without fetching
+the entire document.
+
 Examples:
   weg doc field get User Administrator email
-  weg doc field set User Administrator enabled 0`,
+  weg doc field set User Administrator enabled 0
+  weg doc field get "Sales Invoice" INV-001 grand_total`,
 }
 
 var fieldGetCmd = &cobra.Command{
 	Use:   "get <doctype> <name> <field>",
 	Short: "Get a field value",
-	Args:  cobra.ExactArgs(3),
-	RunE:  runFieldGet,
+	Long: `Get the value of a specific field from a document.
+
+Examples:
+  weg doc field get User Administrator email
+  weg doc field get Item ITEM-001 stock_uom
+  weg doc field get "Sales Invoice" INV-001 grand_total`,
+	Args: cobra.ExactArgs(3),
+	RunE: runFieldGet,
 }
 
 var fieldSetCmd = &cobra.Command{
 	Use:   "set <doctype> <name> <field> <value>",
 	Short: "Set a field value",
-	Args:  cobra.ExactArgs(4),
-	RunE:  runFieldSet,
+	Long: `Set the value of a specific field on a document.
+
+Supports various value types: strings, numbers, booleans (true/false), null.
+
+Examples:
+  weg doc field set User test@example.com enabled 0
+  weg doc field set Item ITEM-001 disabled true
+  weg doc field set Customer CUST-001 credit_limit 50000`,
+	Args: cobra.ExactArgs(4),
+	RunE: runFieldSet,
 }
 
 var fieldSite string
@@ -42,7 +60,7 @@ func init() {
 	fieldCmd.AddCommand(fieldGetCmd)
 	fieldCmd.AddCommand(fieldSetCmd)
 
-	fieldCmd.PersistentFlags().StringVar(&fieldSite, "site", "", "Site to query/update")
+	fieldCmd.PersistentFlags().StringVarP(&fieldSite, "site", "s", "", "Site to query/update")
 }
 
 func runFieldGet(cmd *cobra.Command, args []string) error {

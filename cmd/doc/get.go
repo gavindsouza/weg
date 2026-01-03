@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/gavindsouza/weg/internal/api"
+	"github.com/gavindsouza/weg/internal/completion"
 	"github.com/gavindsouza/weg/internal/config"
 	"github.com/gavindsouza/weg/internal/state"
 	"github.com/spf13/cobra"
@@ -22,8 +23,9 @@ Examples:
   weg doc get User Administrator
   weg doc get "Sales Invoice" INV-001
   weg doc get User test@test.com --json`,
-	Args: cobra.ExactArgs(2),
-	RunE: runGet,
+	Args:              cobra.ExactArgs(2),
+	RunE:              runGet,
+	ValidArgsFunction: completion.CompleteDocTypesForArg(0),
 }
 
 var (
@@ -33,7 +35,7 @@ var (
 
 func init() {
 	DocCmd.AddCommand(getCmd)
-	getCmd.Flags().StringVar(&getSite, "site", "", "Site to query")
+	getCmd.Flags().StringVarP(&getSite, "site", "s", "", "Site to query")
 	getCmd.Flags().BoolVar(&getJSON, "json", false, "Output raw JSON")
 }
 

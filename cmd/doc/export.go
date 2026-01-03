@@ -30,7 +30,7 @@ var (
 
 func init() {
 	DocCmd.AddCommand(exportCmd)
-	exportCmd.Flags().StringVar(&exportSite, "site", "", "Site to export from")
+	exportCmd.Flags().StringVarP(&exportSite, "site", "s", "", "Site to export from")
 	exportCmd.Flags().StringVarP(&exportOutput, "output", "o", "", "Output file (default: stdout)")
 }
 

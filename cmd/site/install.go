@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
+	"github.com/gavindsouza/weg/internal/completion"
 	"github.com/gavindsouza/weg/internal/config"
 	"github.com/gavindsouza/weg/internal/state"
 	"github.com/spf13/cobra"
@@ -20,8 +21,22 @@ The app must already be installed in the bench (use 'weg app get' first).
 
 Examples:
   weg site install mysite.localhost erpnext`,
-	Args: cobra.ExactArgs(2),
-	RunE: runInstall,
+	Args:              cobra.ExactArgs(2),
+	RunE:              runInstall,
+	ValidArgsFunction: completeSiteInstallArgs,
+}
+
+// completeSiteInstallArgs provides completion for site install command.
+// First arg: site name, Second arg: app name
+func completeSiteInstallArgs(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	switch len(args) {
+	case 0:
+		return completion.CompleteSiteNames(cmd, args, toComplete)
+	case 1:
+		return completion.CompleteAppNames(cmd, args, toComplete)
+	default:
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
 }
 
 func runInstall(cmd *cobra.Command, args []string) error {

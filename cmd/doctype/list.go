@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/gavindsouza/weg/internal/api"
+	"github.com/gavindsouza/weg/internal/completion"
 	"github.com/gavindsouza/weg/internal/config"
 	"github.com/gavindsouza/weg/internal/state"
 	"github.com/spf13/cobra"
@@ -21,8 +22,9 @@ Examples:
   weg doctype list              # List all custom doctypes
   weg doctype list myapp        # List doctypes in myapp
   weg doctype list --all        # Include core doctypes`,
-	Args: cobra.MaximumNArgs(1),
-	RunE: runList,
+	Args:              cobra.MaximumNArgs(1),
+	RunE:              runList,
+	ValidArgsFunction: completion.CompleteAppNamesForArg(0),
 }
 
 var (
@@ -32,7 +34,7 @@ var (
 
 func init() {
 	DoctypeCmd.AddCommand(listCmd)
-	listCmd.Flags().StringVar(&listSite, "site", "", "Site to query")
+	listCmd.Flags().StringVarP(&listSite, "site", "s", "", "Site to query")
 	listCmd.Flags().BoolVar(&listAll, "all", false, "Include core doctypes")
 }
 

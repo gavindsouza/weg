@@ -29,7 +29,7 @@ var (
 
 func init() {
 	DocCmd.AddCommand(renameCmd)
-	renameCmd.Flags().StringVar(&renameSite, "site", "", "Site to rename in")
+	renameCmd.Flags().StringVarP(&renameSite, "site", "s", "", "Site to rename in")
 	renameCmd.Flags().BoolVar(&renameMerge, "merge", false, "Merge if target exists")
 }
 

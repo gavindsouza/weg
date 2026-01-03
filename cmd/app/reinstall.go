@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/gavindsouza/weg/internal/api"
+	"github.com/gavindsouza/weg/internal/completion"
 	"github.com/gavindsouza/weg/internal/config"
 	"github.com/gavindsouza/weg/internal/state"
 	"github.com/spf13/cobra"
@@ -26,8 +27,9 @@ Examples:
   weg app reinstall myapp
   weg app reinstall myapp --site test.localhost
   weg app reinstall myapp --force  # Skip confirmation`,
-	Args: cobra.ExactArgs(1),
-	RunE: runReinstall,
+	Args:              cobra.ExactArgs(1),
+	RunE:              runReinstall,
+	ValidArgsFunction: completion.CompleteAppNamesForArg(0),
 }
 
 var (

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/gavindsouza/weg/internal/api"
+	"github.com/gavindsouza/weg/internal/completion"
 	"github.com/spf13/cobra"
 )
 
@@ -20,8 +21,9 @@ Examples:
   weg doctype show User
   weg doctype show "Sales Invoice"
   weg doctype show MyDocType --json`,
-	Args: cobra.ExactArgs(1),
-	RunE: runShow,
+	Args:              cobra.ExactArgs(1),
+	RunE:              runShow,
+	ValidArgsFunction: completion.CompleteDocTypesForArg(0),
 }
 
 var (
@@ -31,7 +33,7 @@ var (
 
 func init() {
 	DoctypeCmd.AddCommand(showCmd)
-	showCmd.Flags().StringVar(&showSite, "site", "", "Site to query")
+	showCmd.Flags().StringVarP(&showSite, "site", "s", "", "Site to query")
 	showCmd.Flags().BoolVar(&showJSON, "json", false, "Output as JSON")
 }
 

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/gavindsouza/weg/internal/api"
+	"github.com/gavindsouza/weg/internal/completion"
 	"github.com/spf13/cobra"
 )
 
@@ -22,15 +23,16 @@ Examples:
   weg doctype reload myapp mymodule MyDocType
   weg doctype reload frappe core User
   weg doctype reload erpnext stock Item`,
-	Args: cobra.ExactArgs(3),
-	RunE: runReload,
+	Args:              cobra.ExactArgs(3),
+	RunE:              runReload,
+	ValidArgsFunction: completion.CompleteAppNamesForArg(0),
 }
 
 var reloadSite string
 
 func init() {
 	DoctypeCmd.AddCommand(reloadCmd)
-	reloadCmd.Flags().StringVar(&reloadSite, "site", "", "Site to reload on")
+	reloadCmd.Flags().StringVarP(&reloadSite, "site", "s", "", "Site to reload on")
 }
 
 func runReload(cmd *cobra.Command, args []string) error {

@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/gavindsouza/weg/internal/completion"
 	"github.com/gavindsouza/weg/internal/config"
 	"github.com/gavindsouza/weg/internal/state"
 	"github.com/spf13/cobra"
@@ -30,8 +31,9 @@ This drops the database and removes the site directory.
 Examples:
   weg site drop mysite.localhost
   weg site drop mysite.localhost --force`,
-	Args: cobra.ExactArgs(1),
-	RunE: runDrop,
+	Args:              cobra.ExactArgs(1),
+	RunE:              runDrop,
+	ValidArgsFunction: completion.CompleteSiteNamesForArg(0),
 }
 
 func init() {

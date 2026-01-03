@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/gavindsouza/weg/internal/apps"
+	"github.com/gavindsouza/weg/internal/completion"
 	"github.com/gavindsouza/weg/internal/config"
 	"github.com/gavindsouza/weg/internal/state"
 	"github.com/spf13/cobra"
@@ -29,8 +30,9 @@ This uninstalls the app and removes it from the configuration.
 Examples:
   weg app remove erpnext
   weg app rm erpnext -y`,
-	Args: cobra.ExactArgs(1),
-	RunE: runRemove,
+	Args:              cobra.ExactArgs(1),
+	RunE:              runRemove,
+	ValidArgsFunction: completion.CompleteInstalledAppNames,
 }
 
 func init() {

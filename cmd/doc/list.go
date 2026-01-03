@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/gavindsouza/weg/internal/api"
+	"github.com/gavindsouza/weg/internal/completion"
 	"github.com/spf13/cobra"
 )
 
@@ -20,8 +21,9 @@ Examples:
   weg doc list User --limit 50
   weg doc list User --filters '{"enabled":1}'
   weg doc list User --fields '["name","email","enabled"]'`,
-	Args: cobra.ExactArgs(1),
-	RunE: runList,
+	Args:              cobra.ExactArgs(1),
+	RunE:              runList,
+	ValidArgsFunction: completion.CompleteDocTypesForArg(0),
 }
 
 var (
@@ -34,7 +36,7 @@ var (
 
 func init() {
 	DocCmd.AddCommand(listCmd)
-	listCmd.Flags().StringVar(&listSite, "site", "", "Site to query")
+	listCmd.Flags().StringVarP(&listSite, "site", "s", "", "Site to query")
 	listCmd.Flags().StringVarP(&listFilters, "filters", "f", "", "JSON filter object")
 	listCmd.Flags().StringVar(&listFields, "fields", "", "JSON array of fields")
 	listCmd.Flags().IntVarP(&listLimit, "limit", "l", 20, "Limit results")

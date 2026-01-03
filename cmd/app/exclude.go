@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/BurntSushi/toml"
+	"github.com/gavindsouza/weg/internal/completion"
 	"github.com/gavindsouza/weg/internal/config"
 	"github.com/spf13/cobra"
 )
@@ -20,8 +21,9 @@ removing it from the configuration.
 
 Examples:
   weg app exclude erpnext`,
-	Args: cobra.ExactArgs(1),
-	RunE: runExclude,
+	Args:              cobra.ExactArgs(1),
+	RunE:              runExclude,
+	ValidArgsFunction: completion.CompleteAppNamesForArg(0),
 }
 
 func runExclude(cmd *cobra.Command, args []string) error {
@@ -35,8 +37,9 @@ var includeCmd = &cobra.Command{
 
 Examples:
   weg app include erpnext`,
-	Args: cobra.ExactArgs(1),
-	RunE: runInclude,
+	Args:              cobra.ExactArgs(1),
+	RunE:              runInclude,
+	ValidArgsFunction: completion.CompleteAppNamesForArg(0),
 }
 
 func runInclude(cmd *cobra.Command, args []string) error {

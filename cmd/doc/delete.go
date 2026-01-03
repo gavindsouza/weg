@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/gavindsouza/weg/internal/api"
+	"github.com/gavindsouza/weg/internal/completion"
 	"github.com/spf13/cobra"
 )
 
@@ -19,8 +20,9 @@ Examples:
   weg doc delete User test@test.com
   weg doc delete "Sales Invoice" INV-001
   weg doc delete Item OLD-ITEM --force`,
-	Args: cobra.ExactArgs(2),
-	RunE: runDelete,
+	Args:              cobra.ExactArgs(2),
+	RunE:              runDelete,
+	ValidArgsFunction: completion.CompleteDocTypesForArg(0),
 }
 
 var (
@@ -30,7 +32,7 @@ var (
 
 func init() {
 	DocCmd.AddCommand(deleteCmd)
-	deleteCmd.Flags().StringVar(&deleteSite, "site", "", "Site to delete from")
+	deleteCmd.Flags().StringVarP(&deleteSite, "site", "s", "", "Site to delete from")
 	deleteCmd.Flags().BoolVarP(&deleteForce, "force", "f", false, "Skip confirmation")
 }
 

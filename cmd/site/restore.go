@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/gavindsouza/weg/internal/api"
+	"github.com/gavindsouza/weg/internal/completion"
 	"github.com/gavindsouza/weg/internal/config"
 	"github.com/gavindsouza/weg/internal/state"
 	"github.com/spf13/cobra"
@@ -32,8 +33,9 @@ Examples:
   weg site restore backup.sql.gz test.localhost   # Restore to specific site
   weg site restore db.sql.gz --files files.tar.gz # Also restore files
   weg site restore backup.sql.gz -f               # Skip confirmation`,
-	Args: cobra.RangeArgs(1, 2),
-	RunE: runRestore,
+	Args:              cobra.RangeArgs(1, 2),
+	RunE:              runRestore,
+	ValidArgsFunction: completion.CompleteSiteNamesForArg(1),
 }
 
 var (
