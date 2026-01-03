@@ -15,6 +15,7 @@ import (
 	"github.com/gavindsouza/weg/cmd/config"
 	"github.com/gavindsouza/weg/cmd/docker"
 	"github.com/gavindsouza/weg/cmd/image"
+	"github.com/gavindsouza/weg/cmd/scheduler"
 	"github.com/gavindsouza/weg/cmd/site"
 	"github.com/spf13/cobra"
 )
@@ -86,6 +87,7 @@ func init() {
 	rootCmd.AddCommand(config.ConfigCmd)
 	rootCmd.AddCommand(docker.DockerCmd)
 	rootCmd.AddCommand(image.ImageCmd)
+	rootCmd.AddCommand(scheduler.SchedulerCmd)
 	rootCmd.AddCommand(site.SiteCmd)
 }
 
