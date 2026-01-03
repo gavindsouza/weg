@@ -3,9 +3,11 @@ package cmd
 import (
 	"fmt"
 	"path/filepath"
+	"sort"
 	"time"
 
 	"github.com/gavindsouza/weg/internal/config"
+	"github.com/gavindsouza/weg/internal/runtime"
 	"github.com/gavindsouza/weg/internal/state"
 	"github.com/spf13/cobra"
 )
@@ -147,7 +149,13 @@ func showBenchStatus(path string, result *config.DetectionResult) error {
 				fmt.Printf("  - %s%s\n", site.Name, defaultMark)
 			}
 		}
+
+		// Show worker configuration
+		showWorkerConfig(benchConfig.Services.Workers)
 	}
+
+	// Show runtime status if services are running
+	showRuntimeStatus(path)
 
 	// Show state
 	return showStateInfo(path)
@@ -236,4 +244,59 @@ func formatTime(t time.Time) string {
 	}
 
 	return t.Format("2006-01-02 15:04")
+}
+
+func showWorkerConfig(workers map[string]int) {
+	fmt.Printf("\nWorkers:\n")
+
+	if len(workers) == 0 {
+		fmt.Printf("  1 worker (all queues) [default]\n")
+		return
+	}
+
+	// Sort queue names for consistent output
+	queues := make([]string, 0, len(workers))
+	for q := range workers {
+		queues = append(queues, q)
+	}
+	sort.Strings(queues)
+
+	totalWorkers := 0
+	for _, queue := range queues {
+		count := workers[queue]
+		if count <= 0 {
+			continue
+		}
+		totalWorkers += count
+
+		queueType := "dedicated"
+		queueDesc := queue
+		if queue == "all" {
+			queueType = "shared"
+			queueDesc = "short,default,long"
+		}
+
+		if count == 1 {
+			fmt.Printf("  %d worker (%s) [%s]\n", count, queueDesc, queueType)
+		} else {
+			fmt.Printf("  %d workers (%s) [%s]\n", count, queueDesc, queueType)
+		}
+	}
+
+	fmt.Printf("  Total: %d worker(s)\n", totalWorkers)
+}
+
+func showRuntimeStatus(path string) {
+	rtConfig, err := runtime.LoadIfRunning(path)
+	if err != nil || rtConfig == nil {
+		return
+	}
+
+	fmt.Printf("\n--- Runtime Status ---\n\n")
+	fmt.Printf("Status:   running\n")
+	fmt.Printf("Web:      http://localhost:%d\n", rtConfig.Ports.Web)
+	fmt.Printf("SocketIO: port %d\n", rtConfig.Ports.SocketIO)
+	if rtConfig.RunID != "" {
+		fmt.Printf("Run ID:   %s\n", rtConfig.RunID)
+	}
 }

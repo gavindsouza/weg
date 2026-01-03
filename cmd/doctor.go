@@ -99,6 +99,9 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	// Check runtime
 	checks = append(checks, checkRuntime(benchPath))
 
+	// Check workers
+	checks = append(checks, checkWorkers(benchPath))
+
 	// Print results
 	issues := 0
 	for _, c := range checks {
@@ -309,4 +312,42 @@ func checkRuntime(benchPath string) checkResult {
 	}
 
 	return checkResult{"Runtime", true, fmt.Sprintf("Web: %d, SocketIO: %d", rtConfig.Ports.Web, rtConfig.Ports.SocketIO)}
+}
+
+func checkWorkers(benchPath string) checkResult {
+	benchConfig, err := config.ParseWegToml(benchPath)
+	if err != nil {
+		return checkResult{"Workers", false, "Cannot read weg.toml"}
+	}
+
+	workers := benchConfig.Services.Workers
+	if len(workers) == 0 {
+		return checkResult{"Workers", true, "1 worker (all queues) [default]"}
+	}
+
+	// Count total workers and summarize
+	total := 0
+	shared := 0
+	dedicated := 0
+	var queues []string
+
+	for queue, count := range workers {
+		if count <= 0 {
+			continue
+		}
+		total += count
+		if queue == "all" {
+			shared += count
+		} else {
+			dedicated += count
+			queues = append(queues, queue)
+		}
+	}
+
+	msg := fmt.Sprintf("%d total: %d shared, %d dedicated", total, shared, dedicated)
+	if len(queues) > 0 {
+		msg += fmt.Sprintf(" (%s)", strings.Join(queues, ", "))
+	}
+
+	return checkResult{"Workers", true, msg}
 }
