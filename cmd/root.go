@@ -16,6 +16,7 @@ import (
 	"github.com/gavindsouza/weg/cmd/db"
 	"github.com/gavindsouza/weg/cmd/doc"
 	"github.com/gavindsouza/weg/cmd/docker"
+	"github.com/gavindsouza/weg/cmd/doctype"
 	"github.com/gavindsouza/weg/cmd/image"
 	"github.com/gavindsouza/weg/cmd/scheduler"
 	"github.com/gavindsouza/weg/cmd/site"
@@ -90,6 +91,7 @@ func init() {
 	rootCmd.AddCommand(db.DbCmd)
 	rootCmd.AddCommand(doc.DocCmd)
 	rootCmd.AddCommand(docker.DockerCmd)
+	rootCmd.AddCommand(doctype.DoctypeCmd)
 	rootCmd.AddCommand(image.ImageCmd)
 	rootCmd.AddCommand(scheduler.SchedulerCmd)
 	rootCmd.AddCommand(site.SiteCmd)
