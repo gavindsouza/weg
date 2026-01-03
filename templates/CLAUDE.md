@@ -272,6 +272,134 @@ const debouncedHandler = frappe.utils.debounce(handler, 300);
 button.onclick = debouncedHandler;
 ```
 
+## The Frappe Way
+
+These patterns ensure changes are tracked, version-controlled, and properly migrated.
+
+### Schema Changes - Edit JSON, Then Migrate
+
+```bash
+# BAD - direct SQL breaks migrations, not version-controlled
+mysql -e "ALTER TABLE tabUser ADD COLUMN custom_field VARCHAR(255)"
+
+# GOOD - edit the DocType JSON, then migrate
+# 1. Edit myapp/doctype/my_doctype/my_doctype.json
+# 2. Add field to "fields" array
+# 3. Run migrate
+weg migrate
+```
+
+For Custom Fields on standard DocTypes:
+```bash
+# Create a Custom Field via fixtures or the UI
+# Then export to keep in version control:
+weg export-fixtures
+```
+
+### Data Changes - Use Frappe API, Not Raw SQL
+
+```bash
+# BAD - bypasses permissions, hooks, and validation
+mysql -e "UPDATE tabUser SET first_name='John' WHERE name='john@example.com'"
+
+# GOOD - use weg api (respects permissions and triggers hooks)
+weg api call frappe.client.set_value \
+  --doctype User \
+  --name john@example.com \
+  --fieldname first_name \
+  --value John
+
+# GOOD - for bulk updates, use weg py
+weg py "
+for user in frappe.get_all('User', filters={'user_type': 'Website User'}):
+    frappe.db.set_value('User', user.name, 'enabled', 0)
+frappe.db.commit()
+"
+```
+
+### Reading Data - Use Frappe API
+
+```bash
+# BAD - requires knowing table structure, no permission checks
+mysql -e "SELECT name, first_name FROM tabUser WHERE enabled=1"
+
+# GOOD - respects permissions, returns proper types
+weg api call frappe.client.get_list \
+  --doctype User \
+  --filters '{"enabled": 1}' \
+  --fields '["name", "first_name"]'
+
+# GOOD - for complex queries
+weg py "print(frappe.get_all('User', filters={'enabled': 1}, fields=['name', 'first_name']))"
+```
+
+### Creating DocTypes - Edit JSON, Not API
+
+```bash
+# BAD - fragile, hard to version control
+curl -X POST localhost:8000/api/resource/DocType -d '{"doctype": "DocType", ...}'
+
+# GOOD - create the directory structure and JSON files
+mkdir -p myapp/myapp/module/doctype/my_doctype
+# Create my_doctype.json with proper schema
+# Create my_doctype.py for controller
+# Then sync:
+weg migrate
+```
+
+### Fixtures for Master Data
+
+```python
+# In hooks.py - for data that should exist in every installation
+fixtures = [
+    {"dt": "Custom Field", "filters": [["module", "=", "My App"]]},
+    {"dt": "Property Setter", "filters": [["module", "=", "My App"]]},
+    {"dt": "My Master DocType", "filters": [["is_standard", "=", 1]]},
+]
+```
+
+```bash
+# Export fixtures to JSON files
+weg export-fixtures
+
+# Import fixtures (runs during migrate)
+weg migrate
+```
+
+### Background Jobs - Use Frappe's Job System
+
+```python
+# BAD - blocks the request
+def long_running_task():
+    for doc in frappe.get_all("BigDocType"):
+        process(doc)  # Takes forever
+
+# GOOD - enqueue for background processing
+frappe.enqueue(
+    "myapp.tasks.process_all",
+    queue="long",
+    timeout=3600
+)
+```
+
+### File Operations - Use Frappe's File API
+
+```python
+# BAD - direct filesystem access
+with open("/home/frappe/files/doc.pdf", "wb") as f:
+    f.write(content)
+
+# GOOD - use Frappe's File doctype
+file_doc = frappe.get_doc({
+    "doctype": "File",
+    "file_name": "doc.pdf",
+    "content": content,
+    "attached_to_doctype": "Sales Invoice",
+    "attached_to_name": invoice.name
+})
+file_doc.insert()
+```
+
 ## Testing
 
 Run tests with:
@@ -292,6 +420,11 @@ weg test --app myapp --module module_name
 | `frappe.db.get_value(Single, Single, field)` | `frappe.db.get_single_value()` |
 | `map()/filter()` | List comprehensions |
 | Global DB calls | Wrap in functions |
+| `ALTER TABLE` | Edit JSON + `weg migrate` |
+| `mysql -e "UPDATE..."` | `weg api call frappe.client.set_value` |
+| `mysql -e "SELECT..."` | `weg api call frappe.client.get_list` |
+| Direct file writes | `frappe.get_doc({"doctype": "File", ...})` |
+| Inline long tasks | `frappe.enqueue()` |
 
 ## Pre-commit
 

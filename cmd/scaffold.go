@@ -229,6 +229,55 @@ _("User {0} not found").format(user)
 - Create debounced functions once, not on each call
 - Translate button text: ` + "`frm.add_custom_button(__('Process'), fn)`" + `
 
+## The Frappe Way
+
+### Schema Changes - Edit JSON, Then Migrate
+
+` + "```bash" + `
+# BAD - direct SQL breaks migrations
+mysql -e "ALTER TABLE tabUser ADD COLUMN custom_field VARCHAR(255)"
+
+# GOOD - edit DocType JSON, then migrate
+weg migrate
+` + "```" + `
+
+### Data Changes - Use Frappe API, Not Raw SQL
+
+` + "```bash" + `
+# BAD - bypasses permissions and hooks
+mysql -e "UPDATE tabUser SET first_name='John' WHERE name='john@example.com'"
+
+# GOOD - use weg api
+weg api call frappe.client.set_value --doctype User --name john@example.com --fieldname first_name --value John
+
+# GOOD - for bulk updates, use weg py
+weg py "
+for user in frappe.get_all('User', filters={'user_type': 'Website User'}):
+    frappe.db.set_value('User', user.name, 'enabled', 0)
+frappe.db.commit()
+"
+` + "```" + `
+
+### Reading Data - Use Frappe API
+
+` + "```bash" + `
+# BAD
+mysql -e "SELECT name FROM tabUser WHERE enabled=1"
+
+# GOOD
+weg api call frappe.client.get_list --doctype User --filters '{"enabled": 1}'
+` + "```" + `
+
+### Creating DocTypes - Edit JSON Files
+
+` + "```bash" + `
+# BAD - fragile, not version controlled
+curl -X POST localhost:8000/api/resource/DocType -d '...'
+
+# GOOD - create JSON files in doctype directory, then:
+weg migrate
+` + "```" + `
+
 ## Quick Reference
 
 | Instead of | Use |
@@ -240,6 +289,9 @@ _("User {0} not found").format(user)
 | ` + "`frappe.db.get_value(Single, Single, field)`" + ` | ` + "`frappe.db.get_single_value()`" + ` |
 | ` + "`map()/filter()`" + ` | List comprehensions |
 | Global DB calls | Wrap in functions |
+| ` + "`ALTER TABLE`" + ` | Edit JSON + ` + "`weg migrate`" + ` |
+| ` + "`mysql -e \"UPDATE...\"`" + ` | ` + "`weg api call frappe.client.set_value`" + ` |
+| ` + "`mysql -e \"SELECT...\"`" + ` | ` + "`weg api call frappe.client.get_list`" + ` |
 `
 
 	claudePath := filepath.Join(projectPath, "CLAUDE.md")
@@ -291,6 +343,14 @@ Analyze Frappe Framework code for common antipatterns and produce an actionable 
 - ` + "`map()/filter()`" + ` (use comprehensions)
 - ` + "`debug=True`" + ` left in code
 - ` + "`cur_frm`" + ` in JavaScript (deprecated)
+
+## The Frappe Way Violations
+
+- **Direct SQL for schema**: ` + "`ALTER TABLE`" + `, ` + "`CREATE TABLE`" + ` - use JSON + migrate
+- **Direct SQL for data**: ` + "`UPDATE`" + `, ` + "`INSERT`" + `, ` + "`DELETE`" + ` - use ` + "`weg api`" + ` or ` + "`weg py`" + `
+- **Direct SQL for queries**: ` + "`SELECT`" + ` - use ` + "`frappe.get_all`" + ` or ` + "`weg api`" + `
+- **curl to create DocTypes**: Use JSON files in doctype directory
+- **Direct file writes**: Use ` + "`frappe.get_doc({\"doctype\": \"File\", ...})`" + `
 
 ## Translation Checks
 
