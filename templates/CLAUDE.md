@@ -309,12 +309,8 @@ weg api call frappe.client.set_value \
   --fieldname first_name \
   --value John
 
-# GOOD - for bulk updates, use weg py
-weg py "
-for user in frappe.get_all('User', filters={'user_type': 'Website User'}):
-    frappe.db.set_value('User', user.name, 'enabled', 0)
-frappe.db.commit()
-"
+# GOOD - for bulk updates, use filters dict + values dict
+weg py "frappe.db.set_value('User', {'user_type': 'Website User'}, {'enabled': 0})"
 ```
 
 ### Reading Data - Use Frappe API
