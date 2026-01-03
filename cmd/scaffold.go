@@ -264,6 +264,14 @@ mysql -e "SELECT name FROM tabUser WHERE enabled=1"
 weg api call frappe.client.get_list --doctype User --filters '{"enabled": 1}'
 ` + "```" + `
 
+` + "```python" + `
+# BAD - raw SQL for simple list
+names = frappe.db.sql("SELECT name FROM tabUser WHERE enabled=1", pluck=True)
+
+# GOOD - use pluck for list[str]
+names = frappe.get_all("User", filters={"enabled": 1}, pluck="name")
+` + "```" + `
+
 ### Creating DocTypes - Edit JSON Files
 
 ` + "```bash" + `
@@ -288,6 +296,7 @@ weg migrate
 | ` + "`ALTER TABLE`" + ` | Edit JSON + ` + "`weg migrate`" + ` |
 | ` + "`mysql -e \"UPDATE...\"`" + ` | ` + "`weg api call frappe.client.set_value`" + ` |
 | ` + "`mysql -e \"SELECT...\"`" + ` | ` + "`weg api call frappe.client.get_list`" + ` |
+| ` + "`frappe.db.sql(\"SELECT x...\")`" + ` | ` + "`frappe.get_all(pluck=\"x\")`" + ` |
 `
 
 	claudePath := filepath.Join(projectPath, "CLAUDE.md")

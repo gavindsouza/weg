@@ -329,6 +329,15 @@ weg api call frappe.client.get_list \
 weg py "print(frappe.get_all('User', filters={'enabled': 1}, fields=['name', 'first_name']))"
 ```
 
+```python
+# BAD - raw SQL for simple list
+names = frappe.db.sql("SELECT name FROM tabUser WHERE enabled=1", pluck=True)
+
+# GOOD - use pluck parameter for list[str]
+names = frappe.get_all("User", filters={"enabled": 1}, pluck="name")
+# Returns: ["user1@example.com", "user2@example.com", ...]
+```
+
 ### Creating DocTypes - Edit JSON, Not API
 
 ```bash
@@ -419,6 +428,7 @@ weg test --app myapp --module module_name
 | `ALTER TABLE` | Edit JSON + `weg migrate` |
 | `mysql -e "UPDATE..."` | `weg api call frappe.client.set_value` |
 | `mysql -e "SELECT..."` | `weg api call frappe.client.get_list` |
+| `frappe.db.sql("SELECT x FROM tabY")` | `frappe.get_all("Y", pluck="x")` |
 | Direct file writes | `frappe.get_doc({"doctype": "File", ...})` |
 | Inline long tasks | `frappe.enqueue()` |
 
