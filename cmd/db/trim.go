@@ -34,7 +34,7 @@ var (
 
 func init() {
 	DbCmd.AddCommand(trimCmd)
-	trimCmd.Flags().StringVar(&trimSite, "site", "", "Site to trim tables for")
+	trimCmd.Flags().StringVarP(&trimSite, "site", "s", "", "Site to trim tables for")
 	trimCmd.Flags().IntVar(&trimDays, "days", 30, "Keep records from last N days")
 }
 
