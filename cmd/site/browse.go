@@ -1,11 +1,13 @@
-package cmd
+package site
 
 import (
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
+	"github.com/gavindsouza/weg/internal/completion"
 	"github.com/gavindsouza/weg/internal/config"
 	"github.com/gavindsouza/weg/internal/runtime"
 	"github.com/spf13/cobra"
@@ -17,17 +19,18 @@ var browseCmd = &cobra.Command{
 	Long: `Opens the site in browser, automatically logging in as Administrator.
 
 Examples:
-  weg browse                    # Open default site as Administrator
-  weg browse --user hr@test.com # Open as specific user
-  weg browse mysite.localhost   # Open specific site`,
-	RunE:         runBrowse,
-	SilenceUsage: true,
+  weg site browse                    # Open default site as Administrator
+  weg site browse --user hr@test.com # Open as specific user
+  weg site browse mysite.localhost   # Open specific site`,
+	RunE:              runBrowse,
+	SilenceUsage:      true,
+	ValidArgsFunction: completion.CompleteSiteNamesForArg(0),
 }
 
 var browseUser string
 
 func init() {
-	rootCmd.AddCommand(browseCmd)
+	SiteCmd.AddCommand(browseCmd)
 	browseCmd.Flags().StringVarP(&browseUser, "user", "u", "Administrator", "User to login as")
 }
 
@@ -57,7 +60,7 @@ func runBrowse(cmd *cobra.Command, args []string) error {
 	if len(args) > 0 {
 		site = args[0]
 	} else {
-		site = getDefaultSite(benchPath, result)
+		site = getDefaultSiteForBrowse(benchPath)
 		if site == "" {
 			return fmt.Errorf("no site found. Create one with 'weg sync'")
 		}
@@ -90,7 +93,30 @@ func runBrowse(cmd *cobra.Command, args []string) error {
 	}
 
 	// Also print the URL for convenience
-	PrintInfo("Site URL: http://%s:%d", site, rtConfig.Ports.Web)
+	fmt.Printf("Site URL: http://%s:%d\n", site, rtConfig.Ports.Web)
 
 	return nil
+}
+
+func getDefaultSiteForBrowse(benchPath string) string {
+	// Try currentsite.txt first
+	currentSitePath := filepath.Join(benchPath, "sites", "currentsite.txt")
+	if data, err := os.ReadFile(currentSitePath); err == nil {
+		return strings.TrimSpace(string(data))
+	}
+
+	// Try sites directory
+	sitesDir := filepath.Join(benchPath, "sites")
+	entries, err := os.ReadDir(sitesDir)
+	if err != nil {
+		return ""
+	}
+
+	for _, e := range entries {
+		if e.IsDir() && e.Name() != "assets" && e.Name()[0] != '.' {
+			return e.Name()
+		}
+	}
+
+	return ""
 }

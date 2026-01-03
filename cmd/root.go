@@ -9,7 +9,7 @@ import (
 
 	"github.com/gavindsouza/weg/cmd/api"
 	"github.com/gavindsouza/weg/cmd/app"
-	"github.com/gavindsouza/weg/cmd/bench"
+	"github.com/gavindsouza/weg/cmd/build"
 	"github.com/gavindsouza/weg/cmd/cache"
 	"github.com/gavindsouza/weg/cmd/cloud"
 	"github.com/gavindsouza/weg/cmd/config"
@@ -17,9 +17,12 @@ import (
 	"github.com/gavindsouza/weg/cmd/doc"
 	"github.com/gavindsouza/weg/cmd/docker"
 	"github.com/gavindsouza/weg/cmd/doctype"
+	"github.com/gavindsouza/weg/cmd/fixtures"
 	"github.com/gavindsouza/weg/cmd/image"
+	"github.com/gavindsouza/weg/cmd/log"
 	"github.com/gavindsouza/weg/cmd/scheduler"
 	"github.com/gavindsouza/weg/cmd/site"
+	"github.com/gavindsouza/weg/cmd/user"
 	"github.com/spf13/cobra"
 )
 
@@ -84,7 +87,8 @@ func init() {
 	// Add subcommand groups
 	rootCmd.AddCommand(api.ApiCmd)
 	rootCmd.AddCommand(app.AppCmd)
-	rootCmd.AddCommand(bench.BenchCmd)
+	// Note: benchCmd is registered in cmd/bench.go (passthrough to bench CLI)
+	rootCmd.AddCommand(build.BuildCmd)
 	rootCmd.AddCommand(cache.CacheCmd)
 	rootCmd.AddCommand(cloud.CloudCmd)
 	rootCmd.AddCommand(config.ConfigCmd)
@@ -92,9 +96,12 @@ func init() {
 	rootCmd.AddCommand(doc.DocCmd)
 	rootCmd.AddCommand(docker.DockerCmd)
 	rootCmd.AddCommand(doctype.DoctypeCmd)
+	rootCmd.AddCommand(fixtures.FixturesCmd)
 	rootCmd.AddCommand(image.ImageCmd)
+	rootCmd.AddCommand(log.LogCmd)
 	rootCmd.AddCommand(scheduler.SchedulerCmd)
 	rootCmd.AddCommand(site.SiteCmd)
+	rootCmd.AddCommand(user.UserCmd)
 }
 
 // initConfig reads in config file and ENV variables if set

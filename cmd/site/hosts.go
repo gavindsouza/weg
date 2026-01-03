@@ -1,4 +1,4 @@
-package cmd
+package site
 
 import (
 	"bufio"
@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/gavindsouza/weg/internal/completion"
 	"github.com/gavindsouza/weg/internal/config"
 	"github.com/gavindsouza/weg/internal/state"
 	"github.com/spf13/cobra"
@@ -23,10 +24,10 @@ instead of having to use localhost:8000.
 Requires sudo/root access to modify /etc/hosts.
 
 Examples:
-  weg hosts add                    # Add all sites to /etc/hosts
-  weg hosts add mysite.localhost   # Add specific site
-  weg hosts remove                 # Remove all sites from /etc/hosts
-  weg hosts list                   # Show current site entries`,
+  weg site hosts add                    # Add all sites to /etc/hosts
+  weg site hosts add mysite.localhost   # Add specific site
+  weg site hosts remove                 # Remove all sites from /etc/hosts
+  weg site hosts list                   # Show current site entries`,
 }
 
 var hostsAddCmd = &cobra.Command{
@@ -38,10 +39,11 @@ If no site is specified, adds all sites in the current project.
 Requires sudo/root access.
 
 Examples:
-  weg hosts add                    # Add all sites
-  weg hosts add mysite.localhost   # Add specific site`,
-	Args: cobra.MaximumNArgs(1),
-	RunE: runHostsAdd,
+  weg site hosts add                    # Add all sites
+  weg site hosts add mysite.localhost   # Add specific site`,
+	Args:              cobra.MaximumNArgs(1),
+	RunE:              runHostsAdd,
+	ValidArgsFunction: completion.CompleteSiteNamesForArg(0),
 }
 
 var hostsRemoveCmd = &cobra.Command{
@@ -53,20 +55,27 @@ If no site is specified, removes all sites in the current project.
 Requires sudo/root access.
 
 Examples:
-  weg hosts remove                    # Remove all sites
-  weg hosts remove mysite.localhost   # Remove specific site`,
-	Args: cobra.MaximumNArgs(1),
-	RunE: runHostsRemove,
+  weg site hosts remove                    # Remove all sites
+  weg site hosts remove mysite.localhost   # Remove specific site`,
+	Args:              cobra.MaximumNArgs(1),
+	RunE:              runHostsRemove,
+	ValidArgsFunction: completion.CompleteSiteNamesForArg(0),
 }
 
 var hostsListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List site entries in /etc/hosts",
-	RunE:  runHostsList,
+	Long: `List all site-related entries in /etc/hosts.
+
+Shows entries for sites managed by weg and any *.localhost entries.
+
+Examples:
+  weg site hosts list`,
+	RunE: runHostsList,
 }
 
 func init() {
-	rootCmd.AddCommand(hostsCmd)
+	SiteCmd.AddCommand(hostsCmd)
 	hostsCmd.AddCommand(hostsAddCmd)
 	hostsCmd.AddCommand(hostsRemoveCmd)
 	hostsCmd.AddCommand(hostsListCmd)
