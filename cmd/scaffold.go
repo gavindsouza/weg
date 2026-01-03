@@ -206,6 +206,17 @@ user.User.some_method = my_method
 # GOOD - use hooks.py doc_events
 ` + "```" + `
 
+### 11. Never use eval() - use safe_eval()
+
+` + "```python" + `
+# BAD - code injection risk
+result = eval(user_input)
+
+# GOOD
+from frappe.utils.safe_exec import safe_eval
+result = safe_eval(user_input)
+` + "```" + `
+
 ## Warnings
 
 - Use ` + "`frappe.logger()`" + ` instead of ` + "`print()`" + `
@@ -297,6 +308,8 @@ weg migrate
 | ` + "`mysql -e \"UPDATE...\"`" + ` | ` + "`weg api call frappe.client.set_value`" + ` |
 | ` + "`mysql -e \"SELECT...\"`" + ` | ` + "`weg api call frappe.client.get_list`" + ` |
 | ` + "`frappe.db.sql(\"SELECT x...\")`" + ` | ` + "`frappe.get_all(pluck=\"x\")`" + ` |
+| ` + "`eval()`" + ` | ` + "`safe_eval()`" + ` |
+| ` + "`in_list(arr, x)`" + ` | ` + "`arr.includes(x)`" + ` |
 `
 
 	claudePath := filepath.Join(projectPath, "CLAUDE.md")
@@ -340,6 +353,8 @@ Analyze Frappe Framework code for common antipatterns and produce an actionable 
 8. **Invalid hooks**: Using ` + "`after_save`" + ` (not valid)
 9. **Query builder**: Missing ` + "`order=`" + ` keyword in ` + "`orderby()`" + `
 10. **Monkey patching**: Modifying imported modules at runtime
+11. **eval()**: Use ` + "`safe_eval()`" + ` instead
+12. **Duplicate dict keys**: Same key assigned twice in dict literal
 
 ## Warnings to Check
 
@@ -348,6 +363,9 @@ Analyze Frappe Framework code for common antipatterns and produce an actionable 
 - ` + "`map()/filter()`" + ` (use comprehensions)
 - ` + "`debug=True`" + ` left in code
 - ` + "`cur_frm`" + ` in JavaScript (deprecated)
+- ` + "`in_list()`" + ` wrapper (use ` + "`.includes()`" + `)
+- ` + "`frappe.get_doc(dict(...))`" + ` (use kwargs directly)
+- ` + "`def process(args):`" + ` (use explicit parameters)
 
 ## The Frappe Way Violations
 
@@ -359,10 +377,16 @@ Analyze Frappe Framework code for common antipatterns and produce an actionable 
 
 ## Translation Checks
 
-- ` + "`frappe.throw()`" + `/` + "`msgprint()`" + ` without ` + "`_()`" + `
+- ` + "`frappe.throw()`" + `/` + "`msgprint()`" + `/` + "`show_alert()`" + ` without ` + "`_()`" + `
 - Format before translate (` + "`_('x %s' % y)`" + `)
 - Empty translations (` + "`_('')`" + `)
+- Variable-only translations (` + "`_('{0}')`" + `)
+- Leading/trailing whitespace in translations
+- Concatenating translations (` + "`_('a') + _('b')`" + `)
+- Template literals in JS (` + "__(`...`)" + `)
 - JavaScript: missing ` + "`__()`" + ` on user text
+- Button text without ` + "`__()`" + `
+- Report labels without ` + "`_()`" + `
 
 ## Execution
 

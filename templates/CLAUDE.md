@@ -146,6 +146,27 @@ doc_events = {
 }
 ```
 
+### 11. Never use eval() - use safe_eval()
+
+```python
+# BAD - code injection risk
+result = eval(user_input)
+
+# GOOD - sandboxed evaluation
+from frappe.utils.safe_exec import safe_eval
+result = safe_eval(user_input)
+```
+
+### 12. Don't duplicate dict keys
+
+```python
+# BAD - second value overwrites first, likely a bug
+data = {"name": "John", "age": 30, "name": "Jane"}
+
+# GOOD
+data = {"name": "Jane", "age": 30}
+```
+
 ## Warnings
 
 ### Use msgprint/logger instead of print
@@ -157,6 +178,28 @@ print("Debug:", value)
 # GOOD
 frappe.logger().info(f"Debug: {value}")
 frappe.msgprint(f"Value: {value}")  # For user-facing messages
+```
+
+### Don't use `args` as sole function argument
+
+```python
+# BAD - reduces readability, allows ill-specified arguments
+def process(args):
+    name = args.get("name")
+
+# GOOD - explicit parameters
+def process(name, value, doctype=None):
+    pass
+```
+
+### Use frappe.get_doc() directly
+
+```python
+# BAD - unnecessary dict()
+doc = frappe.get_doc(dict(doctype="User", email="test@example.com"))
+
+# GOOD - pass kwargs directly
+doc = frappe.get_doc(doctype="User", email="test@example.com")
 ```
 
 ### Avoid manual commits
@@ -227,16 +270,70 @@ _("No results found")
 _("Created {0} records").format(count)
 ```
 
+### No leading/trailing whitespace in translations
+
+```python
+# BAD - whitespace breaks translation matching
+_("  Hello World  ")
+_("\tIndented")
+
+# GOOD
+_("Hello World")
+```
+
+### Don't split or concatenate translations
+
+```python
+# BAD - translators can't see full context
+_("Hello") + _(" World")
+_("This is a very long " + "string that spans lines")
+
+# GOOD - keep as single string
+_("Hello World")
+_("This is a very long string that spans lines")
+```
+
+### Translate dynamic labels from meta
+
+```python
+# BAD - label is not translated
+msg = _("Value required for {0}").format(self.meta.get_label("field"))
+
+# GOOD - translate the label too
+msg = _("Value required for {0}").format(_(self.meta.get_label("field")))
+```
+
+### Report filter options - use label/value objects
+
+```javascript
+// BAD - translated values in business logic are problematic
+filters: [{
+    fieldname: "status",
+    options: [__("Open"), __("Closed")]
+}]
+
+// GOOD - separate label from value
+filters: [{
+    fieldname: "status",
+    options: [
+        {label: __("Open"), value: "Open"},
+        {label: __("Closed"), value: "Closed"}
+    ]
+}]
+```
+
 ### JavaScript translation
 
 ```javascript
 // BAD
 frappe.msgprint("Error occurred");
-frappe.throw(`Error: ${msg}`);  // Template literal
+frappe.throw(`Error: ${msg}`);  // Template literal not allowed
+frappe.show_alert("Success!");
 
 // GOOD
 frappe.msgprint(__("Error occurred"));
 frappe.throw(__("Error: {0}", [msg]));
+frappe.show_alert(__("Success!"));
 ```
 
 ### Button text must be translated
@@ -270,6 +367,16 @@ button.onclick = () => frappe.utils.debounce(handler, 300)();
 // GOOD - create once, call many
 const debouncedHandler = frappe.utils.debounce(handler, 300);
 button.onclick = debouncedHandler;
+```
+
+### Use vanilla JS instead of frappe wrappers
+
+```javascript
+// BAD - unnecessary wrapper
+if (in_list(myList, item)) { ... }
+
+// GOOD - vanilla JS
+if (myList.includes(item)) { ... }
 ```
 
 ## The Frappe Way
@@ -431,6 +538,10 @@ weg test --app myapp --module module_name
 | `frappe.db.sql("SELECT x FROM tabY")` | `frappe.get_all("Y", pluck="x")` |
 | Direct file writes | `frappe.get_doc({"doctype": "File", ...})` |
 | Inline long tasks | `frappe.enqueue()` |
+| `eval()` | `frappe.utils.safe_exec.safe_eval()` |
+| `in_list(arr, x)` | `arr.includes(x)` |
+| `frappe.get_doc(dict(...))` | `frappe.get_doc(...)` |
+| `def process(args):` | `def process(name, value):` |
 
 ## Pre-commit
 
