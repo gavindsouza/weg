@@ -30,11 +30,28 @@ func NewExecutor(benchPath, site, user string) *Executor {
 	if user == "" {
 		user = "Administrator"
 	}
+
+	// Ensure required directories exist
+	// Frappe expects logs/ at multiple locations depending on context
+	ensureDir(filepath.Join(benchPath, "logs"))
+	ensureDir(filepath.Join(benchPath, "sites", site, "logs"))
+	ensureDir(filepath.Join(benchPath, site, "logs")) // Frappe sometimes uses benchPath/<site>/logs
+
+	// For app-centric mode (.weg), also create logs at parent
+	if filepath.Base(benchPath) == ".weg" {
+		ensureDir(filepath.Join(filepath.Dir(benchPath), "logs"))
+	}
+
 	return &Executor{
 		BenchPath: benchPath,
 		Site:      site,
 		User:      user,
 	}
+}
+
+// ensureDir creates a directory if it doesn't exist
+func ensureDir(path string) {
+	os.MkdirAll(path, 0755)
 }
 
 // Call executes a frappe.call() with the given method and kwargs
