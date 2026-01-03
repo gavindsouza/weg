@@ -24,7 +24,7 @@ Examples:
 
 var mariadbCmd = &cobra.Command{
 	Use:     "mariadb",
-	Aliases: []string{"db", "mysql"},
+	Aliases: []string{"mysql"},
 	Short:   "Open a MariaDB/MySQL shell",
 	Long: `Open an interactive database shell for the selected site.
 

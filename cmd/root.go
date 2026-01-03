@@ -13,6 +13,8 @@ import (
 	"github.com/gavindsouza/weg/cmd/cache"
 	"github.com/gavindsouza/weg/cmd/cloud"
 	"github.com/gavindsouza/weg/cmd/config"
+	"github.com/gavindsouza/weg/cmd/db"
+	"github.com/gavindsouza/weg/cmd/doc"
 	"github.com/gavindsouza/weg/cmd/docker"
 	"github.com/gavindsouza/weg/cmd/image"
 	"github.com/gavindsouza/weg/cmd/scheduler"
@@ -85,6 +87,8 @@ func init() {
 	rootCmd.AddCommand(cache.CacheCmd)
 	rootCmd.AddCommand(cloud.CloudCmd)
 	rootCmd.AddCommand(config.ConfigCmd)
+	rootCmd.AddCommand(db.DbCmd)
+	rootCmd.AddCommand(doc.DocCmd)
 	rootCmd.AddCommand(docker.DockerCmd)
 	rootCmd.AddCommand(image.ImageCmd)
 	rootCmd.AddCommand(scheduler.SchedulerCmd)
