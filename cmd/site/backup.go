@@ -1,4 +1,4 @@
-package cmd
+package site
 
 import (
 	"compress/gzip"
@@ -29,11 +29,11 @@ Backups are stored in .weg/backups/ by default, with timestamp naming:
   {site}_{datetime}_files.tar.gz (if --with-files)
 
 Examples:
-  weg backup                      # Backup default site
-  weg backup test.localhost       # Backup specific site
-  weg backup --with-files         # Include private files
-  weg backup --output /path/      # Custom backup location
-  weg backup --all                # Backup all sites`,
+  weg site backup                      # Backup default site
+  weg site backup test.localhost       # Backup specific site
+  weg site backup --with-files         # Include private files
+  weg site backup --output /path/      # Custom backup location
+  weg site backup --all                # Backup all sites`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: runBackup,
 }
@@ -45,7 +45,7 @@ var (
 )
 
 func init() {
-	rootCmd.AddCommand(backupCmd)
+	SiteCmd.AddCommand(backupCmd)
 	backupCmd.Flags().BoolVar(&backupWithFiles, "with-files", false, "Include private files in backup")
 	backupCmd.Flags().StringVarP(&backupOutput, "output", "o", "", "Output directory for backup files")
 	backupCmd.Flags().BoolVar(&backupAll, "all", false, "Backup all sites")
@@ -127,11 +127,11 @@ func runBackup(cmd *cobra.Command, args []string) error {
 
 	// Backup each site
 	for _, site := range sites {
-		PrintInfo("Backing up %s...", site)
+		fmt.Printf("Backing up %s...\n", site)
 
 		siteConfig, err := loadSiteConfig(benchPath, site)
 		if err != nil {
-			PrintError("Failed to load site config for %s: %v", site, err)
+			fmt.Fprintf(os.Stderr, "Failed to load site config for %s: %v\n", site, err)
 			continue
 		}
 
@@ -143,23 +143,23 @@ func runBackup(cmd *cobra.Command, args []string) error {
 		if err := backupDatabase(benchPath, site, siteConfig, dbFile, useDevbox); err != nil {
 			return fmt.Errorf("failed to backup database for %s: %w", site, err)
 		}
-		PrintInfo("  Database: %s", dbFile)
+		fmt.Printf("  Database: %s\n", dbFile)
 
 		// Backup files if requested
 		if backupWithFiles {
 			filesBackup := filepath.Join(backupDir, baseFilename+"_files.tar.gz")
 			if err := backupFiles(benchPath, site, filesBackup); err != nil {
-				PrintVerbose("Warning: failed to backup files for %s: %v", site, err)
+				fmt.Printf("Warning: failed to backup files for %s: %v\n", site, err)
 			} else {
-				PrintInfo("  Files: %s", filesBackup)
+				fmt.Printf("  Files: %s\n", filesBackup)
 			}
 		}
 	}
 
 	if len(sites) == 1 {
-		PrintInfo("Backup completed for %s", sites[0])
+		fmt.Printf("Backup completed for %s\n", sites[0])
 	} else {
-		PrintInfo("Backup completed for %d sites", len(sites))
+		fmt.Printf("Backup completed for %d sites\n", len(sites))
 	}
 
 	return nil

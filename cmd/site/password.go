@@ -1,4 +1,4 @@
-package cmd
+package site
 
 import (
 	"bufio"
@@ -29,10 +29,10 @@ This is commonly used after:
   - Resetting a forgotten password
 
 Examples:
-  weg password                           # Reset Administrator password (prompts)
-  weg password admin@example.com         # Reset specific user password
-  weg password --site test.localhost     # Reset password for specific site
-  weg password --password secret         # Non-interactive (not recommended)`,
+  weg site password                      # Reset Administrator password (prompts)
+  weg site password admin@example.com    # Reset specific user password
+  weg site password --site test          # Reset password for specific site
+  weg site password --password secret    # Non-interactive (not recommended)`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: runPassword,
 }
@@ -44,7 +44,7 @@ var (
 )
 
 func init() {
-	rootCmd.AddCommand(passwordCmd)
+	SiteCmd.AddCommand(passwordCmd)
 	passwordCmd.Flags().StringVar(&passwordSite, "site", "", "Site to update password for")
 	passwordCmd.Flags().StringVar(&passwordValue, "password", "", "New password (prompts if not provided)")
 	passwordCmd.Flags().BoolVar(&passwordLogout, "logout-all-sessions", false, "Logout all existing sessions")
@@ -112,7 +112,7 @@ func runPassword(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("password must be at least 4 characters")
 	}
 
-	PrintInfo("Setting password for %s on %s...", user, site)
+	fmt.Printf("Setting password for %s on %s...\n", user, site)
 
 	// Execute password update
 	executor := api.NewExecutor(benchPath, site, "Administrator")
@@ -147,9 +147,9 @@ finally:
 		return fmt.Errorf("failed to set password: %s", apiResult.Error)
 	}
 
-	PrintInfo("Password updated for %s", user)
+	fmt.Printf("Password updated for %s\n", user)
 	if passwordLogout {
-		PrintInfo("All existing sessions have been logged out")
+		fmt.Println("All existing sessions have been logged out")
 	}
 	return nil
 }
