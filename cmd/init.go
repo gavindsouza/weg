@@ -35,14 +35,16 @@ Examples:
 }
 
 var (
-	forceBench bool
-	forceApp   bool
+	forceBench     bool
+	forceApp       bool
+	skipDevTooling bool
 )
 
 func init() {
 	rootCmd.AddCommand(initCmd)
 	initCmd.Flags().BoolVar(&forceBench, "bench", false, "Force bench-style initialization")
 	initCmd.Flags().BoolVar(&forceApp, "app", false, "Force app-style initialization")
+	initCmd.Flags().BoolVar(&skipDevTooling, "skip-dev-tooling", false, "Skip setting up AI and pre-commit tooling")
 	initCmd.MarkFlagsMutuallyExclusive("bench", "app")
 }
 
@@ -187,9 +189,24 @@ database = "%s"
 	}
 
 	PrintInfo("Created pyproject.toml with [tool.weg] configuration")
+
+	// Set up development tooling unless skipped
+	if !skipDevTooling {
+		fmt.Println()
+		if err := scaffoldAI(path); err != nil {
+			PrintVerbose("Warning: failed to scaffold AI tooling: %v", err)
+		}
+		if err := scaffoldPrecommit(path); err != nil {
+			PrintVerbose("Warning: failed to scaffold pre-commit config: %v", err)
+		}
+	}
+
 	PrintInfo("\nNext steps:")
 	PrintInfo("  1. Run 'weg install' to set up the development environment")
 	PrintInfo("  2. Run 'weg start' to start the development server")
+	if !skipDevTooling {
+		PrintInfo("  3. Run 'pip install pre-commit && pre-commit install' for git hooks")
+	}
 
 	return nil
 }
@@ -351,9 +368,24 @@ database = "%s"
 	}
 
 	PrintInfo("Added [tool.weg] section to pyproject.toml")
+
+	// Set up development tooling unless skipped
+	if !skipDevTooling {
+		fmt.Println()
+		if err := scaffoldAI(path); err != nil {
+			PrintVerbose("Warning: failed to scaffold AI tooling: %v", err)
+		}
+		if err := scaffoldPrecommit(path); err != nil {
+			PrintVerbose("Warning: failed to scaffold pre-commit config: %v", err)
+		}
+	}
+
 	PrintInfo("\nNext steps:")
 	PrintInfo("  1. Run 'weg install' to set up the development environment")
 	PrintInfo("  2. Run 'weg start' to start the development server")
+	if !skipDevTooling {
+		PrintInfo("  3. Run 'pip install pre-commit && pre-commit install' for git hooks")
+	}
 
 	return nil
 }
