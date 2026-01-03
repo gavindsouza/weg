@@ -11,7 +11,14 @@ import (
 // ProcessComposeConfig represents a process-compose.yaml configuration
 type ProcessComposeConfig struct {
 	Version   string             `yaml:"version,omitempty"`
+	Includes  []Include          `yaml:"includes,omitempty"`
 	Processes map[string]Process `yaml:"processes"`
+}
+
+// Include represents a process-compose include directive
+type Include struct {
+	Path     string `yaml:"path"`
+	Optional bool   `yaml:"optional,omitempty"`
 }
 
 // Process represents a single process in process-compose
@@ -54,9 +61,10 @@ type ComposeOptions struct {
 	IncludeRedis  bool
 	IncludeWatch  bool
 	FrappeVersion string
-	NodePath      string // Path to node binary (for devbox)
-	UseVenvPython bool   // Use .venv/bin/python for bench commands (devbox projects)
-	RunID         string // Unique run ID for process identification
+	NodePath      string         // Path to node binary (for devbox)
+	UseVenvPython bool           // Use .venv/bin/python for bench commands (devbox projects)
+	RunID         string         // Unique run ID for process identification
+	Workers       map[string]int // Queue name -> instance count ("all" = all queues)
 }
 
 // DefaultComposeOptions returns sensible defaults
@@ -79,6 +87,11 @@ func GenerateProcessCompose(opts ComposeOptions) *ProcessComposeConfig {
 		Processes: make(map[string]Process),
 	}
 
+	// Add optional override file include
+	config.Includes = []Include{
+		{Path: "process-compose.override.yaml", Optional: true},
+	}
+
 	// Helper to generate bench command with correct Python
 	benchCmd := func(args string) string {
 		if opts.UseVenvPython {
@@ -88,6 +101,14 @@ func GenerateProcessCompose(opts ComposeOptions) *ProcessComposeConfig {
 			return fmt.Sprintf("cd sites && ../.venv/bin/python -m frappe.utils.bench_helper frappe %s", args)
 		}
 		return fmt.Sprintf("bench %s", args)
+	}
+
+	// Helper to create worker dependencies
+	workerDeps := func() map[string]DependsOn {
+		if opts.IncludeRedis {
+			return map[string]DependsOn{"redis_queue": {Condition: "process_started"}}
+		}
+		return map[string]DependsOn{"web": {Condition: "process_started"}}
 	}
 
 	// Redis cache (only if not using external redis like devbox)
@@ -127,14 +148,48 @@ func GenerateProcessCompose(opts ComposeOptions) *ProcessComposeConfig {
 		},
 	}
 
-	// Single background worker handling all queues (simpler for dev)
-	worker := Process{Command: benchCmd("worker --queue short,default,long")}
-	if opts.IncludeRedis {
-		worker.DependsOn = map[string]DependsOn{"redis_queue": {Condition: "process_started"}}
-	} else {
-		worker.DependsOn = map[string]DependsOn{"web": {Condition: "process_started"}}
+	// Generate workers based on Workers map
+	workers := opts.Workers
+
+	// If no config specified, default to 1 worker for all queues
+	if len(workers) == 0 {
+		workers = map[string]int{"all": 1}
 	}
-	config.Processes["worker"] = worker
+
+	// Generate workers for each queue
+	for queue, count := range workers {
+		if count <= 0 {
+			continue
+		}
+
+		// Determine the queue flag
+		var queueFlag string
+		if queue == "all" {
+			// "all" is a special case - consume all standard queues
+			queueFlag = "short,default,long"
+		} else {
+			queueFlag = queue
+		}
+
+		for i := 0; i < count; i++ {
+			var name string
+			if queue == "all" {
+				name = "worker"
+				if count > 1 {
+					name = fmt.Sprintf("worker_%d", i+1)
+				}
+			} else {
+				name = fmt.Sprintf("worker_%s", queue)
+				if count > 1 {
+					name = fmt.Sprintf("worker_%s_%d", queue, i+1)
+				}
+			}
+			config.Processes[name] = Process{
+				Command:   benchCmd(fmt.Sprintf("worker --queue %s", queueFlag)),
+				DependsOn: workerDeps(),
+			}
+		}
+	}
 
 	// Scheduler
 	config.Processes["scheduler"] = Process{

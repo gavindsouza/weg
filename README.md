@@ -11,6 +11,7 @@ Weg (वेग - Marathi/Sanskrit for "speed") is a command-line tool for managi
 - **Modern tooling** - devbox (Nix), uv (fast Python), process-compose
 - **Direct API access** - `weg api` without HTTP overhead
 - **70+ commands** covering all common Frappe development workflows
+- **Works from anywhere** - run commands from any subdirectory within your project
 
 ## Installation
 
@@ -139,6 +140,17 @@ branch = "version-15"
 name = "mysite.localhost"
 default = true
 apps = ["frappe", "erpnext"]
+
+[services.workers]
+# Scale background workers per queue
+short = 1
+default = 2
+long = 1
+# Custom queues are also supported
+notifications = 2
+exports = 1
+# "all" consumes all standard queues (short, default, long)
+# all = 1
 ```
 
 ### pyproject.toml (app-centric)
@@ -153,6 +165,31 @@ erpnext = { url = "https://github.com/frappe/erpnext", branch = "version-15" }
 [tool.weg.sites]
 default = "dev.localhost"
 ```
+
+## Customizing Services
+
+Weg generates `process-compose.yaml` for running development services. You can customize it by creating `process-compose.override.yaml`:
+
+```yaml
+# process-compose.override.yaml
+processes:
+  web:
+    environment:
+      - GUNICORN_WORKERS=4
+
+  # Disable a process
+  watch:
+    disabled: true
+
+  # Add a custom process
+  mailhog:
+    command: mailhog
+    readiness_probe:
+      http_get:
+        port: 8025
+```
+
+The override file is automatically included when present (uses process-compose's native include feature).
 
 ## Shell Completions
 

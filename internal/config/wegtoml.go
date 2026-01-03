@@ -48,9 +48,10 @@ type SiteConfig struct {
 
 // ServicesConfig contains service configuration overrides
 type ServicesConfig struct {
-	Redis    RedisConfig    `toml:"redis,omitempty"`
-	Database DatabaseConfig `toml:"database,omitempty"`
-	Web      WebConfig      `toml:"web,omitempty"`
+	Redis    RedisConfig      `toml:"redis,omitempty"`
+	Database DatabaseConfig   `toml:"database,omitempty"`
+	Web      WebConfig        `toml:"web,omitempty"`
+	Workers  map[string]int   `toml:"workers,omitempty"` // Queue name -> instance count
 }
 
 // RedisConfig contains Redis service configuration

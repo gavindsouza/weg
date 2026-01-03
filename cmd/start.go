@@ -156,6 +156,11 @@ func runStart(cmd *cobra.Command, args []string) error {
 	opts.SocketPort = ports.SocketIO
 	opts.RunID = runID
 
+	// Copy worker config from weg.toml if available
+	if benchConfig != nil && len(benchConfig.Services.Workers) > 0 {
+		opts.Workers = benchConfig.Services.Workers
+	}
+
 	// For devbox projects, don't include redis (devbox services handles it)
 	// and use .venv Python for bench commands
 	devboxJSON := filepath.Join(benchPath, "devbox.json")

@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"os"
 
+	internalconfig "github.com/gavindsouza/weg/internal/config"
+
 	"github.com/gavindsouza/weg/cmd/api"
 	"github.com/gavindsouza/weg/cmd/app"
 	"github.com/gavindsouza/weg/cmd/build"
@@ -35,6 +37,12 @@ var (
 	chdir      string
 )
 
+// Detected paths (set in PersistentPreRunE)
+var (
+	projectRoot string // The detected project root (or empty if not in a project)
+	originalDir string // The directory weg was invoked from
+)
+
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:          "weg",
@@ -54,11 +62,53 @@ Quick start:
 Learn more at https://github.com/gavindsouza/weg`,
 	Version: Version,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		// Store original directory
+		var err error
+		originalDir, err = os.Getwd()
+		if err != nil {
+			originalDir = "."
+		}
+
+		// Handle explicit --chdir flag first
 		if chdir != "" {
 			if err := os.Chdir(chdir); err != nil {
 				return fmt.Errorf("failed to change directory to %s: %w", chdir, err)
 			}
 		}
+
+		// Commands that should work without being in a project
+		skipAutoChdir := map[string]bool{
+			"new":        true,
+			"create":     true,
+			"init":       true,
+			"help":       true,
+			"version":    true,
+			"completion": true,
+			"self":       true,
+			"run":        true, // weg run clones fresh
+		}
+
+		// Skip auto-detection for root command (no subcommand) or skipped commands
+		cmdName := cmd.Name()
+		if cmdName == "weg" || skipAutoChdir[cmdName] {
+			return nil
+		}
+
+		// Find project root by walking up the directory tree
+		cwd, _ := os.Getwd()
+		if root, found := internalconfig.FindBenchRoot(cwd); found {
+			projectRoot = root
+			// Only chdir if we're not already at the root
+			if cwd != root {
+				if err := os.Chdir(root); err != nil {
+					return fmt.Errorf("failed to change to project root %s: %w", root, err)
+				}
+				if verbose {
+					fmt.Printf("Changed to project root: %s\n", root)
+				}
+			}
+		}
+
 		return nil
 	},
 }
@@ -147,4 +197,14 @@ func PrintInfo(format string, args ...interface{}) {
 // PrintError prints an error message (always shown)
 func PrintError(format string, args ...interface{}) {
 	fmt.Fprintf(os.Stderr, "Error: "+format+"\n", args...)
+}
+
+// GetProjectRoot returns the detected project root (may be empty if not in a project)
+func GetProjectRoot() string {
+	return projectRoot
+}
+
+// GetOriginalDir returns the directory weg was invoked from
+func GetOriginalDir() string {
+	return originalDir
 }

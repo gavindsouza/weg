@@ -270,3 +270,77 @@ func TestBenchConfigMethods(t *testing.T) {
 		t.Errorf("expected 3 app names, got %d", len(names))
 	}
 }
+
+func TestParseWegTomlWorkerConfig(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	content := `[bench]
+name = "test-bench"
+
+[frappe]
+version = "15"
+database = "mariadb"
+
+[services.workers]
+short = 1
+default = 2
+long = 1
+`
+	wegPath := filepath.Join(tmpDir, "weg.toml")
+	if err := os.WriteFile(wegPath, []byte(content), 0644); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+
+	config, err := ParseWegToml(tmpDir)
+	if err != nil {
+		t.Fatalf("ParseWegToml failed: %v", err)
+	}
+
+	// Verify worker config
+	if config.Services.Workers["short"] != 1 {
+		t.Errorf("expected short workers 1, got %d", config.Services.Workers["short"])
+	}
+	if config.Services.Workers["default"] != 2 {
+		t.Errorf("expected default workers 2, got %d", config.Services.Workers["default"])
+	}
+	if config.Services.Workers["long"] != 1 {
+		t.Errorf("expected long workers 1, got %d", config.Services.Workers["long"])
+	}
+}
+
+func TestParseWegTomlWorkerConfigCustomQueues(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	content := `[bench]
+name = "test-bench"
+
+[frappe]
+version = "15"
+database = "mariadb"
+
+[services.workers]
+all = 1
+notifications = 2
+exports = 1
+`
+	wegPath := filepath.Join(tmpDir, "weg.toml")
+	if err := os.WriteFile(wegPath, []byte(content), 0644); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+
+	config, err := ParseWegToml(tmpDir)
+	if err != nil {
+		t.Fatalf("ParseWegToml failed: %v", err)
+	}
+
+	// Verify worker config - custom queues
+	if config.Services.Workers["all"] != 1 {
+		t.Errorf("expected all workers 1, got %d", config.Services.Workers["all"])
+	}
+	if config.Services.Workers["notifications"] != 2 {
+		t.Errorf("expected notifications workers 2, got %d", config.Services.Workers["notifications"])
+	}
+	if config.Services.Workers["exports"] != 1 {
+		t.Errorf("expected exports workers 1, got %d", config.Services.Workers["exports"])
+	}
+}

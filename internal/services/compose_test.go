@@ -1,6 +1,7 @@
 package services
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -330,5 +331,158 @@ func TestGenerateAndWrite(t *testing.T) {
 	// Should not have watch (disabled)
 	if strings.Contains(content, "watch:") {
 		t.Error("File should not contain watch process")
+	}
+}
+
+func TestGenerateProcessComposeWorkerDefault(t *testing.T) {
+	// Default: no worker config = 1 worker for all queues
+	opts := ComposeOptions{
+		BenchPath:    "/test/bench",
+		WebPort:      8000,
+		SocketPort:   9000,
+		IncludeRedis: true,
+	}
+
+	config := GenerateProcessCompose(opts)
+
+	// Should have exactly 1 worker named "worker"
+	if _, ok := config.Processes["worker"]; !ok {
+		t.Error("Should have 'worker' process by default")
+	}
+
+	// Should not have numbered workers
+	if _, ok := config.Processes["worker_1"]; ok {
+		t.Error("Should not have numbered workers when only 1 all-queue worker")
+	}
+
+	// Worker command should include all queues
+	worker := config.Processes["worker"]
+	if !strings.Contains(worker.Command, "short,default,long") {
+		t.Errorf("Default worker should consume all queues: %s", worker.Command)
+	}
+}
+
+func TestGenerateProcessComposeWorkerAll(t *testing.T) {
+	// Multiple "all" workers
+	opts := ComposeOptions{
+		BenchPath:    "/test/bench",
+		WebPort:      8000,
+		SocketPort:   9000,
+		IncludeRedis: true,
+		Workers:      map[string]int{"all": 3},
+	}
+
+	config := GenerateProcessCompose(opts)
+
+	// Should have 3 numbered workers
+	for i := 1; i <= 3; i++ {
+		name := fmt.Sprintf("worker_%d", i)
+		if _, ok := config.Processes[name]; !ok {
+			t.Errorf("Should have '%s' process", name)
+		}
+	}
+
+	// Should not have plain "worker" (only numbered when > 1)
+	if _, ok := config.Processes["worker"]; ok {
+		t.Error("Should not have 'worker' when multiple all-queue workers")
+	}
+}
+
+func TestGenerateProcessComposeWorkerNamedQueues(t *testing.T) {
+	// Named queue workers
+	opts := ComposeOptions{
+		BenchPath:    "/test/bench",
+		WebPort:      8000,
+		SocketPort:   9000,
+		IncludeRedis: true,
+		Workers:      map[string]int{"short": 1, "default": 2, "long": 1},
+	}
+
+	config := GenerateProcessCompose(opts)
+
+	// Should have worker_short (single, so no number)
+	if w, ok := config.Processes["worker_short"]; !ok {
+		t.Error("Should have 'worker_short' process")
+	} else if !strings.Contains(w.Command, "--queue short") {
+		t.Errorf("worker_short should consume short queue: %s", w.Command)
+	}
+
+	// Should have worker_default_1 and worker_default_2
+	for i := 1; i <= 2; i++ {
+		name := fmt.Sprintf("worker_default_%d", i)
+		if w, ok := config.Processes[name]; !ok {
+			t.Errorf("Should have '%s' process", name)
+		} else if !strings.Contains(w.Command, "--queue default") {
+			t.Errorf("%s should consume default queue: %s", name, w.Command)
+		}
+	}
+
+	// Should have worker_long (single, so no number)
+	if w, ok := config.Processes["worker_long"]; !ok {
+		t.Error("Should have 'worker_long' process")
+	} else if !strings.Contains(w.Command, "--queue long") {
+		t.Errorf("worker_long should consume long queue: %s", w.Command)
+	}
+
+	// Should NOT have "worker" (no all-queue workers)
+	if _, ok := config.Processes["worker"]; ok {
+		t.Error("Should not have 'worker' when only named queue workers")
+	}
+}
+
+func TestGenerateProcessComposeWorkerCustomQueue(t *testing.T) {
+	// Custom queue workers
+	opts := ComposeOptions{
+		BenchPath:    "/test/bench",
+		WebPort:      8000,
+		SocketPort:   9000,
+		IncludeRedis: true,
+		Workers:      map[string]int{"notifications": 2, "exports": 1},
+	}
+
+	config := GenerateProcessCompose(opts)
+
+	// Should have worker_notifications_1 and worker_notifications_2
+	for i := 1; i <= 2; i++ {
+		name := fmt.Sprintf("worker_notifications_%d", i)
+		if w, ok := config.Processes[name]; !ok {
+			t.Errorf("Should have '%s' process", name)
+		} else if !strings.Contains(w.Command, "--queue notifications") {
+			t.Errorf("%s should consume notifications queue: %s", name, w.Command)
+		}
+	}
+
+	// Should have worker_exports (single, so no number)
+	if w, ok := config.Processes["worker_exports"]; !ok {
+		t.Error("Should have 'worker_exports' process")
+	} else if !strings.Contains(w.Command, "--queue exports") {
+		t.Errorf("worker_exports should consume exports queue: %s", w.Command)
+	}
+}
+
+func TestGenerateProcessComposeIncludes(t *testing.T) {
+	opts := ComposeOptions{
+		BenchPath:    "/test/bench",
+		WebPort:      8000,
+		SocketPort:   9000,
+		IncludeRedis: true,
+	}
+
+	config := GenerateProcessCompose(opts)
+
+	// Should have includes for override file
+	if len(config.Includes) == 0 {
+		t.Fatal("Should have includes")
+	}
+
+	found := false
+	for _, inc := range config.Includes {
+		if inc.Path == "process-compose.override.yaml" && inc.Optional {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("Should include optional process-compose.override.yaml")
 	}
 }
