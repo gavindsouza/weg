@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
 	"path/filepath"
 	"sync"
 	"time"
@@ -189,7 +191,16 @@ func updateSingleApp(name string, opts apps.InstallOptions) error {
 }
 
 func runBuildAll(benchPath string) error {
-	// Use bench build for now
-	// TODO: Implement parallel esbuild
+	// Run bench build via devbox
+	// Note: In the future, this could use parallel esbuild for faster builds
+	buildCmd := exec.Command("devbox", "run", "-c", benchPath, "--", "bench", "build")
+	buildCmd.Dir = benchPath
+	buildCmd.Stdout = os.Stdout
+	buildCmd.Stderr = os.Stderr
+
+	if err := buildCmd.Run(); err != nil {
+		return fmt.Errorf("build failed: %w", err)
+	}
+
 	return nil
 }

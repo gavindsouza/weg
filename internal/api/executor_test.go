@@ -2,6 +2,8 @@ package api
 
 import (
 	"encoding/json"
+	"os"
+	"strings"
 	"testing"
 )
 
@@ -185,5 +187,132 @@ func TestResultFields(t *testing.T) {
 
 	if count != 42 {
 		t.Errorf("expected count to be 42, got %v", count)
+	}
+}
+
+func TestEnsureDir(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Test creating a new directory
+	newDir := tmpDir + "/test/nested/dir"
+	ensureDir(newDir)
+
+	info, err := os.Stat(newDir)
+	if err != nil {
+		t.Fatalf("directory not created: %v", err)
+	}
+	if !info.IsDir() {
+		t.Error("expected directory, not file")
+	}
+
+	// Test that it doesn't fail on existing directory
+	ensureDir(newDir) // Should not panic or error
+}
+
+func TestNewExecutorCreatesLogDirs(t *testing.T) {
+	tmpDir := t.TempDir()
+	site := "test.localhost"
+
+	// Create the executor - it should create log directories
+	_ = NewExecutor(tmpDir, site, "Administrator")
+
+	// Check that logs directory was created
+	logsDir := tmpDir + "/logs"
+	if _, err := os.Stat(logsDir); os.IsNotExist(err) {
+		t.Error("logs directory should have been created")
+	}
+
+	// Check site logs directory
+	siteLogsDir := tmpDir + "/sites/" + site + "/logs"
+	if _, err := os.Stat(siteLogsDir); os.IsNotExist(err) {
+		t.Error("site logs directory should have been created")
+	}
+}
+
+func TestNewExecutorAppCentricMode(t *testing.T) {
+	tmpDir := t.TempDir()
+	// Simulate app-centric mode by having bench path end in .weg
+	wegDir := tmpDir + "/project/.weg"
+	if err := os.MkdirAll(wegDir, 0755); err != nil {
+		t.Fatalf("failed to create .weg dir: %v", err)
+	}
+
+	_ = NewExecutor(wegDir, "test.localhost", "")
+
+	// Check parent logs directory was created
+	parentLogs := tmpDir + "/project/logs"
+	if _, err := os.Stat(parentLogs); os.IsNotExist(err) {
+		t.Error("parent logs directory should have been created for app-centric mode")
+	}
+}
+
+func TestFormatJSONOutput(t *testing.T) {
+	data := map[string]interface{}{
+		"name":  "Test",
+		"count": 42,
+	}
+
+	result, err := FormatJSON(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify it's properly indented
+	if !strings.Contains(result, "  ") {
+		t.Error("expected indented output")
+	}
+
+	// Verify it's valid JSON
+	var parsed map[string]interface{}
+	if err := json.Unmarshal([]byte(result), &parsed); err != nil {
+		t.Errorf("output is not valid JSON: %v", err)
+	}
+
+	if parsed["name"] != "Test" {
+		t.Errorf("expected name=Test, got %v", parsed["name"])
+	}
+}
+
+func TestResultWithTraceback(t *testing.T) {
+	result := Result{
+		Success:   false,
+		Error:     "Division by zero",
+		Traceback: "File \"test.py\", line 1\n  1/0\nZeroDivisionError",
+	}
+
+	if result.Success {
+		t.Error("expected failure")
+	}
+	if result.Error == "" {
+		t.Error("expected error message")
+	}
+	if result.Traceback == "" {
+		t.Error("expected traceback")
+	}
+}
+
+func TestResultArrayData(t *testing.T) {
+	jsonStr := `{"success": true, "data": [{"name": "doc1"}, {"name": "doc2"}]}`
+	var result Result
+	if err := json.Unmarshal([]byte(jsonStr), &result); err != nil {
+		t.Fatalf("failed to parse: %v", err)
+	}
+
+	data, ok := result.Data.([]interface{})
+	if !ok {
+		t.Error("expected data to be an array")
+	}
+
+	if len(data) != 2 {
+		t.Errorf("expected 2 items, got %d", len(data))
+	}
+}
+
+func TestExecutorVerboseFlag(t *testing.T) {
+	exec := NewExecutor("/tmp/bench", "site.localhost", "Admin")
+	exec.Verbose = true
+
+	if !exec.Verbose {
+		t.Error("expected Verbose to be true")
 	}
 }

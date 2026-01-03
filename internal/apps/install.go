@@ -108,9 +108,41 @@ func InstallNodeDeps(appPath string, opts InstallOptions) error {
 	return nil
 }
 
-// RemoveApp uninstalls and removes an app
+// RemoveApp uninstalls an app from all sites and removes it from the bench
 func RemoveApp(name string, opts InstallOptions) error {
 	appPath := filepath.Join(opts.AppsDir, name)
+
+	// First, uninstall the app from all sites that have it installed
+	sitesDir := filepath.Join(opts.BenchPath, "sites")
+	if entries, err := os.ReadDir(sitesDir); err == nil {
+		for _, entry := range entries {
+			if !entry.IsDir() {
+				continue
+			}
+			siteName := entry.Name()
+			// Skip non-site directories
+			if siteName == "assets" || siteName[0] == '.' {
+				continue
+			}
+			// Check if this is actually a site (has site_config.json)
+			siteConfigPath := filepath.Join(sitesDir, siteName, "site_config.json")
+			if _, err := os.Stat(siteConfigPath); os.IsNotExist(err) {
+				continue
+			}
+
+			// Try to uninstall the app from this site
+			// This will fail gracefully if the app isn't installed on this site
+			if opts.Verbose {
+				fmt.Printf("Uninstalling %s from site %s...\n", name, siteName)
+			}
+			if err := UninstallAppFromSite(siteName, name, opts); err != nil {
+				// Log but don't fail - app might not be installed on this site
+				if opts.Verbose {
+					fmt.Printf("  Note: %s may not be installed on %s: %v\n", name, siteName, err)
+				}
+			}
+		}
+	}
 
 	// Uninstall from pip
 	cmd := exec.Command("uv", "pip", "uninstall", name)

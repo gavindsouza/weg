@@ -101,7 +101,9 @@ func runStart(cmd *cobra.Command, args []string) error {
 			needsSync, _ := st.NeedsSync(configPath)
 			if needsSync {
 				PrintInfo("Configuration has changed. Running sync first...")
-				// TODO: Call sync logic here
+				if err := runSync(nil, nil); err != nil {
+					return fmt.Errorf("sync failed: %w", err)
+				}
 			}
 		}
 	}
