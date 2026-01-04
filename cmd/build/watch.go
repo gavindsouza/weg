@@ -5,6 +5,8 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
+	"strings"
 	"syscall"
 
 	"github.com/spf13/cobra"
@@ -51,10 +53,12 @@ func runWatch(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Starting asset watcher for site %s...\n", site)
 	fmt.Println("Press Ctrl+C to stop")
 
-	// Run bench watch via devbox
-	watchCmd := exec.Command("devbox", "run", "-c", benchPath, "--", "bench", "--site", site)
-	watchCmd.Args = append(watchCmd.Args, watchArgs...)
-	watchCmd.Dir = benchPath
+	// Run frappe watch via bench_helper
+	sitesDir := filepath.Join(benchPath, "sites")
+	shellCmd := fmt.Sprintf("cd %s && ../.venv/bin/python -m frappe.utils.bench_helper frappe %s",
+		sitesDir, strings.Join(watchArgs, " "))
+
+	watchCmd := exec.Command("devbox", "run", "-c", benchPath, "--", "sh", "-c", shellCmd)
 	watchCmd.Stdout = os.Stdout
 	watchCmd.Stderr = os.Stderr
 

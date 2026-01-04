@@ -110,15 +110,17 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 			defer wg.Done()
 
 			appStart := time.Now()
-			needsMigrate, needsRestart, err := updateSingleApp(name, opts)
+			analysis, err := updateSingleApp(name, opts)
 			duration := time.Since(appStart)
 
 			results <- updateResult{
-				App:          name,
-				Duration:     duration,
-				Error:        err,
-				NeedsMigrate: needsMigrate,
-				NeedsRestart: needsRestart,
+				App:           name,
+				Duration:      duration,
+				Error:         err,
+				NeedsMigrate:  analysis.NeedsMigrate,
+				NeedsRestart:  analysis.NeedsRestart,
+				NeedsPyDeps:   analysis.NeedsPyDeps,
+				NeedsNodeDeps: analysis.NeedsNodeDeps,
 			}
 		}(appName)
 	}
@@ -145,6 +147,12 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 			if result.NeedsRestart {
 				notes = append(notes, "python changes")
 				anyNeedsRestart = true
+			}
+			if result.NeedsPyDeps {
+				notes = append(notes, "py deps updated")
+			}
+			if result.NeedsNodeDeps {
+				notes = append(notes, "node deps updated")
 			}
 			noteStr := ""
 			if len(notes) > 0 {
@@ -199,14 +207,23 @@ type updateResult struct {
 	Error        error
 	NeedsMigrate bool
 	NeedsRestart bool
+	NeedsPyDeps  bool
+	NeedsNodeDeps bool
 }
 
-func updateSingleApp(name string, opts apps.InstallOptions) (needsMigrate, needsRestart bool, err error) {
+type changeAnalysis struct {
+	NeedsMigrate  bool
+	NeedsRestart  bool
+	NeedsPyDeps   bool
+	NeedsNodeDeps bool
+}
+
+func updateSingleApp(name string, opts apps.InstallOptions) (analysis changeAnalysis, err error) {
 	appPath := filepath.Join(opts.AppsDir, name)
 
 	// Check if app exists
 	if !apps.IsGitRepo(appPath) {
-		return false, false, fmt.Errorf("app not installed")
+		return analysis, fmt.Errorf("app not installed")
 	}
 
 	// Get current HEAD before pull
@@ -214,7 +231,7 @@ func updateSingleApp(name string, opts apps.InstallOptions) (needsMigrate, needs
 
 	// Pull latest
 	if err := apps.Pull(appPath); err != nil {
-		return false, false, fmt.Errorf("git pull failed: %w", err)
+		return analysis, fmt.Errorf("git pull failed: %w", err)
 	}
 
 	// Get new HEAD after pull
@@ -222,26 +239,32 @@ func updateSingleApp(name string, opts apps.InstallOptions) (needsMigrate, needs
 
 	// Check what changed
 	if oldHead != "" && newHead != "" && oldHead != newHead {
-		needsMigrate, needsRestart = analyzeChanges(appPath, oldHead, newHead)
+		analysis = analyzeChanges(appPath, oldHead, newHead)
 	}
 
 	if pullOnly {
-		return needsMigrate, needsRestart, nil
+		return analysis, nil
 	}
 
-	// Update dependencies unless --no-deps
+	// Update dependencies only if needed (unless --no-deps)
 	if !noDeps {
-		if err := apps.InstallPythonDeps(appPath, opts); err != nil {
-			return needsMigrate, needsRestart, fmt.Errorf("pip install failed: %w", err)
+		if analysis.NeedsPyDeps {
+			PrintVerbose("  %s: installing Python deps (pyproject.toml changed)", name)
+			if err := apps.InstallPythonDeps(appPath, opts); err != nil {
+				return analysis, fmt.Errorf("pip install failed: %w", err)
+			}
 		}
 
-		if err := apps.InstallNodeDeps(appPath, opts); err != nil {
-			// Node deps are optional, just log
-			PrintVerbose("  %s: node deps skipped: %v", name, err)
+		if analysis.NeedsNodeDeps {
+			PrintVerbose("  %s: installing Node deps (package.json changed)", name)
+			if err := apps.InstallNodeDeps(appPath, opts); err != nil {
+				// Node deps are optional, just log
+				PrintVerbose("  %s: node deps skipped: %v", name, err)
+			}
 		}
 	}
 
-	return needsMigrate, needsRestart, nil
+	return analysis, nil
 }
 
 // getGitHead returns the current HEAD commit hash
@@ -256,44 +279,59 @@ func getGitHead(repoPath string) (string, error) {
 }
 
 // analyzeChanges determines what type of changes occurred between commits
-// Returns: needsMigrate (schema changes), needsRestart (Python changes)
-func analyzeChanges(repoPath, oldCommit, newCommit string) (needsMigrate, needsRestart bool) {
+func analyzeChanges(repoPath, oldCommit, newCommit string) changeAnalysis {
+	var analysis changeAnalysis
+
 	cmd := exec.Command("git", "diff", "--name-only", oldCommit, newCommit)
 	cmd.Dir = repoPath
 	output, err := cmd.Output()
 	if err != nil {
-		return false, false
+		return analysis
 	}
 
 	changedFiles := strings.TrimSpace(string(output))
 	if changedFiles == "" {
-		return false, false
+		return analysis
 	}
 
 	for _, file := range strings.Split(changedFiles, "\n") {
+		basename := filepath.Base(file)
+
 		// Schema changes requiring migrate
 		if strings.HasSuffix(file, ".json") {
 			if strings.Contains(file, "/doctype/") ||
 				strings.Contains(file, "/workspace/") ||
 				strings.Contains(file, "/custom/") ||
 				strings.Contains(file, "/fixtures/") {
-				needsMigrate = true
+				analysis.NeedsMigrate = true
 			}
 		}
 
 		// Python changes requiring restart
 		if strings.HasSuffix(file, ".py") {
-			needsRestart = true
+			analysis.NeedsRestart = true
+		}
+
+		// Python dependency changes
+		if basename == "pyproject.toml" || basename == "setup.py" || basename == "requirements.txt" {
+			analysis.NeedsPyDeps = true
+		}
+
+		// Node dependency changes
+		if basename == "package.json" {
+			analysis.NeedsNodeDeps = true
 		}
 	}
 
-	return needsMigrate, needsRestart
+	return analysis
 }
 
 // runMigrateForUpdate runs database migrations during update
 func runMigrateForUpdate(benchPath string) error {
-	cmd := exec.Command("devbox", "run", "-c", benchPath, "--", "bench", "migrate")
-	cmd.Dir = benchPath
+	sitesDir := filepath.Join(benchPath, "sites")
+	shellCmd := fmt.Sprintf("cd %s && ../.venv/bin/python -m frappe.utils.bench_helper frappe --site all migrate", sitesDir)
+
+	cmd := exec.Command("devbox", "run", "-c", benchPath, "--", "sh", "-c", shellCmd)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
@@ -306,10 +344,11 @@ func isServicesRunning(benchPath string) bool {
 }
 
 func runBuildAll(benchPath string) error {
-	// Run bench build via devbox
-	// Note: In the future, this could use parallel esbuild for faster builds
-	buildCmd := exec.Command("devbox", "run", "-c", benchPath, "--", "bench", "build")
-	buildCmd.Dir = benchPath
+	// Run frappe build via bench_helper
+	sitesDir := filepath.Join(benchPath, "sites")
+	shellCmd := fmt.Sprintf("cd %s && ../.venv/bin/python -m frappe.utils.bench_helper frappe build", sitesDir)
+
+	buildCmd := exec.Command("devbox", "run", "-c", benchPath, "--", "sh", "-c", shellCmd)
 	buildCmd.Stdout = os.Stdout
 	buildCmd.Stderr = os.Stderr
 

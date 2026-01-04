@@ -56,6 +56,11 @@ var siteCommands = map[string]bool{
 	"browse": true,
 }
 
+// Commands that should get "frappe" prefix (no site needed)
+var frappeCommands = map[string]bool{
+	"build": true, "watch": true, "version": true,
+}
+
 // RunBench runs a bench command in the appropriate context
 // For devbox projects, it runs via bench_helper from the sites directory
 // Returns error if it couldn't run, nil if it ran (even if command failed)
@@ -89,10 +94,19 @@ func RunBench(args []string) error {
 	// Get default site from config
 	site := getDefaultSite(benchPath, result)
 
-	// Build command args - add "frappe --site <site>" prefix for site commands
+	// Build command args - add appropriate prefix
 	var benchArgs []string
-	if len(args) > 0 && siteCommands[args[0]] && site != "" {
-		benchArgs = append([]string{"frappe", "--site", site}, args...)
+	if len(args) > 0 {
+		cmd := args[0]
+		if siteCommands[cmd] && site != "" {
+			// Site-specific commands: "frappe --site <site> <cmd>"
+			benchArgs = append([]string{"frappe", "--site", site}, args...)
+		} else if frappeCommands[cmd] {
+			// Frappe commands without site: "frappe <cmd>"
+			benchArgs = append([]string{"frappe"}, args...)
+		} else {
+			benchArgs = args
+		}
 	} else {
 		benchArgs = args
 	}
