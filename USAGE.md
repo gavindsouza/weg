@@ -431,7 +431,28 @@ site_name = "myapp.localhost"
 [tool.weg.dependencies]
 # Additional apps needed for development
 erpnext = { url = "https://github.com/frappe/erpnext", branch = "version-15" }
+
+# Extra services this app needs (optional)
+[tool.weg.services]
+packages = ["tor@latest", "imagemagick@latest"]  # Devbox packages
+
+[tool.weg.services.processes.tor]
+command = "tor -f config/torrc"
+depends_on = ["web"]
+
+[tool.weg.services.processes.my-worker]
+command = "python -m myapp.worker"
+environment = { QUEUE = "priority" }
+depends_on = ["web", "redis_queue"]
 ```
+
+### App Services
+
+Apps can define additional services they need in `pyproject.toml`. When you run `weg sync`, these are automatically:
+- **Packages**: Added to `.weg/devbox.json` and installed
+- **Processes**: Merged into `process-compose.yaml` with proper `WEG_RUNNER` identification
+
+This allows apps to be self-contained with their service dependencies. For example, an app that needs Tor for anonymized requests can declare it in its config, and any developer cloning the app gets the service automatically.
 
 ## Project Structure
 

@@ -193,6 +193,150 @@ func TestValidateAppConfig(t *testing.T) {
 	}
 }
 
+func TestCollectAppServices(t *testing.T) {
+	// Create temp apps directory structure
+	tmpDir := t.TempDir()
+	appsDir := filepath.Join(tmpDir, "apps")
+	os.MkdirAll(appsDir, 0755)
+
+	// Create app1 with services
+	app1Dir := filepath.Join(appsDir, "app1")
+	os.MkdirAll(app1Dir, 0755)
+	app1Content := `[project]
+name = "app1"
+
+[tool.weg.services]
+packages = ["tor@latest", "imagemagick@latest"]
+
+[tool.weg.services.processes.tor]
+command = "tor -f config/torrc"
+depends_on = ["web"]
+
+[tool.weg.services.processes.worker]
+command = "python worker.py"
+working_dir = "/app"
+`
+	os.WriteFile(filepath.Join(app1Dir, "pyproject.toml"), []byte(app1Content), 0644)
+
+	// Create app2 with different services
+	app2Dir := filepath.Join(appsDir, "app2")
+	os.MkdirAll(app2Dir, 0755)
+	app2Content := `[project]
+name = "app2"
+
+[tool.weg.services]
+packages = ["ffmpeg@latest", "tor@latest"]
+
+[tool.weg.services.processes.encoder]
+command = "python encoder.py"
+`
+	os.WriteFile(filepath.Join(app2Dir, "pyproject.toml"), []byte(app2Content), 0644)
+
+	// Create app3 without services (should be skipped)
+	app3Dir := filepath.Join(appsDir, "app3")
+	os.MkdirAll(app3Dir, 0755)
+	app3Content := `[project]
+name = "app3"
+`
+	os.WriteFile(filepath.Join(app3Dir, "pyproject.toml"), []byte(app3Content), 0644)
+
+	// Collect services
+	packages, processes, err := CollectAppServices(appsDir)
+	if err != nil {
+		t.Fatalf("CollectAppServices failed: %v", err)
+	}
+
+	// Check packages (deduplicated)
+	// Should have tor, imagemagick, ffmpeg (tor only once)
+	if len(packages) != 3 {
+		t.Errorf("expected 3 unique packages, got %d: %v", len(packages), packages)
+	}
+
+	packageSet := make(map[string]bool)
+	for _, pkg := range packages {
+		packageSet[pkg] = true
+	}
+	if !packageSet["tor@latest"] {
+		t.Error("expected tor@latest in packages")
+	}
+	if !packageSet["imagemagick@latest"] {
+		t.Error("expected imagemagick@latest in packages")
+	}
+	if !packageSet["ffmpeg@latest"] {
+		t.Error("expected ffmpeg@latest in packages")
+	}
+
+	// Check processes
+	if len(processes) != 3 {
+		t.Errorf("expected 3 processes, got %d: %v", len(processes), processes)
+	}
+
+	if proc, ok := processes["tor"]; !ok {
+		t.Error("expected tor process")
+	} else {
+		if proc.Command != "tor -f config/torrc" {
+			t.Errorf("expected tor command, got %s", proc.Command)
+		}
+		if len(proc.DependsOn) != 1 || proc.DependsOn[0] != "web" {
+			t.Errorf("expected tor depends_on [web], got %v", proc.DependsOn)
+		}
+	}
+
+	if proc, ok := processes["worker"]; !ok {
+		t.Error("expected worker process")
+	} else {
+		if proc.WorkingDir != "/app" {
+			t.Errorf("expected worker working_dir /app, got %s", proc.WorkingDir)
+		}
+	}
+
+	if _, ok := processes["encoder"]; !ok {
+		t.Error("expected encoder process")
+	}
+}
+
+func TestCollectAppServicesWithSymlinks(t *testing.T) {
+	// Create temp directory structure
+	tmpDir := t.TempDir()
+	appsDir := filepath.Join(tmpDir, "apps")
+	os.MkdirAll(appsDir, 0755)
+
+	// Create actual app directory outside of apps/
+	realAppDir := filepath.Join(tmpDir, "real_app")
+	os.MkdirAll(realAppDir, 0755)
+	appContent := `[project]
+name = "symlinked-app"
+
+[tool.weg.services]
+packages = ["redis-stack@latest"]
+
+[tool.weg.services.processes.redis-worker]
+command = "redis-worker"
+`
+	os.WriteFile(filepath.Join(realAppDir, "pyproject.toml"), []byte(appContent), 0644)
+
+	// Create symlink in apps/
+	symlinkPath := filepath.Join(appsDir, "symlinked_app")
+	if err := os.Symlink(realAppDir, symlinkPath); err != nil {
+		t.Skipf("symlinks not supported: %v", err)
+	}
+
+	// Collect services
+	packages, processes, err := CollectAppServices(appsDir)
+	if err != nil {
+		t.Fatalf("CollectAppServices failed: %v", err)
+	}
+
+	// Should find the symlinked app's services
+	if len(packages) != 1 || packages[0] != "redis-stack@latest" {
+		t.Errorf("expected [redis-stack@latest], got %v", packages)
+	}
+
+	if _, ok := processes["redis-worker"]; !ok {
+		t.Error("expected redis-worker process from symlinked app")
+	}
+}
+
 func TestHasWegSection(t *testing.T) {
 	tmpDir := t.TempDir()
 

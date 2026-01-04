@@ -10,9 +10,24 @@ import (
 
 // AppConfig represents the [tool.weg] section in pyproject.toml
 type AppConfig struct {
-	Compatibility CompatibilityConfig `toml:"compatibility"`
-	Dev           DevConfig           `toml:"dev"`
-	Dependencies  DependenciesConfig  `toml:"dependencies"`
+	Compatibility CompatibilityConfig  `toml:"compatibility"`
+	Dev           DevConfig            `toml:"dev"`
+	Dependencies  DependenciesConfig   `toml:"dependencies"`
+	Services      AppServicesConfig    `toml:"services"`
+}
+
+// AppServicesConfig defines additional services an app needs
+type AppServicesConfig struct {
+	Packages  []string                    `toml:"packages"`  // Extra devbox packages (e.g., ["tor@latest"])
+	Processes map[string]AppProcessConfig `toml:"processes"` // Extra processes to run
+}
+
+// AppProcessConfig defines a process for process-compose
+type AppProcessConfig struct {
+	Command     string            `toml:"command"`
+	WorkingDir  string            `toml:"working_dir,omitempty"`
+	Environment map[string]string `toml:"environment,omitempty"`
+	DependsOn   []string          `toml:"depends_on,omitempty"`
 }
 
 // CompatibilityConfig defines which Frappe versions and databases the app supports
@@ -104,6 +119,54 @@ func HasWegSection(path string) bool {
 	return pf.Tool.Weg.Compatibility.Frappe != nil ||
 		pf.Tool.Weg.Dev.Frappe != "" ||
 		pf.Tool.Weg.Dependencies.Apps != nil
+}
+
+// CollectAppServices reads [tool.weg.services] from all apps in appsDir
+// Returns merged packages and processes from all apps
+func CollectAppServices(appsDir string) (packages []string, processes map[string]AppProcessConfig, err error) {
+	processes = make(map[string]AppProcessConfig)
+	seenPackages := make(map[string]bool)
+
+	entries, err := os.ReadDir(appsDir)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to read apps directory: %w", err)
+	}
+
+	for _, entry := range entries {
+		// Follow symlinks for IsDir check
+		appPath := filepath.Join(appsDir, entry.Name())
+		info, err := os.Stat(appPath)
+		if err != nil || !info.IsDir() {
+			continue
+		}
+
+		pyprojectPath := filepath.Join(appPath, "pyproject.toml")
+
+		data, err := os.ReadFile(pyprojectPath)
+		if err != nil {
+			continue // Skip apps without pyproject.toml
+		}
+
+		var pf pyprojectFile
+		if err := toml.Unmarshal(data, &pf); err != nil {
+			continue // Skip invalid pyproject.toml
+		}
+
+		// Collect packages (deduplicated)
+		for _, pkg := range pf.Tool.Weg.Services.Packages {
+			if !seenPackages[pkg] {
+				seenPackages[pkg] = true
+				packages = append(packages, pkg)
+			}
+		}
+
+		// Collect processes (app name prefixed to avoid conflicts)
+		for name, proc := range pf.Tool.Weg.Services.Processes {
+			processes[name] = proc
+		}
+	}
+
+	return packages, processes, nil
 }
 
 // ValidateAppConfig validates the app configuration
