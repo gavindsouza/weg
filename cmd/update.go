@@ -5,11 +5,14 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/gavindsouza/weg/internal/apps"
 	"github.com/gavindsouza/weg/internal/config"
+	"github.com/gavindsouza/weg/internal/runtime"
+	"github.com/gavindsouza/weg/internal/services"
 	"github.com/gavindsouza/weg/internal/state"
 	"github.com/spf13/cobra"
 )
@@ -107,13 +110,15 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 			defer wg.Done()
 
 			appStart := time.Now()
-			err := updateSingleApp(name, opts)
+			needsMigrate, needsRestart, err := updateSingleApp(name, opts)
 			duration := time.Since(appStart)
 
 			results <- updateResult{
-				App:      name,
-				Duration: duration,
-				Error:    err,
+				App:          name,
+				Duration:     duration,
+				Error:        err,
+				NeedsMigrate: needsMigrate,
+				NeedsRestart: needsRestart,
 			}
 		}(appName)
 	}
@@ -125,60 +130,109 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	}()
 
 	var failed []string
+	anyNeedsMigrate := false
+	anyNeedsRestart := false
 	for result := range results {
 		if result.Error != nil {
 			PrintError("%s: %v", result.App, result.Error)
 			failed = append(failed, result.App)
 		} else {
-			PrintInfo("  %s updated in %v", result.App, result.Duration.Round(time.Millisecond))
+			notes := []string{}
+			if result.NeedsMigrate {
+				notes = append(notes, "schema changes")
+				anyNeedsMigrate = true
+			}
+			if result.NeedsRestart {
+				notes = append(notes, "python changes")
+				anyNeedsRestart = true
+			}
+			noteStr := ""
+			if len(notes) > 0 {
+				noteStr = fmt.Sprintf(" (%s)", strings.Join(notes, ", "))
+			}
+			PrintInfo("  %s updated in %v%s", result.App, result.Duration.Round(time.Millisecond), noteStr)
+		}
+	}
+
+	if len(failed) > 0 {
+		return fmt.Errorf("%d app(s) failed to update", len(failed))
+	}
+
+	// Run migrate if schema changes detected
+	if anyNeedsMigrate {
+		PrintInfo("\nRunning migrations (schema changes detected)...")
+		if err := runMigrateForUpdate(benchPath); err != nil {
+			return fmt.Errorf("migrate failed: %w", err)
 		}
 	}
 
 	// Rebuild assets unless --no-build
-	if !noBuild && !pullOnly && len(failed) == 0 {
+	if !noBuild && !pullOnly {
 		PrintInfo("\nRebuilding assets...")
 		if err := runBuildAll(benchPath); err != nil {
 			PrintError("Asset rebuild failed: %v", err)
 		}
 	}
 
-	totalDuration := time.Since(startTime)
-
-	if len(failed) > 0 {
-		return fmt.Errorf("%d app(s) failed to update", len(failed))
+	// Restart services only if Python files changed (JS handled by watcher)
+	if anyNeedsRestart && isServicesRunning(benchPath) {
+		PrintInfo("\nRestarting services (Python changes detected)...")
+		mgr := services.NewManager(benchPath)
+		if rtConfig, err := runtime.Load(benchPath); err == nil {
+			mgr.RunID = rtConfig.RunID
+		}
+		_ = mgr.Stop()
+		_ = runtime.Remove(benchPath)
+		PrintInfo("Services stopped. Run 'weg start' to restart.")
+	} else if !anyNeedsRestart && isServicesRunning(benchPath) {
+		PrintInfo("\nNo restart needed (only JS/CSS changes - handled by watcher)")
 	}
 
+	totalDuration := time.Since(startTime)
 	PrintInfo("\nUpdate complete in %v", totalDuration.Round(time.Millisecond))
 	return nil
 }
 
 type updateResult struct {
-	App      string
-	Duration time.Duration
-	Error    error
+	App          string
+	Duration     time.Duration
+	Error        error
+	NeedsMigrate bool
+	NeedsRestart bool
 }
 
-func updateSingleApp(name string, opts apps.InstallOptions) error {
+func updateSingleApp(name string, opts apps.InstallOptions) (needsMigrate, needsRestart bool, err error) {
 	appPath := filepath.Join(opts.AppsDir, name)
 
 	// Check if app exists
 	if !apps.IsGitRepo(appPath) {
-		return fmt.Errorf("app not installed")
+		return false, false, fmt.Errorf("app not installed")
 	}
+
+	// Get current HEAD before pull
+	oldHead, _ := getGitHead(appPath)
 
 	// Pull latest
 	if err := apps.Pull(appPath); err != nil {
-		return fmt.Errorf("git pull failed: %w", err)
+		return false, false, fmt.Errorf("git pull failed: %w", err)
+	}
+
+	// Get new HEAD after pull
+	newHead, _ := getGitHead(appPath)
+
+	// Check what changed
+	if oldHead != "" && newHead != "" && oldHead != newHead {
+		needsMigrate, needsRestart = analyzeChanges(appPath, oldHead, newHead)
 	}
 
 	if pullOnly {
-		return nil
+		return needsMigrate, needsRestart, nil
 	}
 
 	// Update dependencies unless --no-deps
 	if !noDeps {
 		if err := apps.InstallPythonDeps(appPath, opts); err != nil {
-			return fmt.Errorf("pip install failed: %w", err)
+			return needsMigrate, needsRestart, fmt.Errorf("pip install failed: %w", err)
 		}
 
 		if err := apps.InstallNodeDeps(appPath, opts); err != nil {
@@ -187,7 +241,68 @@ func updateSingleApp(name string, opts apps.InstallOptions) error {
 		}
 	}
 
-	return nil
+	return needsMigrate, needsRestart, nil
+}
+
+// getGitHead returns the current HEAD commit hash
+func getGitHead(repoPath string) (string, error) {
+	cmd := exec.Command("git", "rev-parse", "HEAD")
+	cmd.Dir = repoPath
+	output, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(output)), nil
+}
+
+// analyzeChanges determines what type of changes occurred between commits
+// Returns: needsMigrate (schema changes), needsRestart (Python changes)
+func analyzeChanges(repoPath, oldCommit, newCommit string) (needsMigrate, needsRestart bool) {
+	cmd := exec.Command("git", "diff", "--name-only", oldCommit, newCommit)
+	cmd.Dir = repoPath
+	output, err := cmd.Output()
+	if err != nil {
+		return false, false
+	}
+
+	changedFiles := strings.TrimSpace(string(output))
+	if changedFiles == "" {
+		return false, false
+	}
+
+	for _, file := range strings.Split(changedFiles, "\n") {
+		// Schema changes requiring migrate
+		if strings.HasSuffix(file, ".json") {
+			if strings.Contains(file, "/doctype/") ||
+				strings.Contains(file, "/workspace/") ||
+				strings.Contains(file, "/custom/") ||
+				strings.Contains(file, "/fixtures/") {
+				needsMigrate = true
+			}
+		}
+
+		// Python changes requiring restart
+		if strings.HasSuffix(file, ".py") {
+			needsRestart = true
+		}
+	}
+
+	return needsMigrate, needsRestart
+}
+
+// runMigrateForUpdate runs database migrations during update
+func runMigrateForUpdate(benchPath string) error {
+	cmd := exec.Command("devbox", "run", "-c", benchPath, "--", "bench", "migrate")
+	cmd.Dir = benchPath
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
+// isServicesRunning checks if weg services are currently running
+func isServicesRunning(benchPath string) bool {
+	_, err := runtime.Load(benchPath)
+	return err == nil
 }
 
 func runBuildAll(benchPath string) error {

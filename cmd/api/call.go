@@ -3,6 +3,8 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	"os"
 	"strings"
 
 	internalapi "github.com/gavindsouza/weg/internal/api"
@@ -17,14 +19,18 @@ var callCmd = &cobra.Command{
 	Long: `Call any whitelisted Frappe method with arguments.
 
 Arguments can be passed as key=value pairs after the method name,
-or as JSON using the --args flag.
+or as JSON using the --args flag. Use --args - to read JSON from stdin.
 
 Examples:
   weg api call frappe.ping
   weg api call frappe.client.get doctype=User name=Administrator
   weg api call frappe.client.get_count doctype=User
   weg api call myapp.api.custom_function arg1=value1 arg2=value2
-  weg api call myapp.api.create --args '{"customer":"CUST-001","items":[...]}'`,
+  weg api call myapp.api.create --args '{"customer":"CUST-001","items":[...]}'
+
+  # Read complex JSON from stdin
+  echo '{"customer":"CUST-001","items":[{"item":"ITEM-001","qty":5}]}' | weg api call myapp.api.create --args -
+  cat payload.json | weg api call myapp.api.process --args -`,
 	Args:         cobra.MinimumNArgs(1),
 	RunE:         runCall,
 	SilenceUsage: true,
@@ -47,7 +53,19 @@ func runCall(cmd *cobra.Command, args []string) error {
 
 	// Parse --args JSON if provided
 	if callArgs != "" {
-		if err := json.Unmarshal([]byte(callArgs), &kwargs); err != nil {
+		var argsData []byte
+		if callArgs == "-" {
+			// Read from stdin
+			data, err := io.ReadAll(os.Stdin)
+			if err != nil {
+				return fmt.Errorf("failed to read from stdin: %w", err)
+			}
+			argsData = data
+		} else {
+			argsData = []byte(callArgs)
+		}
+
+		if err := json.Unmarshal(argsData, &kwargs); err != nil {
 			return fmt.Errorf("invalid --args JSON: %w", err)
 		}
 	}
