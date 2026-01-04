@@ -24,6 +24,7 @@ type State struct {
 	Apps       map[string]AppState  `json:"apps"`
 	Sites      map[string]SiteState `json:"sites"`
 	Frappe     FrappeState          `json:"frappe"`
+	Services   ServicesState        `json:"services,omitempty"`
 	LastSync   time.Time            `json:"last_sync"`
 }
 
@@ -50,6 +51,13 @@ type SiteState struct {
 type FrappeState struct {
 	Version  string `json:"version"`
 	Database string `json:"database"`
+}
+
+// ServicesState tracks service configuration
+type ServicesState struct {
+	WebPort    int            `json:"web_port,omitempty"`
+	SocketPort int            `json:"socket_port,omitempty"`
+	Workers    map[string]int `json:"workers,omitempty"`
 }
 
 // NewState creates a new empty state

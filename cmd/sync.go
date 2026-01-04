@@ -13,6 +13,7 @@ import (
 	"github.com/gavindsouza/weg/internal/apps"
 	"github.com/gavindsouza/weg/internal/config"
 	"github.com/gavindsouza/weg/internal/fsutil"
+	"github.com/gavindsouza/weg/internal/services"
 	"github.com/gavindsouza/weg/internal/state"
 	"github.com/spf13/cobra"
 )
@@ -345,6 +346,19 @@ func showDiff(diff *state.Diff) {
 	if diff.FrappeChanged {
 		fmt.Println("Frappe settings changed (manual update may be required)")
 	}
+
+	if diff.ServicesChanged {
+		fmt.Println("Services configuration changed:")
+		if diff.NewServices.WebPort != 0 {
+			fmt.Printf("  ~ web port: %d\n", diff.NewServices.WebPort)
+		}
+		if diff.NewServices.SocketPort != 0 {
+			fmt.Printf("  ~ socket port: %d\n", diff.NewServices.SocketPort)
+		}
+		if len(diff.NewServices.Workers) > 0 {
+			fmt.Printf("  ~ workers: %v\n", diff.NewServices.Workers)
+		}
+	}
 }
 
 func applyAppChanges(path string, cfg *config.AppConfig, st *state.State, diff *state.Diff) error {
@@ -611,6 +625,15 @@ func applyBenchChanges(path string, cfg *config.BenchConfig, st *state.State, di
 				}
 			}
 		}
+	}
+
+	// Regenerate process-compose.yaml if services changed
+	if diff.ServicesChanged {
+		PrintInfo("Updating services configuration...")
+		if err := regenerateProcessCompose(path, cfg); err != nil {
+			return fmt.Errorf("failed to update process-compose.yaml: %w", err)
+		}
+		st.Services = diff.NewServices
 	}
 
 	return nil
@@ -978,4 +1001,27 @@ eval "$(devbox generate direnv --print-envrc -e VENV_DIR=$VENV_DIR -e UV_PYTHON=
 	// Devbox's Python plugin automatically creates .venv, no need to create env/
 
 	return nil
+}
+
+// regenerateProcessCompose regenerates process-compose.yaml from config
+func regenerateProcessCompose(benchPath string, cfg *config.BenchConfig) error {
+	opts := services.ComposeOptions{
+		BenchPath:     benchPath,
+		WebPort:       cfg.Services.Web.Port,
+		SocketPort:    cfg.Services.Web.SocketPort,
+		IncludeRedis:  false, // Devbox manages redis
+		IncludeWatch:  true,
+		UseVenvPython: true,
+		Workers:       cfg.Services.Workers,
+	}
+
+	// Set defaults
+	if opts.WebPort == 0 {
+		opts.WebPort = 8000
+	}
+	if opts.SocketPort == 0 {
+		opts.SocketPort = 9000
+	}
+
+	return services.GenerateAndWrite(opts)
 }

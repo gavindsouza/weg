@@ -25,14 +25,16 @@ func sortAppsToAdd(apps []string) {
 
 // Diff represents the differences between desired config and current state
 type Diff struct {
-	AppsToAdd     []string
-	AppsToRemove  []string
-	AppsToUpdate  []AppUpdate
-	SitesToAdd    []string
-	SitesToRemove []string
-	SitesToUpdate []SiteUpdate
-	ConfigChanged bool
-	FrappeChanged bool
+	AppsToAdd       []string
+	AppsToRemove    []string
+	AppsToUpdate    []AppUpdate
+	SitesToAdd      []string
+	SitesToRemove   []string
+	SitesToUpdate   []SiteUpdate
+	ConfigChanged   bool
+	FrappeChanged   bool
+	ServicesChanged bool
+	NewServices     ServicesState // New services config to apply
 }
 
 // AppUpdate represents an app that needs updating
@@ -60,7 +62,8 @@ func (d *Diff) IsEmpty() bool {
 		len(d.SitesToAdd) == 0 &&
 		len(d.SitesToRemove) == 0 &&
 		len(d.SitesToUpdate) == 0 &&
-		!d.FrappeChanged
+		!d.FrappeChanged &&
+		!d.ServicesChanged
 }
 
 // HasChanges returns true if there are any changes
@@ -73,6 +76,9 @@ func (d *Diff) TotalChanges() int {
 	count := len(d.AppsToAdd) + len(d.AppsToRemove) + len(d.AppsToUpdate)
 	count += len(d.SitesToAdd) + len(d.SitesToRemove) + len(d.SitesToUpdate)
 	if d.FrappeChanged {
+		count++
+	}
+	if d.ServicesChanged {
 		count++
 	}
 	return count
@@ -172,10 +178,51 @@ func ComputeDiffFromBenchConfig(cfg *config.BenchConfig, state *State, benchPath
 		}
 	}
 
+	// Check if services config changed (workers, ports)
+	newServices := ServicesState{
+		WebPort:    cfg.Services.Web.Port,
+		SocketPort: cfg.Services.Web.SocketPort,
+		Workers:    cfg.Services.Workers,
+	}
+
+	// Set defaults if not specified
+	if newServices.WebPort == 0 {
+		newServices.WebPort = 8000
+	}
+	if newServices.SocketPort == 0 {
+		newServices.SocketPort = 9000
+	}
+	if newServices.Workers == nil {
+		newServices.Workers = map[string]int{"all": 1}
+	}
+
+	if servicesChanged(state.Services, newServices) {
+		diff.ServicesChanged = true
+		diff.NewServices = newServices
+	}
+
 	// Sort apps to ensure frappe is always installed first
 	sortAppsToAdd(diff.AppsToAdd)
 
 	return diff
+}
+
+// servicesChanged checks if services configuration has changed
+func servicesChanged(old, new ServicesState) bool {
+	if old.WebPort != new.WebPort || old.SocketPort != new.SocketPort {
+		return true
+	}
+
+	// Compare workers maps
+	if len(old.Workers) != len(new.Workers) {
+		return true
+	}
+	for queue, count := range new.Workers {
+		if old.Workers[queue] != count {
+			return true
+		}
+	}
+	return false
 }
 
 // ComputeDiffFromAppConfig computes the diff for app-centric configs
