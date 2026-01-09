@@ -47,6 +47,42 @@ type Deployment struct {
 	Error      string `json:"error"`
 }
 
+// Job represents a Frappe Cloud job (deploy, migrate, backup, etc.)
+type Job struct {
+	Name       string `json:"name"`
+	JobType    string `json:"job_type"`
+	Status     string `json:"status"`
+	Site       string `json:"site"`
+	Bench      string `json:"bench"`
+	Creation   string `json:"creation"`
+	Start      string `json:"start"`
+	End        string `json:"end"`
+	Duration   string `json:"duration"`
+}
+
+// SiteDetail represents detailed site information
+type SiteDetail struct {
+	Name           string            `json:"name"`
+	Host           string            `json:"host_name"`
+	Status         string            `json:"status"`
+	CurrentPlan    map[string]any    `json:"current_plan"`
+	Bench          string            `json:"bench"`
+	BenchTitle     string            `json:"bench_title"`
+	FrappeVersion  string            `json:"frappe_version"`
+	CreatedBy      string            `json:"created_by"`
+	CreatedAt      string            `json:"creation"`
+	InstalledApps  []InstalledApp    `json:"installed_apps,omitempty"`
+	UpdateAvailable bool             `json:"update_available"`
+}
+
+// InstalledApp represents an app installed on a site
+type InstalledApp struct {
+	App     string `json:"app"`
+	Title   string `json:"title"`
+	Hash    string `json:"hash"`
+	Branch  string `json:"branch"`
+}
+
 // ListSites returns all sites for the authenticated user (optionally filtered by team)
 func (c *Client) ListSites(team string) ([]Site, error) {
 	resp, err := c.doRequest("GET", "/method/press.api.site.all", nil)
@@ -154,55 +190,144 @@ func (c *Client) DeployToSite(siteName, appName string) (*Deployment, error) {
 	return &result.Message, nil
 }
 
-// GetDeployment returns a deployment by ID
-func (c *Client) GetDeployment(deployID string) (*Deployment, error) {
+// GetSiteDetail returns detailed site information
+func (c *Client) GetSiteDetail(siteName string) (*SiteDetail, error) {
 	params := url.Values{}
-	params.Set("name", deployID)
+	params.Set("name", siteName)
 
-	resp, err := c.doRequest("GET", "/method/press.api.site.deploy_status", params)
+	resp, err := c.doRequest("GET", "/method/press.api.site.get", params)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
 
+	body, _ := io.ReadAll(resp.Body)
+
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
 		return nil, fmt.Errorf("API error: %s", string(body))
 	}
 
 	var result struct {
-		Message Deployment `json:"message"`
+		Message SiteDetail `json:"message"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, err
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %s", string(body))
 	}
 
 	return &result.Message, nil
 }
 
-// ListDeployments returns recent deployments (optionally filtered by site)
-func (c *Client) ListDeployments(siteName string) ([]Deployment, error) {
+// GetSiteJobs returns jobs for a site
+func (c *Client) GetSiteJobs(siteName string, limit int) ([]Job, error) {
 	params := url.Values{}
-	if siteName != "" {
-		params.Set("site", siteName)
+	params.Set("filters", fmt.Sprintf(`{"site": "%s"}`, siteName))
+	params.Set("order_by", "creation desc")
+	if limit > 0 {
+		params.Set("limit_page_length", fmt.Sprintf("%d", limit))
 	}
 
-	resp, err := c.doRequest("GET", "/method/press.api.site.deployments", params)
+	resp, err := c.doRequest("GET", "/method/press.api.site.jobs", params)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
 
+	body, _ := io.ReadAll(resp.Body)
+
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
 		return nil, fmt.Errorf("API error: %s", string(body))
 	}
 
 	var result struct {
-		Message []Deployment `json:"message"`
+		Message []Job `json:"message"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %s", string(body))
+	}
+
+	return result.Message, nil
+}
+
+// GetRunningJobs returns currently running jobs for a site
+func (c *Client) GetRunningJobs(siteName string) ([]Job, error) {
+	params := url.Values{}
+	params.Set("name", siteName)
+
+	resp, err := c.doRequest("GET", "/method/press.api.site.running_jobs", params)
+	if err != nil {
 		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API error: %s", string(body))
+	}
+
+	var result struct {
+		Message []Job `json:"message"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %s", string(body))
+	}
+
+	return result.Message, nil
+}
+
+// GetJob returns details for a specific job
+func (c *Client) GetJob(jobName string) (*Job, error) {
+	params := url.Values{}
+	params.Set("job", jobName)
+
+	resp, err := c.doRequest("GET", "/method/press.api.site.job", params)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API error: %s", string(body))
+	}
+
+	var result struct {
+		Message Job `json:"message"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %s", string(body))
+	}
+
+	return &result.Message, nil
+}
+
+// GetBenchJobs returns jobs for a bench/release group
+func (c *Client) GetBenchJobs(benchName string, limit int) ([]Job, error) {
+	params := url.Values{}
+	params.Set("filters", fmt.Sprintf(`{"group": "%s"}`, benchName))
+	params.Set("order_by", "creation desc")
+	if limit > 0 {
+		params.Set("limit_page_length", fmt.Sprintf("%d", limit))
+	}
+
+	resp, err := c.doRequest("GET", "/method/press.api.bench.jobs", params)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API error: %s", string(body))
+	}
+
+	var result struct {
+		Message []Job `json:"message"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %s", string(body))
 	}
 
 	return result.Message, nil

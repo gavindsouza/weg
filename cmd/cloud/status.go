@@ -11,81 +11,214 @@ import (
 )
 
 var statusCmd = &cobra.Command{
-	Use:   "status [deployment-id]",
-	Short: "Check deployment status",
-	Long: `Check the status of a deployment or site.
+	Use:   "status [job-id]",
+	Short: "Check cloud account, site, or job status",
+	Long: `Check the status of your Frappe Cloud resources.
+
+Without arguments, shows account overview (benches and sites).
+With a job ID, tracks that specific job.
 
 Examples:
-  weg cloud status                    # Status of recent deployments
-  weg cloud status <deployment-id>    # Status of specific deployment
-  weg cloud status --site mysite      # Status of a site
-  weg cloud status --watch            # Watch deployment progress`,
+  weg cloud status                    # Account overview
+  weg cloud status --site mysite      # Detailed site status
+  weg cloud status --bench mybench    # Bench status and jobs
+  weg cloud status <job-id>           # Track specific job
+  weg cloud status <job-id> --watch   # Watch job progress`,
 	RunE: runStatus,
 }
 
 var (
 	statusSite  string
+	statusBench string
 	statusWatch bool
 )
 
 func init() {
 	statusCmd.Flags().StringVar(&statusSite, "site", "", "Check status of a specific site")
-	statusCmd.Flags().BoolVarP(&statusWatch, "watch", "w", false, "Watch for updates")
+	statusCmd.Flags().StringVar(&statusBench, "bench", "", "Check status of a specific bench")
+	statusCmd.Flags().BoolVarP(&statusWatch, "watch", "w", false, "Watch for updates (with job ID)")
 }
 
 func runStatus(cmd *cobra.Command, args []string) error {
-	client, err := getAuthenticatedClient()
+	client, err := getAuthenticatedClient("")
 	if err != nil {
 		return err
 	}
 
-	// Check specific deployment
+	// Track specific job
 	if len(args) > 0 {
-		deployID := args[0]
-		return watchDeployment(client, deployID, statusWatch)
+		jobID := args[0]
+		return trackJob(client, jobID, statusWatch)
 	}
 
-	// Check specific site
+	// Show specific site status
 	if statusSite != "" {
-		site, err := client.GetSite(statusSite)
-		if err != nil {
-			return fmt.Errorf("failed to get site: %w", err)
-		}
-
-		fmt.Printf("Site: %s\n", site.Name)
-		fmt.Printf("Status: %s\n", site.Status)
-		fmt.Printf("Plan: %s\n", site.Plan)
-		fmt.Printf("Region: %s\n", site.Region)
-		fmt.Printf("Created: %s\n", site.CreatedAt)
-		return nil
+		return showSiteStatus(client, statusSite)
 	}
 
-	// List recent deployments
-	deploys, err := client.ListDeployments("")
+	// Show specific bench status
+	if statusBench != "" {
+		return showBenchStatus(client, statusBench)
+	}
+
+	// Default: show account overview
+	return showAccountOverview(client)
+}
+
+func showAccountOverview(client *cloud.Client) error {
+	// Get user info
+	user, err := client.GetCurrentUser()
 	if err != nil {
-		return fmt.Errorf("failed to list deployments: %w", err)
+		return fmt.Errorf("failed to get user info: %w", err)
 	}
 
-	if len(deploys) == 0 {
-		fmt.Println("No recent deployments")
+	if user.Name != "" {
+		fmt.Printf("Account: %s (%s)\n", user.Name, user.Email)
+	} else {
+		fmt.Printf("Account: %s\n", user.Email)
+	}
+	if user.Team != "" {
+		fmt.Printf("Team: %s\n", user.Team)
+	}
+	fmt.Println()
+
+	// Get benches
+	benches, err := client.ListBenches("")
+	if err == nil && len(benches) > 0 {
+		fmt.Printf("Benches (%d):\n", len(benches))
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+		fmt.Fprintln(w, "  NAME\tVERSION\tSITES\tAPPS\tSTATUS")
+		for _, b := range benches {
+			fmt.Fprintf(w, "  %s\t%s\t%d\t%d\t%s\n",
+				b.Name,
+				b.FrappeVersion,
+				b.SiteCount,
+				b.AppCount,
+				b.Status,
+			)
+		}
+		w.Flush()
+		fmt.Println()
+	}
+
+	// Get sites
+	sites, err := client.ListSites("")
+	if err == nil && len(sites) > 0 {
+		fmt.Printf("Sites (%d):\n", len(sites))
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+		fmt.Fprintln(w, "  NAME\tSTATUS\tPLAN\tREGION")
+		for _, s := range sites {
+			fmt.Fprintf(w, "  %s\t%s\t%s\t%s\n",
+				s.Name,
+				s.Status,
+				s.Plan,
+				s.Region,
+			)
+		}
+		w.Flush()
+		fmt.Println()
+	}
+
+	if (benches == nil || len(benches) == 0) && (sites == nil || len(sites) == 0) {
+		fmt.Println("No benches or sites found.")
+		fmt.Println("\nYou may only have marketplace apps. Use 'weg cloud mp' to check.")
+	}
+
+	return nil
+}
+
+func showSiteStatus(client *cloud.Client, siteName string) error {
+	site, err := client.GetSiteDetail(siteName)
+	if err != nil {
+		return fmt.Errorf("failed to get site: %w", err)
+	}
+
+	fmt.Printf("Site: %s\n", site.Name)
+	fmt.Printf("Status: %s\n", site.Status)
+	if site.BenchTitle != "" {
+		fmt.Printf("Bench: %s\n", site.BenchTitle)
+	}
+	if site.FrappeVersion != "" {
+		fmt.Printf("Frappe: %s\n", site.FrappeVersion)
+	}
+	fmt.Printf("Created: %s\n", site.CreatedAt)
+
+	if site.UpdateAvailable {
+		fmt.Println("\n[!] Updates available")
+	}
+
+	// Show installed apps
+	if len(site.InstalledApps) > 0 {
+		fmt.Println("\nInstalled Apps:")
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+		fmt.Fprintln(w, "  APP\tBRANCH\tCOMMIT")
+		for _, app := range site.InstalledApps {
+			hash := app.Hash
+			if len(hash) > 7 {
+				hash = hash[:7]
+			}
+			fmt.Fprintf(w, "  %s\t%s\t%s\n", app.App, app.Branch, hash)
+		}
+		w.Flush()
+	}
+
+	// Show running jobs
+	runningJobs, err := client.GetRunningJobs(siteName)
+	if err == nil && len(runningJobs) > 0 {
+		fmt.Println("\nRunning Jobs:")
+		for _, job := range runningJobs {
+			fmt.Printf("  - %s (%s) started %s\n", job.JobType, job.Name, job.Start)
+		}
+	}
+
+	// Show recent jobs
+	recentJobs, err := client.GetSiteJobs(siteName, 5)
+	if err == nil && len(recentJobs) > 0 {
+		fmt.Println("\nRecent Jobs:")
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+		fmt.Fprintln(w, "  TYPE\tSTATUS\tDURATION\tSTARTED")
+		for _, job := range recentJobs {
+			fmt.Fprintf(w, "  %s\t%s\t%s\t%s\n",
+				job.JobType,
+				job.Status,
+				job.Duration,
+				job.Creation,
+			)
+		}
+		w.Flush()
+	}
+
+	return nil
+}
+
+func showBenchStatus(client *cloud.Client, benchName string) error {
+	// Get bench jobs
+	jobs, err := client.GetBenchJobs(benchName, 10)
+	if err != nil {
+		return fmt.Errorf("failed to get bench info: %w", err)
+	}
+
+	fmt.Printf("Bench: %s\n", benchName)
+	fmt.Println("\nRecent Jobs:")
+
+	if len(jobs) == 0 {
+		fmt.Println("  No recent jobs")
 		return nil
 	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "ID\tSITE\tSTATUS\tSTARTED\tDURATION")
-	for _, d := range deploys {
-		duration := ""
-		if d.FinishedAt != "" {
-			duration = d.Duration
-		} else if d.StartedAt != "" {
-			duration = "running..."
+	fmt.Fprintln(w, "  JOB\tTYPE\tSTATUS\tDURATION\tSTARTED")
+	for _, job := range jobs {
+		name := job.Name
+		if len(name) > 15 {
+			name = name[:15] + "..."
 		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
-			d.ID,
-			d.Site,
-			d.Status,
-			d.StartedAt,
-			duration,
+		fmt.Fprintf(w, "  %s\t%s\t%s\t%s\t%s\n",
+			name,
+			job.JobType,
+			job.Status,
+			job.Duration,
+			job.Creation,
 		)
 	}
 	w.Flush()
@@ -93,29 +226,38 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func watchDeployment(client *cloud.Client, deployID string, watch bool) error {
+func trackJob(client *cloud.Client, jobID string, watch bool) error {
 	for {
-		deploy, err := client.GetDeployment(deployID)
+		job, err := client.GetJob(jobID)
 		if err != nil {
-			return fmt.Errorf("failed to get deployment: %w", err)
+			return fmt.Errorf("failed to get job: %w", err)
 		}
 
-		fmt.Printf("\033[2J\033[H") // Clear screen
-		fmt.Printf("Deployment: %s\n", deploy.ID)
-		fmt.Printf("Site: %s\n", deploy.Site)
-		fmt.Printf("Status: %s\n", deploy.Status)
-		fmt.Printf("Started: %s\n", deploy.StartedAt)
+		if watch {
+			// Move cursor to top (simpler than clearing screen)
+			fmt.Print("\033[H\033[2J")
+		}
 
-		if deploy.Status == "Success" || deploy.Status == "Failed" {
-			fmt.Printf("Finished: %s\n", deploy.FinishedAt)
-			fmt.Printf("Duration: %s\n", deploy.Duration)
-			if deploy.Status == "Failed" {
-				fmt.Printf("\nError: %s\n", deploy.Error)
+		fmt.Printf("Job: %s\n", job.Name)
+		fmt.Printf("Type: %s\n", job.JobType)
+		fmt.Printf("Status: %s\n", job.Status)
+		if job.Site != "" {
+			fmt.Printf("Site: %s\n", job.Site)
+		}
+		fmt.Printf("Started: %s\n", job.Start)
+
+		if job.Status == "Success" || job.Status == "Failure" {
+			if job.End != "" {
+				fmt.Printf("Ended: %s\n", job.End)
+			}
+			if job.Duration != "" {
+				fmt.Printf("Duration: %s\n", job.Duration)
 			}
 			return nil
 		}
 
 		if !watch {
+			fmt.Println("\nJob is still running. Use --watch to follow progress.")
 			return nil
 		}
 
