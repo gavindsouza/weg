@@ -1,10 +1,10 @@
 # Weg
 
-A modern CLI replacement for Frappe's `bench` tool with declarative configuration and faster tooling.
+The fast way to develop Frappe apps.
 
 ## What is Weg?
 
-Weg (वेग - Marathi/Sanskrit for "speed") is a command-line tool for managing Frappe development environments. It provides:
+Weg means "way" in German and "वेग" (speed) in Marathi/Sanskrit — the fast way to develop Frappe applications. It's a modern replacement for Frappe's `bench` CLI with declarative configuration and faster tooling. It provides:
 
 - **Declarative configuration** via `weg.toml` or `pyproject.toml`
 - **App-centric development** - your app is the project root, bench hidden in `.weg/`
