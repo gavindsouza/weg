@@ -28,4 +28,5 @@ func init() {
 	CloudCmd.AddCommand(deployCmd)
 	CloudCmd.AddCommand(statusCmd)
 	CloudCmd.AddCommand(cloudLogsCmd)
+	CloudCmd.AddCommand(marketplaceCmd)
 }
