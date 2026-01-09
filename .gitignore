@@ -2,9 +2,31 @@
 weg
 weg-test
 weg-*
+*.exe
+*.test
+*.out
+
+# Go
+vendor/
+coverage.out
+coverage.html
 
 # IDE/Editor
 .claude/
 .specify/
 .idea/
 .vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.*
+*.log
+
+# Temporary
+*.tmp
+*.swp
+*~
