@@ -37,7 +37,7 @@ func runCloudLogs(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("site name is required")
 	}
 
-	client, err := getAuthenticatedClient()
+	client, err := getAuthenticatedClient("")
 	if err != nil {
 		return err
 	}

@@ -16,18 +16,23 @@ var sitesCmd = &cobra.Command{
 
 Examples:
   weg cloud sites                # List all sites
-  weg cloud sites --team myteam  # List sites for a team`,
+  weg cloud sites --team myteam  # List sites for a team
+  weg cloud sites --cloud mycloud # Use specific cloud`,
 	RunE: runSites,
 }
 
-var sitesTeam string
+var (
+	sitesTeam  string
+	sitesCloud string
+)
 
 func init() {
 	sitesCmd.Flags().StringVar(&sitesTeam, "team", "", "Filter by team name")
+	sitesCmd.Flags().StringVar(&sitesCloud, "cloud", "", "Which cloud to use (default: from config)")
 }
 
 func runSites(cmd *cobra.Command, args []string) error {
-	client, err := getAuthenticatedClient()
+	client, err := getAuthenticatedClient(sitesCloud)
 	if err != nil {
 		return err
 	}
@@ -58,16 +63,7 @@ func runSites(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func getAuthenticatedClient() (*cloud.Client, error) {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get home directory: %w", err)
-	}
-
-	apiKey, err := cloud.LoadCredentials(homeDir)
-	if err != nil {
-		return nil, fmt.Errorf("not logged in. Run 'weg cloud login' first")
-	}
-
-	return cloud.NewClient(apiKey), nil
+// getAuthenticatedClient returns a cloud client for the specified cloud (or default)
+func getAuthenticatedClient(cloudName string) (*cloud.Client, error) {
+	return cloud.GetCloudClient(cloudName)
 }

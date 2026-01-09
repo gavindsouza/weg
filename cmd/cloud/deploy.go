@@ -35,7 +35,7 @@ func init() {
 }
 
 func runDeploy(cmd *cobra.Command, args []string) error {
-	client, err := getAuthenticatedClient()
+	client, err := getAuthenticatedClient("")
 	if err != nil {
 		return err
 	}
