@@ -10,18 +10,22 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var forceStop bool
+
 var stopCmd = &cobra.Command{
 	Use:   "stop",
 	Short: "Stop development services",
 	Long: `Stop all running development services.
 
 Examples:
-  weg stop        # Stop all services`,
+  weg stop           # Stop all services (graceful)
+  weg stop --force   # Force stop with SIGKILL (faster)`,
 	RunE: runStop,
 }
 
 func init() {
 	rootCmd.AddCommand(stopCmd)
+	stopCmd.Flags().BoolVarP(&forceStop, "force", "F", false, "Force stop with SIGKILL (faster, but may interrupt jobs)")
 }
 
 func runStop(cmd *cobra.Command, args []string) error {
@@ -56,8 +60,14 @@ func runStop(cmd *cobra.Command, args []string) error {
 	}
 
 	PrintInfo("Stopping services...")
-	if err := mgr.Stop(); err != nil {
-		return err
+	var stopErr error
+	if forceStop {
+		stopErr = mgr.StopFast()
+	} else {
+		stopErr = mgr.Stop()
+	}
+	if stopErr != nil {
+		return stopErr
 	}
 
 	// Clean up runtime config

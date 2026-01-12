@@ -154,10 +154,31 @@ func (m *Manager) StartDetached() error {
 
 // Stop stops all running services
 func (m *Manager) Stop() error {
+	return m.StopWithTimeout(0, false)
+}
+
+// StopFast stops all services with a short timeout and SIGKILL for unresponsive processes
+func (m *Manager) StopFast() error {
+	return m.StopWithTimeout(3, true)
+}
+
+// StopWithTimeout stops services with custom timeout and optional SIGKILL
+func (m *Manager) StopWithTimeout(timeoutSecs int, forceKill bool) error {
+	composePath := filepath.Join(m.BenchPath, "process-compose.yaml")
+
+	// Build process-compose down command with options
+	pcArgs := []string{"down", "-f", composePath}
+	if timeoutSecs > 0 {
+		pcArgs = append(pcArgs, fmt.Sprintf("--timeout=%d", timeoutSecs))
+	}
+	if forceKill {
+		pcArgs = append(pcArgs, "-k") // Send SIGKILL instead of SIGTERM
+	}
+
 	if m.isDevboxProject() {
 		// Stop process-compose first
-		composePath := filepath.Join(m.BenchPath, "process-compose.yaml")
-		pcCmd := exec.Command("devbox", "run", "-c", m.BenchPath, "--", "process-compose", "down", "-f", composePath)
+		devboxArgs := append([]string{"run", "-c", m.BenchPath, "--", "process-compose"}, pcArgs...)
+		pcCmd := exec.Command("devbox", devboxArgs...)
 		pcCmd.Dir = m.BenchPath
 		pcCmd.CombinedOutput() // Ignore errors, may not be running
 
@@ -172,9 +193,7 @@ func (m *Manager) Stop() error {
 		return nil
 	}
 
-	composePath := filepath.Join(m.BenchPath, "process-compose.yaml")
-
-	cmd := exec.Command("process-compose", "down", "-f", composePath)
+	cmd := exec.Command("process-compose", pcArgs...)
 	cmd.Dir = m.BenchPath
 	cmd.CombinedOutput() // Ignore errors
 

@@ -209,6 +209,12 @@ func GenerateProcessCompose(opts ComposeOptions) *ProcessComposeConfig {
 		}
 	}
 
+	// Add DEV_SERVER env var to all processes for development mode detection
+	for name, proc := range config.Processes {
+		proc.Environment = append(proc.Environment, "DEV_SERVER=1")
+		config.Processes[name] = proc
+	}
+
 	// Add WEG_RUNNER env var to all processes for identification
 	if opts.RunID != "" {
 		wegEnv := fmt.Sprintf("WEG_RUNNER=%s", opts.RunID)
