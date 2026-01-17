@@ -22,6 +22,7 @@ import (
 	"github.com/gavindsouza/weg/cmd/fixtures"
 	"github.com/gavindsouza/weg/cmd/image"
 	"github.com/gavindsouza/weg/cmd/log"
+	"github.com/gavindsouza/weg/cmd/remote"
 	"github.com/gavindsouza/weg/cmd/scheduler"
 	"github.com/gavindsouza/weg/cmd/site"
 	"github.com/gavindsouza/weg/cmd/user"
@@ -85,7 +86,9 @@ Learn more at https://github.com/gavindsouza/weg`,
 			"version":    true,
 			"completion": true,
 			"self":       true,
-			"run":        true, // weg run clones fresh
+			"run":        true,  // weg run clones fresh
+			"clone":      true,  // weg remote clone works outside projects
+			"remote":     true,  // weg remote subcommands
 		}
 
 		// Skip auto-detection for root command (no subcommand) or skipped commands
@@ -149,6 +152,7 @@ func init() {
 	rootCmd.AddCommand(fixtures.FixturesCmd)
 	rootCmd.AddCommand(image.ImageCmd)
 	rootCmd.AddCommand(log.LogCmd)
+	rootCmd.AddCommand(remote.RemoteCmd)
 	rootCmd.AddCommand(scheduler.SchedulerCmd)
 	rootCmd.AddCommand(site.SiteCmd)
 	rootCmd.AddCommand(user.UserCmd)
