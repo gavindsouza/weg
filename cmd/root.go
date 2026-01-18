@@ -87,10 +87,10 @@ Learn more at https://github.com/gavindsouza/weg`,
 			"version":    true,
 			"completion": true,
 			"self":       true,
-			"run":        true,  // weg run clones fresh
-			"clone":      true,  // weg remote clone works outside projects
-			"remote":     true,  // weg remote subcommands
-			"workspace":  true,  // weg workspace works in remote clones
+			"run":        true, // weg run clones fresh
+			"clone":      true, // weg remote clone works outside projects
+			"remote":     true, // weg remote subcommands
+			"workspace":  true, // weg workspace works in remote clones
 		}
 
 		// Skip auto-detection for root command (no subcommand) or skipped commands

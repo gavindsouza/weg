@@ -18,20 +18,20 @@ import (
 
 // SiteConfig represents the .weg/site.toml configuration
 type SiteConfig struct {
-	Site     SiteInfo              `toml:"site"`
-	Modules  map[string]ModuleInfo `toml:"modules"`
-	Sync     SyncSettings          `toml:"sync"`
+	Site     SiteInfo               `toml:"site"`
+	Modules  map[string]ModuleInfo  `toml:"modules"`
+	Sync     SyncSettings           `toml:"sync"`
 	Versions map[string]VersionInfo `toml:"versions"`
 }
 
 // SiteInfo contains basic site information
 type SiteInfo struct {
-	URL       string    `toml:"url"`
-	Name      string    `toml:"name"`
-	ClonedAt  time.Time `toml:"cloned_at"`
-	Auth      AuthInfo  `toml:"auth"`
-	Frappe    FrappeInfo `toml:"frappe"`
-	Apps      map[string]AppInfo `toml:"apps"`
+	URL      string             `toml:"url"`
+	Name     string             `toml:"name"`
+	ClonedAt time.Time          `toml:"cloned_at"`
+	Auth     AuthInfo           `toml:"auth"`
+	Frappe   FrappeInfo         `toml:"frappe"`
+	Apps     map[string]AppInfo `toml:"apps"`
 }
 
 // AuthInfo contains authentication method (credentials stored separately)
@@ -57,9 +57,9 @@ type ModuleInfo struct {
 
 // SyncSettings contains sync configuration
 type SyncSettings struct {
-	LastSync time.Time            `toml:"last_sync"`
-	Entities EntitySyncSettings   `toml:"entities"`
-	Exclude  ExcludeSettings      `toml:"exclude"`
+	LastSync time.Time          `toml:"last_sync"`
+	Entities EntitySyncSettings `toml:"entities"`
+	Exclude  ExcludeSettings    `toml:"exclude"`
 }
 
 // EntitySyncSettings controls which entity types to sync

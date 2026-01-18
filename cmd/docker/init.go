@@ -31,11 +31,11 @@ Examples:
 }
 
 var (
-	initMode      string
-	initNoDb      bool
-	initNoRedis   bool
-	initWebPort   int
-	initDbPort    int
+	initMode    string
+	initNoDb    bool
+	initNoRedis bool
+	initWebPort int
+	initDbPort  int
 )
 
 func init() {

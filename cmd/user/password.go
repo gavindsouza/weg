@@ -26,9 +26,9 @@ Examples:
 }
 
 var (
-	passwordSite     string
-	passwordValue    string
-	passwordLogout   bool
+	passwordSite   string
+	passwordValue  string
+	passwordLogout bool
 )
 
 func init() {

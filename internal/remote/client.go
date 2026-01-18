@@ -344,12 +344,12 @@ func (c *Client) GetFrappeVersion() (string, error) {
 
 // VersionRecord represents a single version history entry
 type VersionRecord struct {
-	Name       string                 `json:"name"`
-	RefDoctype string                 `json:"ref_doctype"`
-	Docname    string                 `json:"docname"`
-	Owner      string                 `json:"owner"`
-	Creation   string                 `json:"creation"`
-	Data       string                 `json:"data"` // JSON string of version data
+	Name       string `json:"name"`
+	RefDoctype string `json:"ref_doctype"`
+	Docname    string `json:"docname"`
+	Owner      string `json:"owner"`
+	Creation   string `json:"creation"`
+	Data       string `json:"data"` // JSON string of version data
 }
 
 // GetAllVersions retrieves all Version records for given doctypes
@@ -517,4 +517,3 @@ func deriveNameFromEmail(email string) string {
 
 	return strings.Join(words, " ")
 }
-

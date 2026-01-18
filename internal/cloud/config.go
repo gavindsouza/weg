@@ -12,8 +12,8 @@ import (
 
 // CloudConfig represents cloud configuration (non-secret)
 type CloudConfig struct {
-	Default string                  `toml:"default,omitempty"` // Default cloud name
-	Clouds  map[string]*CloudEntry  `toml:"cloud,omitempty"`
+	Default string                 `toml:"default,omitempty"` // Default cloud name
+	Clouds  map[string]*CloudEntry `toml:"cloud,omitempty"`
 }
 
 // CloudEntry represents a single cloud instance configuration

@@ -16,11 +16,11 @@ import (
 
 // ExpandOptions configures the expand operation
 type ExpandOptions struct {
-	BaseDir    string   // Base directory of the weg clone
-	EntityType string   // Filter by entity type (empty = all)
-	Clean      bool     // Remove stale files first
-	Force      bool     // Overwrite even if conflicts
-	Verbose    bool     // Print detailed output
+	BaseDir    string // Base directory of the weg clone
+	EntityType string // Filter by entity type (empty = all)
+	Clean      bool   // Remove stale files first
+	Force      bool   // Overwrite even if conflicts
+	Verbose    bool   // Print detailed output
 }
 
 // ExpandResult contains the results of an expand operation

@@ -202,12 +202,12 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 }
 
 type updateResult struct {
-	App          string
-	Duration     time.Duration
-	Error        error
-	NeedsMigrate bool
-	NeedsRestart bool
-	NeedsPyDeps  bool
+	App           string
+	Duration      time.Duration
+	Error         error
+	NeedsMigrate  bool
+	NeedsRestart  bool
+	NeedsPyDeps   bool
 	NeedsNodeDeps bool
 }
 

@@ -10,18 +10,18 @@ import (
 
 // ImageOptions configures container image building
 type ImageOptions struct {
-	BenchPath   string
-	AppName     string   // Primary app name for tagging
-	Apps        []string // Apps to include
-	Tag         string   // Image tag
-	Registry    string   // Registry to push to
-	Target      string   // Build target: web, worker, all
-	Platform    string   // Target platform(s): linux/amd64,linux/arm64
-	FrappeBase  string   // Base image from frappe_docker
-	Push        bool     // Push after building
-	NoCache     bool     // Build without cache
-	BuildArgs   map[string]string
-	Verbose     bool
+	BenchPath  string
+	AppName    string   // Primary app name for tagging
+	Apps       []string // Apps to include
+	Tag        string   // Image tag
+	Registry   string   // Registry to push to
+	Target     string   // Build target: web, worker, all
+	Platform   string   // Target platform(s): linux/amd64,linux/arm64
+	FrappeBase string   // Base image from frappe_docker
+	Push       bool     // Push after building
+	NoCache    bool     // Build without cache
+	BuildArgs  map[string]string
+	Verbose    bool
 }
 
 // DefaultImageOptions returns sensible defaults

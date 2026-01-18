@@ -10,14 +10,14 @@ import (
 
 // PublisherProfile represents a marketplace publisher profile
 type PublisherProfile struct {
-	ProfileCreated bool                   `json:"profile_created"`
-	ProfileInfo    *PublisherProfileInfo  `json:"profile_info,omitempty"`
+	ProfileCreated bool                  `json:"profile_created"`
+	ProfileInfo    *PublisherProfileInfo `json:"profile_info,omitempty"`
 }
 
 // PublisherProfileInfo contains publisher details
 type PublisherProfileInfo struct {
-	Name        string `json:"name"`
-	DisplayName string `json:"display_name"`
+	Name         string `json:"name"`
+	DisplayName  string `json:"display_name"`
 	ContactEmail string `json:"contact_email"`
 }
 
@@ -33,15 +33,15 @@ type MarketplaceApp struct {
 
 // MarketplaceAppDetail represents detailed app info
 type MarketplaceAppDetail struct {
-	Name            string                  `json:"name"`
-	Title           string                  `json:"title"`
-	App             string                  `json:"app"`
-	Image           string                  `json:"image"`
-	Status          string                  `json:"status"`
-	Description     string                  `json:"description"`
-	LongDescription string                  `json:"long_description"`
-	Team            string                  `json:"team"`
-	Sources         []MarketplaceAppSource  `json:"sources"`
+	Name            string                 `json:"name"`
+	Title           string                 `json:"title"`
+	App             string                 `json:"app"`
+	Image           string                 `json:"image"`
+	Status          string                 `json:"status"`
+	Description     string                 `json:"description"`
+	LongDescription string                 `json:"long_description"`
+	Team            string                 `json:"team"`
+	Sources         []MarketplaceAppSource `json:"sources"`
 }
 
 // MarketplaceAppSource represents a version source
@@ -52,16 +52,16 @@ type MarketplaceAppSource struct {
 
 // AppAnalytics represents analytics data for an app
 type AppAnalytics struct {
-	TotalInstalls      int                `json:"total_installs"`
-	TotalActiveInstalls int               `json:"total_active_installs"`
-	InstallsByPlan     []PlanInstalls     `json:"installs_by_plan,omitempty"`
-	RevenueData        *RevenueData       `json:"revenue_data,omitempty"`
+	TotalInstalls       int            `json:"total_installs"`
+	TotalActiveInstalls int            `json:"total_active_installs"`
+	InstallsByPlan      []PlanInstalls `json:"installs_by_plan,omitempty"`
+	RevenueData         *RevenueData   `json:"revenue_data,omitempty"`
 }
 
 // PlanInstalls represents installs per plan
 type PlanInstalls struct {
-	Plan   string `json:"plan"`
-	Count  int    `json:"count"`
+	Plan  string `json:"plan"`
+	Count int    `json:"count"`
 }
 
 // RevenueData represents revenue information

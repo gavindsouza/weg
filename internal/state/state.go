@@ -41,10 +41,10 @@ type AppState struct {
 
 // SiteState represents the state of a site
 type SiteState struct {
-	Name         string    `json:"name"`
-	Apps         []string  `json:"apps"`
-	CreatedAt    time.Time `json:"created_at"`
-	DefaultSite  bool      `json:"default,omitempty"`
+	Name        string    `json:"name"`
+	Apps        []string  `json:"apps"`
+	CreatedAt   time.Time `json:"created_at"`
+	DefaultSite bool      `json:"default,omitempty"`
 }
 
 // FrappeState represents the Frappe framework state

@@ -13,9 +13,9 @@ import (
 )
 
 var upgradeCmd = &cobra.Command{
-	Use:          "upgrade",
-	Short:        "Upgrade Frappe to next version",
-	Long:         `Upgrade the Frappe framework to the next major version.
+	Use:   "upgrade",
+	Short: "Upgrade Frappe to next version",
+	Long: `Upgrade the Frappe framework to the next major version.
 
 Version progression: 14 → 15 → 16 → develop
 

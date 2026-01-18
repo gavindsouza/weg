@@ -287,4 +287,3 @@ func TestUserStruct(t *testing.T) {
 		t.Errorf("unexpected Email: %s", user.Email)
 	}
 }
-

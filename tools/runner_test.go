@@ -86,9 +86,9 @@ func TestRunError(t *testing.T) {
 
 func TestRunnerDetectDevbox(t *testing.T) {
 	tests := []struct {
-		name        string
-		setupFunc   func(dir string) error
-		wantDevbox  bool
+		name       string
+		setupFunc  func(dir string) error
+		wantDevbox bool
 	}{
 		{
 			name:       "no devbox",

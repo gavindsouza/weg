@@ -287,9 +287,9 @@ func TestShouldSyncModule(t *testing.T) {
 		module   string
 		expected bool
 	}{
-		{"Custom", true},  // Explicitly enabled
-		{"Core", false},   // Explicitly disabled
-		{"_", true},       // Catch-all always syncs
+		{"Custom", true},   // Explicitly enabled
+		{"Core", false},    // Explicitly disabled
+		{"_", true},        // Catch-all always syncs
 		{"Unknown", false}, // Unknown modules don't sync by default
 	}
 

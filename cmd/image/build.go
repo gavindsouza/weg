@@ -30,12 +30,12 @@ Examples:
 }
 
 var (
-	buildTag       string
-	buildRegistry  string
-	buildTarget    string
-	buildPlatform  string
-	buildPush      bool
-	buildNoCache   bool
+	buildTag        string
+	buildRegistry   string
+	buildTarget     string
+	buildPlatform   string
+	buildPush       bool
+	buildNoCache    bool
 	buildFrappeBase string
 )
 

@@ -49,38 +49,38 @@ type Deployment struct {
 
 // Job represents a Frappe Cloud job (deploy, migrate, backup, etc.)
 type Job struct {
-	Name       string `json:"name"`
-	JobType    string `json:"job_type"`
-	Status     string `json:"status"`
-	Site       string `json:"site"`
-	Bench      string `json:"bench"`
-	Creation   string `json:"creation"`
-	Start      string `json:"start"`
-	End        string `json:"end"`
-	Duration   string `json:"duration"`
+	Name     string `json:"name"`
+	JobType  string `json:"job_type"`
+	Status   string `json:"status"`
+	Site     string `json:"site"`
+	Bench    string `json:"bench"`
+	Creation string `json:"creation"`
+	Start    string `json:"start"`
+	End      string `json:"end"`
+	Duration string `json:"duration"`
 }
 
 // SiteDetail represents detailed site information
 type SiteDetail struct {
-	Name           string            `json:"name"`
-	Host           string            `json:"host_name"`
-	Status         string            `json:"status"`
-	CurrentPlan    map[string]any    `json:"current_plan"`
-	Bench          string            `json:"bench"`
-	BenchTitle     string            `json:"bench_title"`
-	FrappeVersion  string            `json:"frappe_version"`
-	CreatedBy      string            `json:"created_by"`
-	CreatedAt      string            `json:"creation"`
-	InstalledApps  []InstalledApp    `json:"installed_apps,omitempty"`
-	UpdateAvailable bool             `json:"update_available"`
+	Name            string         `json:"name"`
+	Host            string         `json:"host_name"`
+	Status          string         `json:"status"`
+	CurrentPlan     map[string]any `json:"current_plan"`
+	Bench           string         `json:"bench"`
+	BenchTitle      string         `json:"bench_title"`
+	FrappeVersion   string         `json:"frappe_version"`
+	CreatedBy       string         `json:"created_by"`
+	CreatedAt       string         `json:"creation"`
+	InstalledApps   []InstalledApp `json:"installed_apps,omitempty"`
+	UpdateAvailable bool           `json:"update_available"`
 }
 
 // InstalledApp represents an app installed on a site
 type InstalledApp struct {
-	App     string `json:"app"`
-	Title   string `json:"title"`
-	Hash    string `json:"hash"`
-	Branch  string `json:"branch"`
+	App    string `json:"app"`
+	Title  string `json:"title"`
+	Hash   string `json:"hash"`
+	Branch string `json:"branch"`
 }
 
 // ListSites returns all sites for the authenticated user (optionally filtered by team)

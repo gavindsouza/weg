@@ -49,8 +49,8 @@ type AppUpdate struct {
 
 // SiteUpdate represents a site that needs updating
 type SiteUpdate struct {
-	Name       string
-	AppsToAdd  []string
+	Name         string
+	AppsToAdd    []string
 	AppsToRemove []string
 }
 

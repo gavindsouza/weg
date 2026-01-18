@@ -28,9 +28,9 @@ type Config struct {
 
 // Ports holds the actual ports being used by services
 type Ports struct {
-	Web       int `json:"web"`
-	SocketIO  int `json:"socketio"`
-	Redis     int `json:"redis"`
+	Web      int `json:"web"`
+	SocketIO int `json:"socketio"`
+	Redis    int `json:"redis"`
 	// Process-compose API port
 	ProcessCompose int `json:"process_compose"`
 }

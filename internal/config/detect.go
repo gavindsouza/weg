@@ -41,11 +41,11 @@ func (c Context) String() string {
 
 // DetectionResult contains the detected context and relevant paths
 type DetectionResult struct {
-	Context     Context
-	Path        string
-	AppName     string // Set if ContextApp or ContextWegApp
-	BenchPath   string // Set if within a bench
-	ConfigPath  string // Path to config file (pyproject.toml or weg.toml)
+	Context    Context
+	Path       string
+	AppName    string // Set if ContextApp or ContextWegApp
+	BenchPath  string // Set if within a bench
+	ConfigPath string // Path to config file (pyproject.toml or weg.toml)
 }
 
 // DetectContext analyzes a directory to determine its context

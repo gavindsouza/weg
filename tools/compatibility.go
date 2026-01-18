@@ -13,13 +13,13 @@ type Dependency struct {
 
 // FrappeVersion represents a Frappe version and its dependencies
 type FrappeVersion struct {
-	Version           string       `json:"version"`
-	VersionPattern    string       `json:"versionPattern"`
-	Dependencies      []Dependency `json:"dependencies"`
-	SupportedDBs      []string     `json:"supported_dbs"`
-	PythonVersion     string       `json:"python_version"`
-	NodeVersion       string       `json:"node_version"`
-	PackageManager    string       `json:"package_manager"` // yarn, pnpm, bun
+	Version        string       `json:"version"`
+	VersionPattern string       `json:"versionPattern"`
+	Dependencies   []Dependency `json:"dependencies"`
+	SupportedDBs   []string     `json:"supported_dbs"`
+	PythonVersion  string       `json:"python_version"`
+	NodeVersion    string       `json:"node_version"`
+	PackageManager string       `json:"package_manager"` // yarn, pnpm, bun
 }
 
 // Frappe holds all version configurations

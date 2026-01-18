@@ -213,10 +213,10 @@ func (m *Manager) killOrphanedProcesses() {
 	// Also kill by path patterns (catches orphaned child processes like esbuild)
 	// These may have been reparented to init and lost their WEG_RUNNER env
 	patterns := []string{
-		filepath.Join(m.BenchPath, "sites"),                      // gunicorn, bench commands
-		filepath.Join(m.BenchPath, "apps/frappe/socketio.js"),    // socketio
-		filepath.Join(m.BenchPath, "apps/frappe/node_modules"),   // esbuild, yarn
-		filepath.Join(m.BenchPath, ".devbox"),                    // devbox-spawned node/yarn
+		filepath.Join(m.BenchPath, "sites"),                    // gunicorn, bench commands
+		filepath.Join(m.BenchPath, "apps/frappe/socketio.js"),  // socketio
+		filepath.Join(m.BenchPath, "apps/frappe/node_modules"), // esbuild, yarn
+		filepath.Join(m.BenchPath, ".devbox"),                  // devbox-spawned node/yarn
 	}
 
 	for _, pattern := range patterns {

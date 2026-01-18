@@ -36,11 +36,11 @@ const (
 
 // Entity represents a fetched entity with metadata
 type Entity struct {
-	Type       EntityType
-	Name       string
-	Module     string
-	Data       map[string]interface{}
-	FilePath   string // Relative path where this should be saved
+	Type     EntityType
+	Name     string
+	Module   string
+	Data     map[string]interface{}
+	FilePath string // Relative path where this should be saved
 }
 
 // FetchResult contains the results of fetching all entities

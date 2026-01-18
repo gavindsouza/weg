@@ -39,19 +39,19 @@ type AppSettings struct {
 
 // SiteConfig represents a site configuration
 type SiteConfig struct {
-	Name         string   `toml:"name"`
-	Apps         []string `toml:"apps,omitempty"`          // Apps to install on site
-	AdminPass    string   `toml:"admin_password,omitempty"`
-	DefaultSite  bool     `toml:"default,omitempty"`
-	Domains      []string `toml:"domains,omitempty"`
+	Name        string   `toml:"name"`
+	Apps        []string `toml:"apps,omitempty"` // Apps to install on site
+	AdminPass   string   `toml:"admin_password,omitempty"`
+	DefaultSite bool     `toml:"default,omitempty"`
+	Domains     []string `toml:"domains,omitempty"`
 }
 
 // ServicesConfig contains service configuration overrides
 type ServicesConfig struct {
-	Redis    RedisConfig      `toml:"redis,omitempty"`
-	Database DatabaseConfig   `toml:"database,omitempty"`
-	Web      WebConfig        `toml:"web,omitempty"`
-	Workers  map[string]int   `toml:"workers,omitempty"` // Queue name -> instance count
+	Redis    RedisConfig    `toml:"redis,omitempty"`
+	Database DatabaseConfig `toml:"database,omitempty"`
+	Web      WebConfig      `toml:"web,omitempty"`
+	Workers  map[string]int `toml:"workers,omitempty"` // Queue name -> instance count
 }
 
 // RedisConfig contains Redis service configuration

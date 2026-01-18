@@ -86,4 +86,3 @@ finally:
 	fmt.Printf("Renamed %s: %s -> %s\n", doctype, oldName, result.Data)
 	return nil
 }
-

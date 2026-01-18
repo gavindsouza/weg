@@ -10,10 +10,10 @@ import (
 
 // AppConfig represents the [tool.weg] section in pyproject.toml
 type AppConfig struct {
-	Compatibility CompatibilityConfig  `toml:"compatibility"`
-	Dev           DevConfig            `toml:"dev"`
-	Dependencies  DependenciesConfig   `toml:"dependencies"`
-	Services      AppServicesConfig    `toml:"services"`
+	Compatibility CompatibilityConfig `toml:"compatibility"`
+	Dev           DevConfig           `toml:"dev"`
+	Dependencies  DependenciesConfig  `toml:"dependencies"`
+	Services      AppServicesConfig   `toml:"services"`
 }
 
 // AppServicesConfig defines additional services an app needs
