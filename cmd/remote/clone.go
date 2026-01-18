@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/gavindsouza/weg/internal/remote"
+	"github.com/gavindsouza/weg/internal/workspace"
 	"github.com/schollz/progressbar/v3"
 	"github.com/spf13/cobra"
 )
@@ -507,6 +508,10 @@ func runClone(cobraCmd *cobra.Command, args []string) error {
 		}
 	}
 
+	// Initialize workspace
+	fmt.Println("Initializing workspace...")
+	initWorkspace(dirName)
+
 	// Summary
 	fmt.Println()
 	fmt.Printf("✓ Cloned to %s/\n", dirName)
@@ -516,9 +521,9 @@ func runClone(cobraCmd *cobra.Command, args []string) error {
 	fmt.Println()
 	fmt.Println("Next steps:")
 	fmt.Printf("  cd %s\n", dirName)
+	fmt.Println("  weg workspace expand    # Extract scripts for editing")
 	fmt.Println("  weg remote status       # Check sync state")
-	fmt.Println("  weg remote pull         # Fetch remote changes")
-	fmt.Println("  weg remote sync -m \"msg\" # Push local changes")
+	fmt.Println("  weg remote push         # Push local changes")
 
 	return nil
 }
@@ -529,6 +534,65 @@ func modules(entities []remote.Entity) map[string]bool {
 		m[e.Module] = true
 	}
 	return m
+}
+
+// initWorkspace sets up the workspace directory with gitignore and pre-commit hooks
+func initWorkspace(baseDir string) {
+	// Create workspace directory
+	workspaceDir := filepath.Join(baseDir, workspace.WorkspaceDir)
+	os.MkdirAll(workspaceDir, 0755)
+
+	// Add to gitignore
+	gitignorePath := filepath.Join(baseDir, ".gitignore")
+	content := ""
+	if data, err := os.ReadFile(gitignorePath); err == nil {
+		content = string(data)
+	}
+
+	// Add workspace to gitignore if not present
+	if !strings.Contains(content, workspace.WorkspaceDir) {
+		f, err := os.OpenFile(gitignorePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err == nil {
+			defer f.Close()
+			if content != "" && content[len(content)-1] != '\n' {
+				f.WriteString("\n")
+			}
+			f.WriteString("\n# Expanded workspace for code editing\n")
+			f.WriteString(workspace.WorkspaceDir + "/\n")
+		}
+	}
+
+	// Create pre-commit config if it doesn't exist
+	precommitPath := filepath.Join(baseDir, ".pre-commit-config.yaml")
+	if _, err := os.Stat(precommitPath); os.IsNotExist(err) {
+		precommitConfig := `# Pre-commit hooks for weg workspace
+# Install with: pre-commit install
+
+repos:
+  # Collapse workspace before commit
+  - repo: local
+    hooks:
+      - id: weg-workspace-collapse
+        name: Collapse weg workspace
+        entry: weg workspace collapse
+        language: system
+        pass_filenames: false
+        files: ^weg_workspace/
+
+  # Python linting with ruff
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.4.4
+    hooks:
+      - id: ruff
+        files: ^weg_workspace/.*\.py$
+        args: [--fix]
+      - id: ruff-format
+        files: ^weg_workspace/.*\.py$
+`
+		os.WriteFile(precommitPath, []byte(precommitConfig), 0644)
+	}
+
+	fmt.Println("✓ Workspace initialized")
 }
 
 // writeFileContent writes JSON content to a file path
