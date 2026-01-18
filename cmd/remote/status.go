@@ -4,8 +4,13 @@ Copyright © 2025 Gavin <me@gavv.in>
 package remote
 
 import (
+	"crypto/md5"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/gavindsouza/weg/internal/remote"
@@ -108,10 +113,21 @@ func runStatus(cobraCmd *cobra.Command, args []string) error {
 		if err := client.Ping(); err != nil {
 			return fmt.Errorf("failed to connect: %w", err)
 		}
+		fmt.Println("✓ Connected")
 
-		// TODO: Implement proper remote change detection
-		// For now, just confirm connectivity
-		fmt.Println("Remote: Connected (detailed diff not yet implemented)")
+		// Fetch remote entities and compare with local
+		remoteChanges, err := detectRemoteChanges(client, config, ".")
+		if err != nil {
+			fmt.Printf("Warning: Could not detect remote changes: %v\n", err)
+		} else if len(remoteChanges) == 0 {
+			fmt.Println("Remote: No changes detected")
+		} else {
+			fmt.Printf("Remote: %d entity change(s) detected\n", len(remoteChanges))
+			for _, change := range remoteChanges {
+				fmt.Printf("  %s: %s\n", change.Status, change.Name)
+			}
+			fmt.Println("\nRun 'weg remote pull' to fetch remote changes.")
+		}
 	}
 
 	// Show sync instructions
@@ -122,4 +138,111 @@ func runStatus(cobraCmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+// RemoteChange represents a detected change on the remote
+type RemoteChange struct {
+	Name   string
+	Type   string
+	Status string // "modified", "added", "deleted"
+}
+
+// detectRemoteChanges compares local files with remote entities
+func detectRemoteChanges(client *remote.Client, config *remote.SiteConfig, baseDir string) ([]RemoteChange, error) {
+	var changes []RemoteChange
+
+	// Fetch current remote entities
+	fetcher := remote.NewFetcher(client, config)
+	result, err := fetcher.FetchAll()
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch remote entities: %w", err)
+	}
+
+	// Build map of local entity hashes
+	localHashes := make(map[string]string)
+	localEntities := make(map[string]bool)
+
+	err = filepath.Walk(baseDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() {
+			return nil
+		}
+		if !strings.HasSuffix(path, ".json") {
+			return nil
+		}
+
+		relPath, err := filepath.Rel(baseDir, path)
+		if err != nil {
+			return nil
+		}
+
+		// Skip .weg directory
+		if strings.HasPrefix(relPath, ".weg") || strings.HasPrefix(relPath, "weg_workspace") {
+			return nil
+		}
+
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return nil
+		}
+
+		// Normalize JSON for comparison (parse and re-marshal)
+		var doc map[string]interface{}
+		if err := json.Unmarshal(data, &doc); err != nil {
+			return nil
+		}
+
+		// Remove fields that change on every save
+		delete(doc, "modified")
+		delete(doc, "modified_by")
+
+		normalized, _ := json.Marshal(doc)
+		hash := md5.Sum(normalized)
+		localHashes[relPath] = hex.EncodeToString(hash[:])
+		localEntities[relPath] = true
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// Compare remote entities with local
+	for _, entity := range result.Entities {
+		// Normalize remote entity
+		dataCopy := make(map[string]interface{})
+		for k, v := range entity.Data {
+			dataCopy[k] = v
+		}
+		delete(dataCopy, "modified")
+		delete(dataCopy, "modified_by")
+
+		normalized, _ := json.Marshal(dataCopy)
+		remoteHash := md5.Sum(normalized)
+		remoteHashStr := hex.EncodeToString(remoteHash[:])
+
+		localHash, exists := localHashes[entity.FilePath]
+		if !exists {
+			// New entity on remote
+			changes = append(changes, RemoteChange{
+				Name:   entity.Name,
+				Type:   string(entity.Type),
+				Status: "added",
+			})
+		} else if localHash != remoteHashStr {
+			// Modified on remote
+			changes = append(changes, RemoteChange{
+				Name:   entity.Name,
+				Type:   string(entity.Type),
+				Status: "modified",
+			})
+		}
+
+		// Mark as seen
+		delete(localEntities, entity.FilePath)
+	}
+
+	// Remaining local entities might be deleted on remote
+	// (but could also be local additions - skip for now to avoid false positives)
+
+	return changes, nil
 }
