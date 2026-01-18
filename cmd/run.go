@@ -95,7 +95,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 		}
 
 		PrintInfo("Cloning %s...", appURL)
-		if err := apps.CloneRepo(appURL, appPath, ""); err != nil {
+		if err := apps.CloneRepo(appURL, "", appPath, false); err != nil {
 			return fmt.Errorf("failed to clone repository: %w", err)
 		}
 		PrintInfo("Cloned to: %s", appPath)

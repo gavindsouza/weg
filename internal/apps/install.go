@@ -27,7 +27,7 @@ func InstallApp(name, url, branch string, opts InstallOptions) error {
 		if opts.Verbose {
 			fmt.Printf("Cloning %s from %s@%s...\n", name, url, branch)
 		}
-		if err := CloneRepoQuiet(url, branch, appPath); err != nil {
+		if err := CloneRepo(url, branch, appPath, true); err != nil {
 			return fmt.Errorf("failed to clone %s: %w", name, err)
 		}
 	}

@@ -91,29 +91,18 @@ func TestGetCurrentBranchInvalidRepo(t *testing.T) {
 }
 
 func TestCloneRepoDestinationExists(t *testing.T) {
-	tmpDir := t.TempDir()
+	// Test both quiet and non-quiet modes
+	for _, quiet := range []bool{false, true} {
+		tmpDir := t.TempDir()
 
-	// Should fail because destination already exists
-	err := CloneRepo("https://github.com/test/repo", "", tmpDir)
-	if err == nil {
-		t.Error("expected error when destination exists")
-	}
+		err := CloneRepo("https://github.com/test/repo", "", tmpDir, quiet)
+		if err == nil {
+			t.Errorf("expected error when destination exists (quiet=%v)", quiet)
+		}
 
-	if !contains(err.Error(), "already exists") {
-		t.Errorf("expected 'already exists' error, got: %v", err)
-	}
-}
-
-func TestCloneRepoQuietDestinationExists(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	err := CloneRepoQuiet("https://github.com/test/repo", "", tmpDir)
-	if err == nil {
-		t.Error("expected error when destination exists")
-	}
-
-	if !contains(err.Error(), "already exists") {
-		t.Errorf("expected 'already exists' error, got: %v", err)
+		if !contains(err.Error(), "already exists") {
+			t.Errorf("expected 'already exists' error, got: %v (quiet=%v)", err, quiet)
+		}
 	}
 }
 

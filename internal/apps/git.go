@@ -8,46 +8,34 @@ import (
 	"strings"
 )
 
-// CloneRepo clones a git repository to the specified path
-func CloneRepo(url, branch, destPath string) error {
-	// Check if already exists
+// CloneRepo clones a git repository to the specified path.
+// If quiet is true, output is suppressed unless an error occurs.
+func CloneRepo(url, branch, destPath string, quiet bool) error {
 	if _, err := os.Stat(destPath); err == nil {
 		return fmt.Errorf("destination already exists: %s", destPath)
 	}
 
 	args := []string{"clone", "--depth", "1"}
+	if quiet {
+		args = append(args, "--quiet")
+	}
 	if branch != "" {
 		args = append(args, "--branch", branch)
 	}
 	args = append(args, url, destPath)
 
 	cmd := exec.Command("git", args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("git clone failed: %w", err)
-	}
-
-	return nil
-}
-
-// CloneRepoQuiet clones without output
-func CloneRepoQuiet(url, branch, destPath string) error {
-	if _, err := os.Stat(destPath); err == nil {
-		return fmt.Errorf("destination already exists: %s", destPath)
-	}
-
-	args := []string{"clone", "--depth", "1", "--quiet"}
-	if branch != "" {
-		args = append(args, "--branch", branch)
-	}
-	args = append(args, url, destPath)
-
-	cmd := exec.Command("git", args...)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("git clone failed: %w\n%s", err, string(output))
+	if quiet {
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("git clone failed: %w\n%s", err, string(output))
+		}
+	} else {
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("git clone failed: %w", err)
+		}
 	}
 
 	return nil
