@@ -94,28 +94,6 @@ func GetCurrentBranch(repoPath string) (string, error) {
 	return strings.TrimSpace(string(output)), nil
 }
 
-// GetCurrentCommit returns the current commit hash
-func GetCurrentCommit(repoPath string) (string, error) {
-	cmd := exec.Command("git", "rev-parse", "HEAD")
-	cmd.Dir = repoPath
-	output, err := cmd.Output()
-	if err != nil {
-		return "", fmt.Errorf("failed to get commit: %w", err)
-	}
-	return strings.TrimSpace(string(output)), nil
-}
-
-// GetRemoteURL returns the remote origin URL
-func GetRemoteURL(repoPath string) (string, error) {
-	cmd := exec.Command("git", "remote", "get-url", "origin")
-	cmd.Dir = repoPath
-	output, err := cmd.Output()
-	if err != nil {
-		return "", fmt.Errorf("failed to get remote URL: %w", err)
-	}
-	return strings.TrimSpace(string(output)), nil
-}
-
 // IsGitRepo checks if a path is a git repository
 func IsGitRepo(path string) bool {
 	gitDir := filepath.Join(path, ".git")

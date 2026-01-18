@@ -81,78 +81,10 @@ func TestGetCurrentBranch(t *testing.T) {
 	}
 }
 
-func TestGetCurrentCommit(t *testing.T) {
-	// Skip if git not available
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git not available")
-	}
-
-	// Find git root
-	cmd := exec.Command("git", "rev-parse", "--show-toplevel")
-	output, err := cmd.Output()
-	if err != nil {
-		t.Skip("not in a git repository")
-	}
-	projectRoot := string(output[:len(output)-1])
-
-	commit, err := GetCurrentCommit(projectRoot)
-	if err != nil {
-		t.Fatalf("failed to get commit: %v", err)
-	}
-
-	// Git commit hashes are 40 characters
-	if len(commit) != 40 {
-		t.Errorf("expected 40 char commit hash, got %d chars: %s", len(commit), commit)
-	}
-}
-
-func TestGetRemoteURL(t *testing.T) {
-	// Skip if git not available
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git not available")
-	}
-
-	// Find git root from current directory
-	cmd := exec.Command("git", "rev-parse", "--show-toplevel")
-	output, err := cmd.Output()
-	if err != nil {
-		t.Skip("not in a git repository")
-	}
-	projectRoot := string(output[:len(output)-1]) // trim newline
-
-	url, err := GetRemoteURL(projectRoot)
-	if err != nil {
-		// Skip if no remote configured
-		t.Skipf("no remote configured: %v", err)
-	}
-
-	if url == "" {
-		t.Error("expected non-empty remote URL")
-	}
-}
-
 func TestGetCurrentBranchInvalidRepo(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	_, err := GetCurrentBranch(tmpDir)
-	if err == nil {
-		t.Error("expected error for non-git directory")
-	}
-}
-
-func TestGetCurrentCommitInvalidRepo(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	_, err := GetCurrentCommit(tmpDir)
-	if err == nil {
-		t.Error("expected error for non-git directory")
-	}
-}
-
-func TestGetRemoteURLInvalidRepo(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	_, err := GetRemoteURL(tmpDir)
 	if err == nil {
 		t.Error("expected error for non-git directory")
 	}

@@ -342,21 +342,6 @@ func (c *Client) GetSiteLogs(siteName, logType string, lines int) ([]string, err
 	return strings.Split(logs, "\n"), nil
 }
 
-// StreamSiteLogs streams logs from a site (returns channels for log lines and errors)
-func (c *Client) StreamSiteLogs(siteName, logType string) (<-chan string, <-chan error) {
-	logChan := make(chan string)
-	errChan := make(chan error, 1)
-
-	// Note: Real implementation would use websockets or SSE
-	// This is a placeholder that closes immediately
-	go func() {
-		close(logChan)
-		close(errChan)
-	}()
-
-	return logChan, errChan
-}
-
 // Deploy triggers a deployment for a site
 func (c *Client) Deploy(opts DeployOptions) error {
 	params := url.Values{}
