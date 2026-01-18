@@ -9,7 +9,7 @@ Weg is a modern CLI replacement for Frappe's `bench` tool, offering declarative 
 | Metric | Value | Target | Status |
 |--------|-------|--------|--------|
 | Commands implemented | 70+ | ~70 | ✅ Complete |
-| Test coverage | ~40% | 80%+ | 🔄 In progress |
+| Test coverage | ~45% | 80%+ | 🔄 In progress |
 | Critical missing features | 0 | 0 | ✅ Complete |
 | Known TODOs/bugs | 0 | 0 | ✅ Complete |
 | Documentation completeness | 60% | 100% | 🔄 In progress |
@@ -174,13 +174,19 @@ These commands exist in bench but are rarely used in daily development:
 
 | Package | Coverage | Status |
 |---------|----------|--------|
-| `internal/state` | 77.5% | ✅ Good |
 | `internal/completion` | 84.4% | ✅ Good |
-| `internal/config` | ~60% | 🔄 Adequate |
-| `internal/api` | 15% | ⚠️ Needs work |
-| `internal/services` | ~10% | ⚠️ Needs work |
-| `internal/apps` | 0% | ⚠️ Needs work |
-| `internal/cloud` | 0% | ⚠️ Needs work |
+| `internal/config` | 77.5% | ✅ Good |
+| `internal/state` | 76.3% | ✅ Good |
+| `internal/runtime` | 76.8% | ✅ Good |
+| `internal/fsutil` | 68.0% | 🔄 Adequate |
+| `internal/remote` | 37.8% | 🔄 Adequate |
+| `internal/container` | 32.5% | 🔄 Adequate |
+| `internal/services` | 31.5% | ⚠️ Needs work |
+| `internal/apps` | 19.3% | ⚠️ Needs work |
+| `internal/cloud` | 16.2% | ⚠️ Needs work |
+| `internal/api` | 15.0% | ⚠️ Needs work |
+| `tools` | 6.5% | ⚠️ Needs work |
+| `cmd/*` | 0% | ⚠️ Biggest gap |
 
 ---
 
