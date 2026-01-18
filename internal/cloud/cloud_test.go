@@ -11,8 +11,8 @@ import (
 func TestNewClient(t *testing.T) {
 	// Test without API key
 	c := NewClient("")
-	if c.BaseURL != FrappeCloudAPI {
-		t.Errorf("expected BaseURL %s, got %s", FrappeCloudAPI, c.BaseURL)
+	if c.BaseURL != DefaultCloudAPI {
+		t.Errorf("expected BaseURL %s, got %s", DefaultCloudAPI, c.BaseURL)
 	}
 	if c.Token != nil {
 		t.Error("expected nil token without API key")
@@ -36,71 +36,70 @@ func TestTokenStruct(t *testing.T) {
 		AccessToken:  "access123",
 		RefreshToken: "refresh456",
 		ExpiresAt:    time.Now().Add(1 * time.Hour),
-		TeamID:       "team789",
+		Team:         "team789",
 	}
 
 	if token.AccessToken != "access123" {
 		t.Errorf("unexpected AccessToken: %s", token.AccessToken)
 	}
-	if token.TeamID != "team789" {
-		t.Errorf("unexpected TeamID: %s", token.TeamID)
+	if token.Team != "team789" {
+		t.Errorf("unexpected Team: %s", token.Team)
 	}
 }
 
 func TestSaveAndLoadCredentials(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	// Save credentials
-	err := SaveCredentials(tmpDir, "test-api-key-123")
+	// Change to temp dir so ConfigPaths() uses it for local paths
+	origDir, _ := os.Getwd()
+	os.Chdir(tmpDir)
+	defer os.Chdir(origDir)
+
+	// Create credentials struct
+	creds := &CloudCredentials{
+		Clouds: map[string]*CloudAuth{
+			"test": {Token: "test-api-key-123"},
+		},
+	}
+
+	// Save credentials (local)
+	err := SaveCredentials(creds, false)
 	if err != nil {
 		t.Fatalf("failed to save credentials: %v", err)
 	}
 
 	// Verify file exists
-	tokenPath := filepath.Join(tmpDir, ".weg", "cloud-token.json")
+	tokenPath := filepath.Join(tmpDir, ".weg", "credentials.toml")
 	if _, err := os.Stat(tokenPath); os.IsNotExist(err) {
-		t.Error("token file not created")
+		t.Error("credentials file not created")
 	}
 
 	// Load credentials
-	apiKey, err := LoadCredentials(tmpDir)
+	loaded, err := LoadCredentials()
 	if err != nil {
 		t.Fatalf("failed to load credentials: %v", err)
 	}
 
-	if apiKey != "test-api-key-123" {
-		t.Errorf("expected 'test-api-key-123', got %s", apiKey)
+	if loaded.Clouds["test"] == nil || loaded.Clouds["test"].Token != "test-api-key-123" {
+		t.Errorf("expected token 'test-api-key-123', got %+v", loaded.Clouds["test"])
 	}
 }
 
 func TestLoadCredentialsNotExist(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	_, err := LoadCredentials(tmpDir)
-	if err == nil {
-		t.Error("expected error for non-existent credentials")
-	}
-}
+	// Change to temp dir so ConfigPaths() uses it for local paths
+	origDir, _ := os.Getwd()
+	os.Chdir(tmpDir)
+	defer os.Chdir(origDir)
 
-func TestRemoveCredentials(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	// Save first
-	err := SaveCredentials(tmpDir, "test-key")
+	// LoadCredentials returns empty struct when no files exist, not an error
+	creds, err := LoadCredentials()
 	if err != nil {
-		t.Fatalf("failed to save: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
-
-	// Remove
-	err = RemoveCredentials(tmpDir)
-	if err != nil {
-		t.Fatalf("failed to remove: %v", err)
-	}
-
-	// Verify removed
-	tokenPath := filepath.Join(tmpDir, ".weg", "cloud-token.json")
-	if _, err := os.Stat(tokenPath); !os.IsNotExist(err) {
-		t.Error("token file should be removed")
+	if len(creds.Clouds) != 0 {
+		t.Errorf("expected empty clouds map, got %d entries", len(creds.Clouds))
 	}
 }
 
@@ -278,20 +277,6 @@ func TestClientDoRequestNoAuth(t *testing.T) {
 	}
 }
 
-func TestDeviceCodeResponse(t *testing.T) {
-	resp := DeviceCodeResponse{
-		DeviceCode:      "device123",
-		UserCode:        "USER-CODE",
-		VerificationURL: "https://frappe.cloud/verify",
-		ExpiresIn:       900,
-		Interval:        5,
-	}
-
-	if resp.UserCode != "USER-CODE" {
-		t.Errorf("unexpected UserCode: %s", resp.UserCode)
-	}
-}
-
 func TestUserStruct(t *testing.T) {
 	user := User{
 		Email: "test@example.com",
@@ -303,14 +288,3 @@ func TestUserStruct(t *testing.T) {
 	}
 }
 
-func TestGetDeviceCodeNotImplemented(t *testing.T) {
-	c := NewClient("")
-
-	_, err := c.GetDeviceCode()
-	if err == nil {
-		t.Error("expected error for unimplemented feature")
-	}
-	if !strings.Contains(err.Error(), "not yet implemented") {
-		t.Errorf("expected 'not yet implemented' error, got: %v", err)
-	}
-}
