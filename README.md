@@ -61,12 +61,17 @@ This creates a git-backed directory mirroring the site's customizations, enablin
 # Download the latest binary
 curl -fsSL https://github.com/gavindsouza/weg/releases/latest/download/weg-$(uname -s)-$(uname -m) -o weg
 chmod +x weg
-sudo mv weg /usr/local/bin/
+mkdir -p ~/.local/bin
+mv weg ~/.local/bin/
+
+# Add to PATH if not already (add to ~/.bashrc or ~/.zshrc)
+export PATH="$HOME/.local/bin:$PATH"
 
 # Or build from source
 git clone https://github.com/gavindsouza/weg
 cd weg
 go build -o weg .
+mv weg ~/.local/bin/
 ```
 
 ## Quick Start
