@@ -6,6 +6,8 @@ package workspace
 import (
 	"fmt"
 	"os"
+	"os/exec"
+	"path/filepath"
 
 	"github.com/gavindsouza/weg/internal/workspace"
 	"github.com/spf13/cobra"
@@ -55,6 +57,16 @@ func runCollapse(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("no workspace found (run 'weg workspace expand' first)")
 	}
 
+	// Run validation if requested
+	if collapseValidate {
+		fmt.Println("Running linters...")
+		if err := runLinters(cwd); err != nil {
+			return fmt.Errorf("validation failed: %w", err)
+		}
+		fmt.Println("✓ Validation passed")
+		fmt.Println()
+	}
+
 	result, err := workspace.Collapse(workspace.CollapseOptions{
 		BaseDir:  cwd,
 		DryRun:   collapseDryRun,
@@ -102,6 +114,53 @@ func runCollapse(cmd *cobra.Command, args []string) error {
 
 	if len(result.Updated) == 0 && len(result.Conflicts) == 0 && len(result.Errors) == 0 {
 		fmt.Println("Nothing to collapse. Workspace is in sync.")
+	}
+
+	return nil
+}
+
+// runLinters runs ruff (Python) and eslint (JavaScript) on workspace files
+func runLinters(baseDir string) error {
+	workspaceDir := filepath.Join(baseDir, workspace.WorkspaceDir)
+	var hasErrors bool
+
+	// Run ruff on Python files if ruff is available
+	if _, err := exec.LookPath("ruff"); err == nil {
+		fmt.Println("  Running ruff...")
+		cmd := exec.Command("ruff", "check", workspaceDir)
+		cmd.Dir = baseDir
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			fmt.Printf("%s", output)
+			hasErrors = true
+		} else {
+			fmt.Println("  ✓ ruff: no issues")
+		}
+	} else {
+		fmt.Println("  (ruff not found, skipping Python linting)")
+	}
+
+	// Run eslint on JavaScript files if eslint is available
+	if _, err := exec.LookPath("eslint"); err == nil {
+		fmt.Println("  Running eslint...")
+		cmd := exec.Command("eslint", workspaceDir, "--ext", ".js")
+		cmd.Dir = baseDir
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			// ESLint returns non-zero even for warnings
+			if len(output) > 0 {
+				fmt.Printf("%s", output)
+				hasErrors = true
+			}
+		} else {
+			fmt.Println("  ✓ eslint: no issues")
+		}
+	} else {
+		fmt.Println("  (eslint not found, skipping JavaScript linting)")
+	}
+
+	if hasErrors {
+		return fmt.Errorf("linting errors found")
 	}
 
 	return nil
