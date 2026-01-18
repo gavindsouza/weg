@@ -26,6 +26,7 @@ import (
 	"github.com/gavindsouza/weg/cmd/scheduler"
 	"github.com/gavindsouza/weg/cmd/site"
 	"github.com/gavindsouza/weg/cmd/user"
+	"github.com/gavindsouza/weg/cmd/workspace"
 	"github.com/spf13/cobra"
 )
 
@@ -89,6 +90,7 @@ Learn more at https://github.com/gavindsouza/weg`,
 			"run":        true,  // weg run clones fresh
 			"clone":      true,  // weg remote clone works outside projects
 			"remote":     true,  // weg remote subcommands
+			"workspace":  true,  // weg workspace works in remote clones
 		}
 
 		// Skip auto-detection for root command (no subcommand) or skipped commands
@@ -156,6 +158,7 @@ func init() {
 	rootCmd.AddCommand(scheduler.SchedulerCmd)
 	rootCmd.AddCommand(site.SiteCmd)
 	rootCmd.AddCommand(user.UserCmd)
+	rootCmd.AddCommand(workspace.WorkspaceCmd)
 }
 
 // initConfig reads in config file and ENV variables if set

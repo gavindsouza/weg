@@ -341,3 +341,180 @@ func (c *Client) GetFrappeVersion() (string, error) {
 
 	return "", fmt.Errorf("could not determine Frappe version")
 }
+
+// VersionRecord represents a single version history entry
+type VersionRecord struct {
+	Name       string                 `json:"name"`
+	RefDoctype string                 `json:"ref_doctype"`
+	Docname    string                 `json:"docname"`
+	Owner      string                 `json:"owner"`
+	Creation   string                 `json:"creation"`
+	Data       string                 `json:"data"` // JSON string of version data
+}
+
+// GetAllVersions retrieves all Version records for given doctypes
+func (c *Client) GetAllVersions(doctypes []string) ([]VersionRecord, error) {
+	// Build filter for multiple doctypes
+	filters := map[string]interface{}{
+		"ref_doctype": []interface{}{"in", doctypes},
+	}
+
+	docs, err := c.GetAll("Version", filters, []string{"name", "ref_doctype", "docname", "owner", "creation", "data"})
+	if err != nil {
+		return nil, err
+	}
+
+	var versions []VersionRecord
+	for _, doc := range docs {
+		v := VersionRecord{
+			Name:       getString(doc, "name"),
+			RefDoctype: getString(doc, "ref_doctype"),
+			Docname:    getString(doc, "docname"),
+			Owner:      getString(doc, "owner"),
+			Creation:   getString(doc, "creation"),
+			Data:       getString(doc, "data"),
+		}
+		if v.Name != "" && v.RefDoctype != "" && v.Docname != "" {
+			versions = append(versions, v)
+		}
+	}
+
+	return versions, nil
+}
+
+// UserInfo contains basic user information
+type UserInfo struct {
+	Email    string
+	FullName string
+}
+
+// GetUsers retrieves user information for a list of emails/usernames
+func (c *Client) GetUsers(emails []string) (map[string]UserInfo, error) {
+	if len(emails) == 0 {
+		return make(map[string]UserInfo), nil
+	}
+
+	// Deduplicate emails
+	seen := make(map[string]bool)
+	var uniqueEmails []string
+	for _, email := range emails {
+		if !seen[email] && email != "" {
+			seen[email] = true
+			uniqueEmails = append(uniqueEmails, email)
+		}
+	}
+
+	// Fetch users
+	filters := map[string]interface{}{
+		"name": []interface{}{"in", uniqueEmails},
+	}
+	docs, err := c.GetAll("User", filters, []string{"name", "full_name", "email"})
+	if err != nil {
+		return nil, err
+	}
+
+	users := make(map[string]UserInfo)
+	for _, doc := range docs {
+		name := getString(doc, "name")
+		fullName := getString(doc, "full_name")
+		email := getString(doc, "email")
+
+		if name != "" {
+			// Use full_name if available, otherwise derive from email
+			if fullName == "" {
+				fullName = deriveNameFromEmail(name)
+			}
+			users[name] = UserInfo{
+				Email:    email,
+				FullName: fullName,
+			}
+		}
+	}
+
+	// Add fallback for users not found
+	for _, email := range uniqueEmails {
+		if _, exists := users[email]; !exists {
+			users[email] = UserInfo{
+				Email:    email,
+				FullName: deriveNameFromEmail(email),
+			}
+		}
+	}
+
+	return users, nil
+}
+
+// GetDocTypeModules retrieves the module for each specified DocType
+// Returns a map of doctype name -> module name
+func (c *Client) GetDocTypeModules(doctypes []string) (map[string]string, error) {
+	if len(doctypes) == 0 {
+		return make(map[string]string), nil
+	}
+
+	// Deduplicate
+	seen := make(map[string]bool)
+	var uniqueDocTypes []string
+	for _, dt := range doctypes {
+		if !seen[dt] && dt != "" {
+			seen[dt] = true
+			uniqueDocTypes = append(uniqueDocTypes, dt)
+		}
+	}
+
+	// Fetch DocTypes with their modules
+	filters := map[string]interface{}{
+		"name": []interface{}{"in", uniqueDocTypes},
+	}
+	docs, err := c.GetAll("DocType", filters, []string{"name", "module"})
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[string]string)
+	for _, doc := range docs {
+		name := getString(doc, "name")
+		module := getString(doc, "module")
+		if name != "" {
+			if module == "" {
+				module = "_"
+			}
+			result[name] = module
+		}
+	}
+
+	return result, nil
+}
+
+// deriveNameFromEmail extracts a readable name from an email address
+func deriveNameFromEmail(email string) string {
+	// Handle special cases
+	if email == "Administrator" {
+		return "Administrator"
+	}
+	if email == "Guest" {
+		return "Guest"
+	}
+
+	// Extract part before @
+	parts := strings.Split(email, "@")
+	if len(parts) == 0 || parts[0] == "" {
+		return email
+	}
+
+	name := parts[0]
+	// Replace dots and underscores with spaces and title case
+	name = strings.ReplaceAll(name, ".", " ")
+	name = strings.ReplaceAll(name, "_", " ")
+	name = strings.ReplaceAll(name, "-", " ")
+
+	// Title case each word
+	words := strings.Fields(name)
+	for i, word := range words {
+		if len(word) > 0 {
+			words[i] = strings.ToUpper(string(word[0])) + strings.ToLower(word[1:])
+		}
+	}
+
+	return strings.Join(words, " ")
+}
+

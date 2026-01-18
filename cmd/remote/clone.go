@@ -5,6 +5,7 @@ package remote
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"os"
@@ -19,11 +20,12 @@ import (
 )
 
 var (
-	cloneAPIKey     string
-	cloneAPISecret  string
-	cloneModules    string
-	cloneExclude    string
+	cloneAPIKey         string
+	cloneAPISecret      string
+	cloneModules        string
+	cloneExclude        string
 	cloneNonInteractive bool
+	cloneNoHistory      bool
 )
 
 var cloneCmd = &cobra.Command{
@@ -66,6 +68,7 @@ func init() {
 	cloneCmd.Flags().StringVar(&cloneModules, "modules", "", "Comma-separated list of modules to sync")
 	cloneCmd.Flags().StringVar(&cloneExclude, "exclude", "", "Comma-separated list of entity types to exclude")
 	cloneCmd.Flags().BoolVar(&cloneNonInteractive, "non-interactive", false, "Skip interactive prompts")
+	cloneCmd.Flags().BoolVar(&cloneNoHistory, "no-history", false, "Skip version history (faster, single commit)")
 }
 
 func runClone(cobraCmd *cobra.Command, args []string) error {
@@ -321,8 +324,10 @@ func runClone(cobraCmd *cobra.Command, args []string) error {
 		config.Site.Apps[name] = info
 	}
 
-	// Write entities to disk with progress bar
-	if len(result.Entities) > 0 {
+	// Write entities to disk (only if not doing history reconstruction)
+	// When doing history reconstruction, entities are written incrementally per commit
+	writeEntitiesUpfront := cloneNoHistory
+	if writeEntitiesUpfront && len(result.Entities) > 0 {
 		bar := progressbar.NewOptions(len(result.Entities),
 			progressbar.OptionSetDescription("Writing files"),
 			progressbar.OptionSetWriter(os.Stdout),
@@ -356,19 +361,151 @@ func runClone(cobraCmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to save config: %w", err)
 	}
 
-	// Initial git commit
-	fmt.Println("Creating initial commit...")
-	gitAdd := exec.Command("git", "add", "-A")
-	gitAdd.Dir = dirName
-	if err := gitAdd.Run(); err != nil {
-		return fmt.Errorf("failed to stage files: %w", err)
-	}
+	// Create git commits
+	if cloneNoHistory {
+		// Simple: single initial commit
+		fmt.Println("Creating initial commit...")
+		gitAdd := exec.Command("git", "add", "-A")
+		gitAdd.Dir = dirName
+		if err := gitAdd.Run(); err != nil {
+			return fmt.Errorf("failed to stage files: %w", err)
+		}
 
-	commitMsg := fmt.Sprintf("Initial clone from %s\n\nFrappe version: %s\nEntities: %d",
-		siteURL, frappeVersion, len(result.Entities))
-	gitCommit := exec.Command("git", "commit", "-m", commitMsg)
-	gitCommit.Dir = dirName
-	gitCommit.Run() // Might fail if nothing to commit, that's ok
+		commitMsg := fmt.Sprintf("Initial clone from %s\n\nFrappe version: %s\nEntities: %d",
+			siteURL, frappeVersion, len(result.Entities))
+		gitCommit := exec.Command("git", "commit", "-m", commitMsg)
+		gitCommit.Dir = dirName
+		gitCommit.Run() // Might fail if nothing to commit, that's ok
+	} else {
+		// Full history reconstruction from Version DocType
+		fmt.Println("Fetching version history...")
+		history, entitiesWithoutHistory, err := fetcher.FetchHistoryWithDocs(result.Entities)
+		if err != nil {
+			// Fall back to simple commit if history fetch fails
+			fmt.Printf("Warning: Could not fetch version history: %v\n", err)
+			fmt.Println("Creating simple initial commit...")
+			gitAdd := exec.Command("git", "add", "-A")
+			gitAdd.Dir = dirName
+			gitAdd.Run()
+			commitMsg := fmt.Sprintf("Initial clone from %s\n\nFrappe version: %s\nEntities: %d",
+				siteURL, frappeVersion, len(result.Entities))
+			gitCommit := exec.Command("git", "commit", "-m", commitMsg)
+			gitCommit.Dir = dirName
+			gitCommit.Run()
+		} else {
+			// Fetch user information for author names
+			fmt.Println("Fetching user information...")
+			users, err := fetcher.FetchUsers(history)
+			if err != nil {
+				// Non-fatal: we'll fall back to email-derived names
+				users = make(map[string]remote.UserInfo)
+			}
+
+			commitPlan := remote.BuildCommitPlan(history, result.Entities, entitiesWithoutHistory, users)
+
+			if len(commitPlan) == 0 {
+				// No history found, create a single commit
+				fmt.Println("No version history found, creating initial commit...")
+				gitAdd := exec.Command("git", "add", "-A")
+				gitAdd.Dir = dirName
+				gitAdd.Run()
+				commitMsg := fmt.Sprintf("Initial clone from %s\n\nFrappe version: %s\nEntities: %d",
+					siteURL, frappeVersion, len(result.Entities))
+				gitCommit := exec.Command("git", "commit", "-m", commitMsg)
+				gitCommit.Dir = dirName
+				gitCommit.Run()
+			} else {
+				fmt.Printf("Reconstructing %d commits from version history...\n", len(commitPlan))
+
+				bar := progressbar.NewOptions(len(commitPlan),
+					progressbar.OptionSetDescription("Creating commits"),
+					progressbar.OptionSetWriter(os.Stdout),
+					progressbar.OptionShowCount(),
+					progressbar.OptionSetWidth(40),
+					progressbar.OptionClearOnFinish(),
+				)
+
+				// Track modules for modules.txt
+				mods := make(map[string]bool)
+
+				for _, commit := range commitPlan {
+					// Write file contents for this commit (historical state)
+					for filePath, content := range commit.FileContents {
+						if err := writeFileContent(dirName, filePath, content); err != nil {
+							fmt.Fprintf(os.Stderr, "Error: Failed to write %s: %v\n", filePath, err)
+							continue
+						}
+						// Track module from path
+						parts := strings.Split(filePath, "/")
+						if len(parts) > 0 {
+							mods[parts[0]] = true
+						}
+					}
+
+					// Stage files for this commit
+					for _, file := range commit.Files {
+						gitAdd := exec.Command("git", "add", file)
+						gitAdd.Dir = dirName
+						gitAdd.Run()
+					}
+
+					// Check if there's anything staged
+					gitDiff := exec.Command("git", "diff", "--cached", "--quiet")
+					gitDiff.Dir = dirName
+					if err := gitDiff.Run(); err == nil {
+						// No changes staged, skip this commit
+						bar.Add(1)
+						continue
+					}
+
+					// Format timestamp for git (RFC3339 or ISO 8601)
+					timestamp := formatGitTimestamp(commit.Timestamp)
+
+					// Create commit with historical timestamp from version.creation
+					// Both author date and committer date are set to preserve timeline
+					gitCommit := exec.Command("git", "commit",
+						"--date", timestamp,
+						"--author", commit.Author,
+						"-m", commit.Message,
+					)
+					gitCommit.Dir = dirName
+					gitCommit.Env = append(os.Environ(), "GIT_COMMITTER_DATE="+timestamp)
+					gitCommit.Run()
+
+					bar.Add(1)
+				}
+
+				// Write modules.txt after all commits
+				if len(mods) > 0 {
+					var moduleList []string
+					for m := range mods {
+						moduleList = append(moduleList, m)
+					}
+					modulesContent := strings.Join(moduleList, "\n") + "\n"
+					os.WriteFile(modulesFile, []byte(modulesContent), 0644)
+				}
+
+				// Final commit for config files
+				gitAdd := exec.Command("git", "add", "-A")
+				gitAdd.Dir = dirName
+				gitAdd.Run()
+
+				// Check if there are uncommitted changes
+				gitStatus := exec.Command("git", "status", "--porcelain")
+				gitStatus.Dir = dirName
+				output, _ := gitStatus.Output()
+				if len(strings.TrimSpace(string(output))) > 0 {
+					commitMsg := fmt.Sprintf("chore(config): initialize weg config\n\nSource: %s", siteURL)
+					gitCommit := exec.Command("git", "commit",
+						"--author", "Weg <noreply@weg.io>",
+						"-m", commitMsg,
+					)
+					gitCommit.Dir = dirName
+					gitCommit.Run()
+				}
+			}
+		}
+	}
 
 	// Summary
 	fmt.Println()
@@ -392,4 +529,57 @@ func modules(entities []remote.Entity) map[string]bool {
 		m[e.Module] = true
 	}
 	return m
+}
+
+// writeFileContent writes JSON content to a file path
+func writeFileContent(baseDir, filePath string, content map[string]interface{}) error {
+	fullPath := filepath.Join(baseDir, filePath)
+
+	// Create directory
+	dir := filepath.Dir(fullPath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("failed to create directory %s: %w", dir, err)
+	}
+
+	// Marshal to JSON with indentation
+	data, err := json.MarshalIndent(content, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal content: %w", err)
+	}
+
+	// Write file
+	if err := os.WriteFile(fullPath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write file %s: %w", fullPath, err)
+	}
+
+	return nil
+}
+
+// formatGitTimestamp converts Frappe timestamp to git-compatible format
+func formatGitTimestamp(ts string) string {
+	// Frappe format: "2025-01-21 14:31:36.892644"
+	// Git format: "2025-01-21T14:31:36"
+
+	// Parse the timestamp
+	layouts := []string{
+		"2006-01-02 15:04:05.999999",
+		"2006-01-02 15:04:05",
+		"2006-01-02T15:04:05",
+	}
+
+	var t time.Time
+	var err error
+	for _, layout := range layouts {
+		t, err = time.Parse(layout, ts)
+		if err == nil {
+			break
+		}
+	}
+
+	if err != nil {
+		// Return as-is if parsing fails
+		return ts
+	}
+
+	return t.Format(time.RFC3339)
 }

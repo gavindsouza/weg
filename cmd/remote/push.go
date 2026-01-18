@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -19,30 +20,30 @@ var pushCmd = &cobra.Command{
 	Short: "Push local changes to the remote site",
 	Long: `Push local file changes to the remote Frappe site.
 
-This command:
-  1. Detects locally modified files
-  2. Validates the changes
-  3. Pushes changes to the remote site
-  4. Creates Version records on the remote
-
-Note: This pushes all committed changes. Use 'weg sync -m "msg"' to
-commit and push in one step.
+By default, only pushes committed changes since last push.
+Use -u to include uncommitted changes, or -a to push everything.
 
 Examples:
-  weg push               # Push all local changes
-  weg push --dry-run     # Preview what would be pushed
-  weg push --force       # Push even if remote has newer changes`,
+  weg remote push           # Push committed changes since last push
+  weg remote push -n        # Dry-run (preview what would be pushed)
+  weg remote push -u        # Include uncommitted changes
+  weg remote push -a        # Push all entities (use with caution)
+  weg remote push -f        # Force push even if remote is newer`,
 	RunE: runPush,
 }
 
 var (
-	pushDryRun bool
-	pushForce  bool
+	pushDryRun      bool
+	pushForce       bool
+	pushAll         bool
+	pushUncommitted bool
 )
 
 func init() {
-	pushCmd.Flags().BoolVar(&pushDryRun, "dry-run", false, "Preview changes without pushing")
-	pushCmd.Flags().BoolVar(&pushForce, "force", false, "Force push even if remote is newer")
+	pushCmd.Flags().BoolVarP(&pushDryRun, "dry-run", "n", false, "Preview changes without pushing")
+	pushCmd.Flags().BoolVarP(&pushForce, "force", "f", false, "Force push even if remote is newer")
+	pushCmd.Flags().BoolVarP(&pushAll, "all", "a", false, "Push all entities (not just changed ones)")
+	pushCmd.Flags().BoolVarP(&pushUncommitted, "uncommitted", "u", false, "Include uncommitted changes")
 }
 
 func runPush(cobraCmd *cobra.Command, args []string) error {
@@ -62,22 +63,37 @@ func runPush(cobraCmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load credentials: %w", err)
 	}
 
-	// Find modified files
-	// For now, we'll push all entity files (full sync)
-	// TODO: Implement incremental push based on git diff
+	// Find modified files using git diff
+	var entities []localEntity
 
-	entities, err := findLocalEntities(".")
-	if err != nil {
-		return fmt.Errorf("failed to find entities: %w", err)
+	if pushAll {
+		// Push everything (dangerous, but sometimes needed)
+		var err error
+		entities, err = findLocalEntities(".")
+		if err != nil {
+			return fmt.Errorf("failed to find entities: %w", err)
+		}
+	} else {
+		// Only push changed files (default, safe behavior)
+		var err error
+		entities, err = findChangedEntities(".", pushUncommitted)
+		if err != nil {
+			return fmt.Errorf("failed to find changed entities: %w", err)
+		}
 	}
 
 	if len(entities) == 0 {
-		fmt.Println("No entities to push")
+		fmt.Println("No changes to push")
+		fmt.Println("(use --all to push all entities)")
 		return nil
 	}
 
 	if pushDryRun {
-		fmt.Printf("Dry run - would push %d entities:\n", len(entities))
+		if pushAll {
+			fmt.Printf("Dry run - would push ALL %d entities:\n", len(entities))
+		} else {
+			fmt.Printf("Dry run - would push %d changed entities:\n", len(entities))
+		}
 		for _, e := range entities {
 			fmt.Printf("  %s: %s\n", e.entityType, e.name)
 		}
@@ -113,7 +129,26 @@ func runPush(cobraCmd *cobra.Command, args []string) error {
 		return fmt.Errorf("%d entities failed to push", failed)
 	}
 
+	// Save current commit as last push point
+	if !pushDryRun {
+		saveLastPushCommit(".")
+	}
+
 	return nil
+}
+
+// saveLastPushCommit saves the current HEAD commit as the last push point
+func saveLastPushCommit(baseDir string) {
+	cmd := exec.Command("git", "rev-parse", "HEAD")
+	cmd.Dir = baseDir
+	output, err := cmd.Output()
+	if err != nil {
+		return
+	}
+
+	commit := strings.TrimSpace(string(output))
+	lastPushFile := filepath.Join(baseDir, ".weg", "last_push_commit")
+	os.WriteFile(lastPushFile, []byte(commit), 0644)
 }
 
 type localEntity struct {
@@ -122,6 +157,169 @@ type localEntity struct {
 	doctype    string
 	name       string
 	data       map[string]interface{}
+}
+
+// findChangedEntities finds only entities that have been modified since last push
+func findChangedEntities(baseDir string, includeUncommitted bool) ([]localEntity, error) {
+	// Get changed files from git
+	changedFiles, err := getChangedFiles(baseDir, includeUncommitted)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get changed files: %w", err)
+	}
+
+	if len(changedFiles) == 0 {
+		return nil, nil
+	}
+
+	var entities []localEntity
+	seen := make(map[string]bool) // Dedupe by file path
+
+	for _, filePath := range changedFiles {
+		// Skip non-JSON files and special files
+		if !strings.HasSuffix(filePath, ".json") {
+			continue
+		}
+		if strings.HasPrefix(filePath, ".weg/") || strings.HasPrefix(filePath, "weg_workspace/") {
+			continue
+		}
+
+		// Skip if already processed
+		if seen[filePath] {
+			continue
+		}
+		seen[filePath] = true
+
+		// Read and parse the file
+		fullPath := filepath.Join(baseDir, filePath)
+		data, err := os.ReadFile(fullPath)
+		if err != nil {
+			// File might have been deleted
+			continue
+		}
+
+		var doc map[string]interface{}
+		if err := json.Unmarshal(data, &doc); err != nil {
+			continue
+		}
+
+		// Detect entity type from path
+		parts := strings.Split(filePath, string(filepath.Separator))
+		if len(parts) < 2 {
+			continue
+		}
+
+		// Find the entity type directory (e.g., "server_script", "client_script")
+		var typeName string
+		for _, part := range parts {
+			if isEntityType(part) {
+				typeName = part
+				break
+			}
+		}
+		if typeName == "" {
+			continue
+		}
+
+		doctype := typeToDocType(typeName)
+		name := getString(doc, "name")
+		if name == "" {
+			name = strings.TrimSuffix(filepath.Base(filePath), ".json")
+		}
+
+		entities = append(entities, localEntity{
+			filePath:   fullPath,
+			entityType: typeName,
+			doctype:    doctype,
+			name:       name,
+			data:       doc,
+		})
+	}
+
+	return entities, nil
+}
+
+// getChangedFiles returns list of changed files using git
+func getChangedFiles(baseDir string, includeUncommitted bool) ([]string, error) {
+	var allFiles []string
+
+	if includeUncommitted {
+		// Get uncommitted changes (staged and unstaged)
+		cmd := exec.Command("git", "diff", "--name-only", "HEAD")
+		cmd.Dir = baseDir
+		output, err := cmd.Output()
+		if err == nil && len(output) > 0 {
+			files := strings.Split(strings.TrimSpace(string(output)), "\n")
+			allFiles = append(allFiles, files...)
+		}
+
+		// Get staged changes
+		cmd = exec.Command("git", "diff", "--name-only", "--cached")
+		cmd.Dir = baseDir
+		output, err = cmd.Output()
+		if err == nil && len(output) > 0 {
+			files := strings.Split(strings.TrimSpace(string(output)), "\n")
+			allFiles = append(allFiles, files...)
+		}
+	}
+
+	// Get committed changes since last push
+	// Uses .weg/last_push_commit to know what was last pushed
+	lastPushFile := filepath.Join(baseDir, ".weg", "last_push_commit")
+	if data, err := os.ReadFile(lastPushFile); err == nil {
+		lastCommit := strings.TrimSpace(string(data))
+		if lastCommit != "" {
+			cmd := exec.Command("git", "diff", "--name-only", lastCommit+"..HEAD")
+			cmd.Dir = baseDir
+			output, err := cmd.Output()
+			if err == nil && len(output) > 0 {
+				files := strings.Split(strings.TrimSpace(string(output)), "\n")
+				allFiles = append(allFiles, files...)
+			}
+		}
+	} else {
+		// No last push commit, get changes from initial commit to HEAD
+		// This handles fresh clones - compare against root commit
+		cmd := exec.Command("git", "rev-list", "--max-parents=0", "HEAD")
+		cmd.Dir = baseDir
+		output, err := cmd.Output()
+		if err == nil && len(output) > 0 {
+			rootCommit := strings.TrimSpace(strings.Split(string(output), "\n")[0])
+			cmd = exec.Command("git", "diff", "--name-only", rootCommit+"..HEAD")
+			cmd.Dir = baseDir
+			output, err = cmd.Output()
+			if err == nil && len(output) > 0 {
+				files := strings.Split(strings.TrimSpace(string(output)), "\n")
+				allFiles = append(allFiles, files...)
+			}
+		}
+	}
+
+	// Dedupe
+	seen := make(map[string]bool)
+	var result []string
+	for _, f := range allFiles {
+		if f != "" && !seen[f] {
+			seen[f] = true
+			result = append(result, f)
+		}
+	}
+
+	return result, nil
+}
+
+// isEntityType checks if a directory name is an entity type
+func isEntityType(name string) bool {
+	types := []string{
+		"doctype", "custom_field", "property_setter", "client_script",
+		"server_script", "report", "print_format", "workflow",
+		"notification", "letter_head", "web_template",
+	}
+	for _, t := range types {
+		if name == t {
+			return true
+		}
+	}
+	return false
 }
 
 func findLocalEntities(baseDir string) ([]localEntity, error) {
