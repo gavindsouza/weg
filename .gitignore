@@ -30,3 +30,6 @@ Thumbs.db
 *.tmp
 *.swp
 *~
+
+# Gas Town beads redirect (machine-specific)
+.beads/redirect
