@@ -417,11 +417,15 @@ func IsRemoteSite(dir string) bool {
 	return err == nil
 }
 
-// EnsureGitignore ensures credentials.toml is in .gitignore
+// EnsureGitignore ensures sensitive/local files are in .gitignore
 func EnsureGitignore(dir string) error {
 	gitignorePath := filepath.Join(dir, ".weg", ".gitignore")
 	content := `# Credentials - NEVER commit
 credentials.toml
+
+# Local state - machine-specific
+last_push_commit
+workspace_state.json
 `
 	return os.WriteFile(gitignorePath, []byte(content), 0644)
 }
