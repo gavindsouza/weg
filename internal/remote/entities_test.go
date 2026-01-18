@@ -434,6 +434,16 @@ func TestFetchClientScripts(t *testing.T) {
 					"enabled": 1,
 				},
 			})
+		case "/api/resource/DocType":
+			// DocType module lookup for prefetchDocTypeModules
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"data": []map[string]interface{}{
+					{
+						"name":   "User",
+						"module": "Custom",
+					},
+				},
+			})
 		default:
 			json.NewEncoder(w).Encode(map[string]interface{}{"data": []map[string]interface{}{}})
 		}
