@@ -88,6 +88,9 @@ func runPush(cobraCmd *cobra.Command, args []string) error {
 		return nil
 	}
 
+	// Find deleted entities for dry-run display
+	deletedEntities, _ := findDeletedEntities(".", pushUncommitted)
+
 	if pushDryRun {
 		if pushAll {
 			fmt.Printf("Dry run - would push ALL %d entities:\n", len(entities))
@@ -95,7 +98,13 @@ func runPush(cobraCmd *cobra.Command, args []string) error {
 			fmt.Printf("Dry run - would push %d changed entities:\n", len(entities))
 		}
 		for _, e := range entities {
-			fmt.Printf("  %s: %s\n", e.entityType, e.name)
+			fmt.Printf("  + %s: %s\n", e.entityType, e.name)
+		}
+		if len(deletedEntities) > 0 {
+			fmt.Printf("\nWould delete %d entities:\n", len(deletedEntities))
+			for _, e := range deletedEntities {
+				fmt.Printf("  - %s: %s\n", e.entityType, e.name)
+			}
 		}
 		return nil
 	}
@@ -109,8 +118,15 @@ func runPush(cobraCmd *cobra.Command, args []string) error {
 	fmt.Println("✓ Connected")
 
 	// Push each entity
-	fmt.Printf("Pushing %d entities...\n", len(entities))
+	totalChanges := len(entities) + len(deletedEntities)
+	if totalChanges == 0 {
+		fmt.Println("No changes to push")
+		return nil
+	}
+
+	fmt.Printf("Pushing %d changes...\n", totalChanges)
 	pushed := 0
+	deleted := 0
 	failed := 0
 
 	for _, e := range entities {
@@ -118,12 +134,21 @@ func runPush(cobraCmd *cobra.Command, args []string) error {
 			fmt.Fprintf(os.Stderr, "Error: Failed to push %s: %v\n", e.name, err)
 			failed++
 		} else {
-			// Verbose output omitted for now
 			pushed++
 		}
 	}
 
-	fmt.Printf("✓ Pushed: %d, Failed: %d\n", pushed, failed)
+	// Delete removed entities
+	for _, e := range deletedEntities {
+		if err := deleteEntity(client, e); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: Failed to delete %s: %v\n", e.name, err)
+			failed++
+		} else {
+			deleted++
+		}
+	}
+
+	fmt.Printf("✓ Pushed: %d, Deleted: %d, Failed: %d\n", pushed, deleted, failed)
 
 	if failed > 0 {
 		return fmt.Errorf("%d entities failed to push", failed)
@@ -305,6 +330,97 @@ func getChangedFiles(baseDir string, includeUncommitted bool) ([]string, error) 
 	}
 
 	return result, nil
+}
+
+// findDeletedEntities finds entities that were deleted since last push
+func findDeletedEntities(baseDir string, includeUncommitted bool) ([]localEntity, error) {
+	var entities []localEntity
+
+	// Get deleted files from git
+	var deletedFiles []string
+
+	if includeUncommitted {
+		// Check for deleted files in working tree
+		cmd := exec.Command("git", "diff", "--name-status", "HEAD")
+		cmd.Dir = baseDir
+		output, err := cmd.Output()
+		if err == nil {
+			lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+			for _, line := range lines {
+				if strings.HasPrefix(line, "D\t") {
+					deletedFiles = append(deletedFiles, strings.TrimPrefix(line, "D\t"))
+				}
+			}
+		}
+	}
+
+	// Check for deleted files since last push
+	lastPushFile := filepath.Join(baseDir, ".weg", "last_push_commit")
+	if data, err := os.ReadFile(lastPushFile); err == nil {
+		lastCommit := strings.TrimSpace(string(data))
+		if lastCommit != "" {
+			cmd := exec.Command("git", "diff", "--name-status", lastCommit+"..HEAD")
+			cmd.Dir = baseDir
+			output, err := cmd.Output()
+			if err == nil {
+				lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+				for _, line := range lines {
+					if strings.HasPrefix(line, "D\t") {
+						deletedFiles = append(deletedFiles, strings.TrimPrefix(line, "D\t"))
+					}
+				}
+			}
+		}
+	}
+
+	// Dedupe and process
+	seen := make(map[string]bool)
+	for _, filePath := range deletedFiles {
+		if seen[filePath] || !strings.HasSuffix(filePath, ".json") {
+			continue
+		}
+		if strings.HasPrefix(filePath, ".weg/") || strings.HasPrefix(filePath, "weg_workspace/") {
+			continue
+		}
+		seen[filePath] = true
+
+		// Detect entity type from path
+		parts := strings.Split(filePath, string(filepath.Separator))
+		var typeName string
+		for _, part := range parts {
+			if isEntityType(part) {
+				typeName = part
+				break
+			}
+		}
+		if typeName == "" {
+			continue
+		}
+
+		// Extract name from filename
+		name := strings.TrimSuffix(filepath.Base(filePath), ".json")
+
+		entities = append(entities, localEntity{
+			filePath:   filePath,
+			entityType: typeName,
+			doctype:    typeToDocType(typeName),
+			name:       name,
+		})
+	}
+
+	return entities, nil
+}
+
+// deleteEntity deletes an entity on the remote site
+func deleteEntity(client *remote.Client, e localEntity) error {
+	switch e.entityType {
+	case "custom_field", "property_setter":
+		// These are grouped files - can't delete individual items this way
+		// Would need special handling
+		return fmt.Errorf("deletion of grouped entities not yet supported")
+	default:
+		return client.DeleteDoc(e.doctype, e.name)
+	}
 }
 
 // isEntityType checks if a directory name is an entity type
