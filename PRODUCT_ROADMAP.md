@@ -2,150 +2,167 @@
 
 ## Executive Summary
 
-Weg is a modern CLI replacement for Frappe's `bench` tool, offering declarative configuration, faster tooling (devbox, uv, process-compose), and an app-centric development model.
+Weg is a modern CLI replacement for Frappe's `bench` tool, offering declarative configuration, faster tooling (devbox, uv, process-compose), and three distinct development modes:
+
+1. **App-centric** - Your app is the project root, bench hidden in `.weg/`
+2. **Bench-centric** - Traditional bench directory structure
+3. **Remote-site** - Work with remote Frappe sites without direct bench access
 
 ### Current State
 
 | Metric | Value | Target | Status |
 |--------|-------|--------|--------|
-| Commands implemented | 70+ | ~70 | ✅ Complete |
-| Test coverage | ~45% | 80%+ | 🔄 In progress |
-| Critical missing features | 0 | 0 | ✅ Complete |
-| Known TODOs/bugs | 0 | 0 | ✅ Complete |
-| Documentation completeness | 60% | 100% | 🔄 In progress |
+| Commands implemented | 70+ | ~70 | Complete |
+| Test coverage | ~45% | 80%+ | In progress |
+| Critical missing features | 0 | 0 | Complete |
+| Known TODOs/bugs | 0 | 0 | Complete |
+| Documentation completeness | 60% | 100% | In progress |
 
 ### Key Differentiators from Bench
 
 1. **Declarative config** - `weg.toml` / `pyproject.toml [tool.weg]` vs imperative commands
-2. **App-centric mode** - Your app is the project root, bench hidden in `.weg/`
+2. **Three development modes** - App-centric, bench-centric, and remote-site
 3. **Modern tooling** - devbox (Nix), uv (fast Python), process-compose
 4. **Direct API access** - `weg api` without HTTP overhead
-5. **Multi-version testing** - `weg test --versions 14,15,16`
+5. **Remote site editing** - Git-backed local editing of remote site customizations
 6. **Cloud-native** - Built-in Frappe Cloud, Docker, container image support
 
 ---
 
 ## Feature Status
 
-### Core Commands (All Complete ✅)
+### Core Commands (Complete)
 
 | Command | Description | Status |
 |---------|-------------|--------|
-| `weg new` | Create new Frappe app | ✅ |
-| `weg init` | Initialize weg in directory | ✅ |
-| `weg sync` | Apply configuration changes | ✅ |
-| `weg start` | Start development servers | ✅ |
-| `weg stop` | Stop development services | ✅ |
-| `weg build` | Build assets and frontend | ✅ |
-| `weg test` | Run tests | ✅ |
-| `weg update` | Update apps to latest | ✅ |
-| `weg version` | Show version info | ✅ |
+| `weg new` | Create new Frappe app | Done |
+| `weg init` | Initialize weg in directory | Done |
+| `weg sync` | Apply configuration changes | Done |
+| `weg start` | Start development servers | Done |
+| `weg stop` | Stop development services | Done |
+| `weg build` | Build assets and frontend | Done |
+| `weg test` | Run tests | Done |
+| `weg update` | Update apps to latest | Done |
+| `weg version` | Show version info | Done |
 
-### Site Management (All Complete ✅)
-
-| Command | Description | Status |
-|---------|-------------|--------|
-| `weg site new` | Create new site | ✅ |
-| `weg site drop` | Delete site | ✅ |
-| `weg site list` | List all sites | ✅ |
-| `weg site use` | Set default site | ✅ |
-| `weg site install` | Install app on site | ✅ |
-| `weg site backup` | Backup database + files | ✅ |
-| `weg site restore` | Restore from backup | ✅ |
-| `weg site password` | Set/reset user password | ✅ |
-| `weg site browse` | Open site in browser | ✅ |
-| `weg site config` | Manage site config | ✅ |
-| `weg site hosts` | Manage /etc/hosts entries | ✅ |
-| `weg site maintenance` | Toggle maintenance mode | ✅ |
-
-### App Management (All Complete ✅)
+### Site Management (Complete)
 
 | Command | Description | Status |
 |---------|-------------|--------|
-| `weg app get` | Clone/install app | ✅ |
-| `weg app remove` | Remove app | ✅ |
-| `weg app list` | List installed apps | ✅ |
+| `weg site new` | Create new site | Done |
+| `weg site drop` | Delete site | Done |
+| `weg site list` | List all sites | Done |
+| `weg site use` | Set default site | Done |
+| `weg site install` | Install app on site | Done |
+| `weg site backup` | Backup database + files | Done |
+| `weg site restore` | Restore from backup | Done |
+| `weg site password` | Set/reset user password | Done |
+| `weg site browse` | Open site in browser | Done |
+| `weg site config` | Manage site config | Done |
+| `weg site hosts` | Manage /etc/hosts entries | Done |
+| `weg site maintenance` | Toggle maintenance mode | Done |
 
-### Cache & Scheduler (All Complete ✅)
-
-| Command | Description | Status |
-|---------|-------------|--------|
-| `weg cache clear` | Clear Redis + pycache | ✅ |
-| `weg scheduler status` | Check scheduler state | ✅ |
-| `weg scheduler enable` | Enable scheduler | ✅ |
-| `weg scheduler disable` | Disable scheduler | ✅ |
-| `weg scheduler jobs` | List pending jobs | ✅ |
-| `weg scheduler purge` | Purge failed jobs | ✅ |
-
-### User Management (All Complete ✅)
+### App Management (Complete)
 
 | Command | Description | Status |
 |---------|-------------|--------|
-| `weg user list` | List users | ✅ |
-| `weg user create` | Create user | ✅ |
-| `weg user password` | Set password | ✅ |
-| `weg user enable` | Enable user | ✅ |
-| `weg user disable` | Disable user | ✅ |
-| `weg user role` | Manage roles | ✅ |
-| `weg user show` | Show user details | ✅ |
+| `weg app get` | Clone/install app | Done |
+| `weg app remove` | Remove app | Done |
+| `weg app list` | List installed apps | Done |
 
-### Data & Fixtures (All Complete ✅)
+### Cache & Scheduler (Complete)
 
 | Command | Description | Status |
 |---------|-------------|--------|
-| `weg fixtures export` | Export fixtures | ✅ |
-| `weg fixtures import` | Import fixtures | ✅ |
-| `weg fixtures list` | List fixture files | ✅ |
+| `weg cache clear` | Clear Redis + pycache | Done |
+| `weg scheduler status` | Check scheduler state | Done |
+| `weg scheduler enable` | Enable scheduler | Done |
+| `weg scheduler disable` | Disable scheduler | Done |
+| `weg scheduler jobs` | List pending jobs | Done |
+| `weg scheduler purge` | Purge failed jobs | Done |
 
-### Database Operations (All Complete ✅)
-
-| Command | Description | Status |
-|---------|-------------|--------|
-| `weg db console` | Open DB console | ✅ |
-| `weg db backup` | Backup database | ✅ |
-| `weg db restore` | Restore database | ✅ |
-| `weg db trim` | Trim old data | ✅ |
-
-### API Access (All Complete ✅)
+### User Management (Complete)
 
 | Command | Description | Status |
 |---------|-------------|--------|
-| `weg api get` | GET request | ✅ |
-| `weg api post` | POST request | ✅ |
-| `weg api put` | PUT request | ✅ |
-| `weg api delete` | DELETE request | ✅ |
-| `weg api call` | Call whitelisted method | ✅ |
+| `weg user list` | List users | Done |
+| `weg user create` | Create user | Done |
+| `weg user password` | Set password | Done |
+| `weg user enable` | Enable user | Done |
+| `weg user disable` | Disable user | Done |
+| `weg user role` | Manage roles | Done |
+| `weg user show` | Show user details | Done |
 
-### Document Operations (All Complete ✅)
-
-| Command | Description | Status |
-|---------|-------------|--------|
-| `weg doc get` | Get document | ✅ |
-| `weg doc list` | List documents | ✅ |
-| `weg doc create` | Create document | ✅ |
-| `weg doc delete` | Delete document | ✅ |
-| `weg doctype list` | List doctypes | ✅ |
-| `weg doctype show` | Show doctype schema | ✅ |
-
-### Cloud & Container (All Complete ✅)
+### Data & Fixtures (Complete)
 
 | Command | Description | Status |
 |---------|-------------|--------|
-| `weg cloud login` | Login to Frappe Cloud | ✅ |
-| `weg cloud deploy` | Deploy to cloud | ✅ |
-| `weg docker *` | Docker compose operations | ✅ |
-| `weg image build` | Build container image | ✅ |
+| `weg fixtures export` | Export fixtures | Done |
+| `weg fixtures import` | Import fixtures | Done |
+| `weg fixtures list` | List fixture files | Done |
 
-### Utilities (All Complete ✅)
+### Database Operations (Complete)
 
 | Command | Description | Status |
 |---------|-------------|--------|
-| `weg exec` | Run command in bench context | ✅ |
-| `weg bench` | Run raw bench commands | ✅ |
-| `weg doctor` | Check environment health | ✅ |
-| `weg log` | View logs | ✅ |
-| `weg config` | View/modify weg config | ✅ |
-| `weg migrate` | Migrate between modes | ✅ |
+| `weg db console` | Open DB console | Done |
+| `weg db backup` | Backup database | Done |
+| `weg db restore` | Restore database | Done |
+| `weg db trim` | Trim old data | Done |
+
+### API Access (Complete)
+
+| Command | Description | Status |
+|---------|-------------|--------|
+| `weg api get` | GET request | Done |
+| `weg api post` | POST request | Done |
+| `weg api put` | PUT request | Done |
+| `weg api delete` | DELETE request | Done |
+| `weg api call` | Call whitelisted method | Done |
+
+### Document Operations (Complete)
+
+| Command | Description | Status |
+|---------|-------------|--------|
+| `weg doc get` | Get document | Done |
+| `weg doc list` | List documents | Done |
+| `weg doc create` | Create document | Done |
+| `weg doc delete` | Delete document | Done |
+| `weg doctype list` | List doctypes | Done |
+| `weg doctype show` | Show doctype schema | Done |
+
+### Cloud & Container (Complete)
+
+| Command | Description | Status |
+|---------|-------------|--------|
+| `weg cloud login` | Login to Frappe Cloud | Done |
+| `weg cloud deploy` | Deploy to cloud | Done |
+| `weg docker *` | Docker compose operations | Done |
+| `weg image build` | Build container image | Done |
+
+### Remote Site Development (Complete)
+
+| Command | Description | Status |
+|---------|-------------|--------|
+| `weg remote clone` | Clone site customizations | Done |
+| `weg remote pull` | Pull changes from remote | Done |
+| `weg remote push` | Push local changes to remote | Done |
+| `weg remote sync` | Bidirectional sync | Done |
+| `weg remote status` | Show local vs remote diff | Done |
+| `weg remote login` | Save site credentials | Done |
+| `weg remote logout` | Remove site credentials | Done |
+| `weg remote info` | Show remote site info | Done |
+
+### Utilities (Complete)
+
+| Command | Description | Status |
+|---------|-------------|--------|
+| `weg exec` | Run command in bench context | Done |
+| `weg bench` | Run raw bench commands | Done |
+| `weg doctor` | Check environment health | Done |
+| `weg log` | View logs | Done |
+| `weg config` | View/modify weg config | Done |
+| `weg migrate` | Migrate between modes | Done |
 
 ---
 
@@ -165,28 +182,28 @@ These commands exist in bench but are rarely used in daily development:
 
 | Task | Priority | Status |
 |------|----------|--------|
-| Increase test coverage to 80% | Medium | 🔄 In progress |
+| Increase test coverage to 80% | Medium | In progress |
 | Add integration tests | Medium | Not started |
-| Complete documentation | Medium | 🔄 In progress |
+| Complete documentation | Medium | In progress |
 | Add structured error types | Low | Not started |
 
 ### Test Coverage by Package
 
 | Package | Coverage | Status |
 |---------|----------|--------|
-| `internal/completion` | 84.4% | ✅ Good |
-| `internal/config` | 77.5% | ✅ Good |
-| `internal/state` | 76.3% | ✅ Good |
-| `internal/runtime` | 76.8% | ✅ Good |
-| `internal/fsutil` | 68.0% | 🔄 Adequate |
-| `internal/remote` | 37.8% | 🔄 Adequate |
-| `internal/container` | 32.5% | 🔄 Adequate |
-| `internal/services` | 31.5% | ⚠️ Needs work |
-| `internal/apps` | 19.3% | ⚠️ Needs work |
-| `internal/cloud` | 16.2% | ⚠️ Needs work |
-| `internal/api` | 15.0% | ⚠️ Needs work |
-| `tools` | 6.5% | ⚠️ Needs work |
-| `cmd/*` | 0% | ⚠️ Biggest gap |
+| `internal/completion` | 84.4% | Good |
+| `internal/config` | 77.5% | Good |
+| `internal/runtime` | 76.8% | Good |
+| `internal/state` | 76.3% | Good |
+| `internal/fsutil` | 68.0% | Adequate |
+| `internal/remote` | 37.8% | Adequate |
+| `internal/container` | 32.5% | Adequate |
+| `internal/services` | 31.5% | Needs work |
+| `internal/apps` | 19.3% | Needs work |
+| `internal/cloud` | 16.2% | Needs work |
+| `internal/api` | 15.0% | Needs work |
+| `tools` | 6.5% | Needs work |
+| `cmd/*` | 0% | Biggest gap |
 
 ---
 
@@ -255,6 +272,7 @@ backups/
 | `weg image *` | *(new - container images)* |
 | `weg doc *` | *(new - document operations)* |
 | `weg doctype *` | *(new - doctype operations)* |
+| `weg remote *` | *(new - remote site development)* |
 
 ---
 

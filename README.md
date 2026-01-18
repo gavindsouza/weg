@@ -4,10 +4,52 @@ The fast way to develop Frappe apps.
 
 ## What is Weg?
 
-Weg means "way" in German and "वेग" (speed) in Marathi/Sanskrit — the fast way to develop Frappe applications. It's a modern replacement for Frappe's `bench` CLI with declarative configuration and faster tooling. It provides:
+Weg means "way" in German and "speed" in Marathi/Sanskrit — the fast way to develop Frappe applications. It's a modern replacement for Frappe's `bench` CLI with declarative configuration and faster tooling.
+
+## Three Development Modes
+
+Weg supports three distinct workflows for Frappe development:
+
+### 1. App-Centric Development
+
+Your app is the project root. The bench infrastructure is hidden in `.weg/`. Ideal for developing a single Frappe app with modern tooling.
+
+```bash
+weg new myapp
+cd myapp
+weg start
+```
+
+Configuration lives in `pyproject.toml [tool.weg]`.
+
+### 2. Bench-Centric Development
+
+Traditional bench directory structure. Use this when working with multiple apps or migrating from existing bench setups.
+
+```bash
+cd /path/to/frappe-bench
+weg init
+weg start
+```
+
+Configuration lives in `weg.toml`.
+
+### 3. Remote-Site Development
+
+Work with remote Frappe sites (like Frappe Cloud) without direct bench access. Clone customizations locally, edit with any tools, and sync changes back.
+
+```bash
+weg remote clone https://mysite.frappe.cloud mysite
+cd mysite
+# Edit Client Scripts, Server Scripts, Custom Fields locally
+weg remote push -m "Add priority field to Todo"
+```
+
+This creates a git-backed directory mirroring the site's customizations, enabling version control, team collaboration, and AI-assisted editing.
+
+## Key Features
 
 - **Declarative configuration** via `weg.toml` or `pyproject.toml`
-- **App-centric development** - your app is the project root, bench hidden in `.weg/`
 - **Modern tooling** - devbox (Nix), uv (fast Python), process-compose
 - **Direct API access** - `weg api` without HTTP overhead
 - **70+ commands** covering all common Frappe development workflows
@@ -29,29 +71,31 @@ go build -o weg .
 
 ## Quick Start
 
-### Create a new Frappe app
+### App-Centric (new app)
 
 ```bash
-# Create a new app with weg managing dependencies
 weg new myapp
 cd myapp
-
-# Start development servers
 weg start
-
-# Open in browser (auto-login as Administrator)
-weg site browse
+weg site browse    # Open in browser (auto-login as Administrator)
 ```
 
-### Work with an existing bench
+### Bench-Centric (existing bench)
 
 ```bash
-# Initialize weg in an existing bench directory
 cd /path/to/frappe-bench
 weg init
-
-# Start development
 weg start
+```
+
+### Remote-Site (Frappe Cloud or any remote site)
+
+```bash
+weg remote clone https://mysite.frappe.cloud mysite
+cd mysite
+# Edit customizations locally...
+weg remote status  # See what changed
+weg remote push    # Push changes to remote
 ```
 
 ## Common Commands
@@ -110,6 +154,18 @@ weg api call frappe.client.get_count --doctype User
 weg doc get User Administrator   # Get a document
 weg doc list User --limit 10     # List documents
 weg doctype list                 # List all doctypes
+```
+
+### Remote Site Development
+
+```bash
+weg remote clone <url> <dir>     # Clone site customizations
+weg remote pull                  # Pull changes from remote
+weg remote push                  # Push local changes to remote
+weg remote push -m "message"     # Push with commit message
+weg remote status                # Show local vs remote diff
+weg remote sync                  # Bidirectional sync
+weg remote login <url>           # Save credentials for a site
 ```
 
 ### Frappe Cloud
@@ -209,11 +265,12 @@ weg completion fish > ~/.config/fish/completions/weg.fish
 | Feature | weg | bench |
 |---------|-----|-------|
 | Configuration | Declarative (TOML) | Imperative (commands) |
-| Project structure | App-centric or bench-centric | Bench-centric only |
+| Development modes | App-centric, bench-centric, remote-site | Bench-centric only |
 | Python management | uv (fast) | pip |
 | System dependencies | devbox/Nix (reproducible) | Manual |
 | Process management | process-compose | honcho/supervisord |
 | API access | Direct (no HTTP) | Via HTTP |
+| Remote site editing | Built-in (git-backed) | Not available |
 | Cloud integration | Built-in | Separate tool |
 
 ## Requirements
