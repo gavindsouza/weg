@@ -3,11 +3,18 @@ package config
 import (
 	"fmt"
 	"os"
-	"text/tabwriter"
 
 	"github.com/gavindsouza/weg/internal/config"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/spf13/cobra"
 )
+
+// AppListItem represents an app for list output
+type AppListItem struct {
+	App    string `json:"app"`
+	Source string `json:"source"`
+	Branch string `json:"branch"`
+}
 
 var listAppsCmd = &cobra.Command{
 	Use:   "list-apps",
@@ -46,9 +53,7 @@ func listBenchApps(result *config.DetectionResult) error {
 		return fmt.Errorf("failed to parse config: %w", err)
 	}
 
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "APP\tSOURCE\tBRANCH")
-
+	var apps []AppListItem
 	for name, app := range cfg.Apps {
 		if app.Excluded {
 			continue
@@ -57,11 +62,14 @@ func listBenchApps(result *config.DetectionResult) error {
 		if app.Path != "" {
 			source = app.Path + " (local)"
 		}
-		fmt.Fprintf(w, "%s\t%s\t%s\n", name, source, app.Branch)
+		apps = append(apps, AppListItem{
+			App:    name,
+			Source: source,
+			Branch: app.Branch,
+		})
 	}
-	w.Flush()
 
-	return nil
+	return output.List(apps)
 }
 
 func listAppDeps(result *config.DetectionResult) error {
@@ -71,17 +79,23 @@ func listAppDeps(result *config.DetectionResult) error {
 		return fmt.Errorf("failed to parse config: %w", err)
 	}
 
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "APP\tSOURCE\tBRANCH")
+	var apps []AppListItem
 
 	// Main app
-	fmt.Fprintf(w, "%s\t%s\t%s\n", result.AppName, ". (local)", "-")
+	apps = append(apps, AppListItem{
+		App:    result.AppName,
+		Source: ". (local)",
+		Branch: "-",
+	})
 
 	// Dependencies
 	for _, app := range cfg.Dependencies.Apps {
-		fmt.Fprintf(w, "%s\t%s\t%s\n", app.Name, app.URL, app.Branch)
+		apps = append(apps, AppListItem{
+			App:    app.Name,
+			Source: app.URL,
+			Branch: app.Branch,
+		})
 	}
-	w.Flush()
 
-	return nil
+	return output.List(apps)
 }

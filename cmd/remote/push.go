@@ -115,7 +115,7 @@ func runPush(cobraCmd *cobra.Command, args []string) error {
 	if err := client.Ping(); err != nil {
 		return fmt.Errorf("failed to connect: %w", err)
 	}
-	fmt.Println("✓ Connected")
+	fmt.Println("Connected")
 
 	// Push each entity
 	totalChanges := len(entities) + len(deletedEntities)
@@ -148,7 +148,7 @@ func runPush(cobraCmd *cobra.Command, args []string) error {
 		}
 	}
 
-	fmt.Printf("✓ Pushed: %d, Deleted: %d, Failed: %d\n", pushed, deleted, failed)
+	fmt.Printf("Pushed: %d, Deleted: %d, Failed: %d\n", pushed, deleted, failed)
 
 	if failed > 0 {
 		return fmt.Errorf("%d entities failed to push", failed)

@@ -2,9 +2,8 @@ package cloud
 
 import (
 	"fmt"
-	"os"
-	"text/tabwriter"
 
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -64,24 +63,34 @@ func runMpApps(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(apps) == 0 {
-		fmt.Println("No marketplace apps published yet.")
-		fmt.Println("\nPublish an app at https://cloud.frappe.io/dashboard/marketplace")
+		output.Print("No marketplace apps published yet.")
+		output.Print("\nPublish an app at https://cloud.frappe.io/dashboard/marketplace")
 		return nil
 	}
 
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "APP\tTITLE\tSTATUS")
-	for _, app := range apps {
-		fmt.Fprintf(w, "%s\t%s\t%s\n",
-			app.Name,
-			app.Title,
-			app.Status,
-		)
+	type AppRow struct {
+		App    string `json:"app"`
+		Title  string `json:"title"`
+		Status string `json:"status"`
 	}
-	w.Flush()
 
-	fmt.Printf("\nTotal: %d app(s)\n", len(apps))
-	fmt.Println("\nUse 'weg cloud mp app <name>' for details and analytics")
+	var rows []AppRow
+	for _, app := range apps {
+		rows = append(rows, AppRow{
+			App:    app.Name,
+			Title:  app.Title,
+			Status: app.Status,
+		})
+	}
+
+	if err := output.List(rows); err != nil {
+		return err
+	}
+
+	if output.EffectiveFormat() != output.FormatJSON {
+		output.Printf("\nTotal: %d app(s)", len(apps))
+		output.Print("\nUse 'weg cloud mp app <name>' for details and analytics")
+	}
 
 	return nil
 }
@@ -148,16 +157,23 @@ func runMpSubs(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(subs) == 0 {
-		fmt.Printf("No active subscriptions for %s\n", appName)
+		output.Printf("No active subscriptions for %s", appName)
 		return nil
 	}
 
-	fmt.Printf("Subscriptions for %s\n\n", appName)
+	if output.EffectiveFormat() != output.FormatJSON {
+		output.Printf("Subscriptions for %s\n", appName)
+	}
 
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "SITE\tPLAN\tPRICE (USD)\tACTIVE DAYS\tSTATUS")
+	type SubRow struct {
+		Site       string  `json:"site"`
+		Plan       string  `json:"plan"`
+		PriceUSD   float64 `json:"price_usd"`
+		ActiveDays int     `json:"active_days"`
+		Status     string  `json:"status"`
+	}
 
-	var totalRevenue float64
+	var rows []SubRow
 	var activeCount int
 
 	for _, sub := range subs {
@@ -166,20 +182,22 @@ func runMpSubs(cmd *cobra.Command, args []string) error {
 			status = "active"
 			activeCount++
 		}
-		fmt.Fprintf(w, "%s\t%s\t$%.2f\t%d\t%s\n",
-			sub.Site,
-			sub.AppPlan,
-			sub.PriceUSD,
-			sub.ActiveDays,
-			status,
-		)
-		if sub.Enabled == 1 {
-			totalRevenue += sub.PriceUSD * float64(sub.ActiveDays) / 30 // rough monthly estimate
-		}
+		rows = append(rows, SubRow{
+			Site:       sub.Site,
+			Plan:       sub.AppPlan,
+			PriceUSD:   sub.PriceUSD,
+			ActiveDays: sub.ActiveDays,
+			Status:     status,
+		})
 	}
-	w.Flush()
 
-	fmt.Printf("\nTotal: %d subscription(s), %d active\n", len(subs), activeCount)
+	if err := output.List(rows); err != nil {
+		return err
+	}
+
+	if output.EffectiveFormat() != output.FormatJSON {
+		output.Printf("\nTotal: %d subscription(s), %d active", len(subs), activeCount)
+	}
 
 	return nil
 }

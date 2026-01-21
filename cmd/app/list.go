@@ -2,12 +2,11 @@ package app
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
-	"text/tabwriter"
 
 	"github.com/gavindsouza/weg/internal/apps"
 	"github.com/gavindsouza/weg/internal/config"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/state"
 	"github.com/spf13/cobra"
 )
@@ -85,10 +84,15 @@ func runList(cmd *cobra.Command, args []string) error {
 		st = state.NewState()
 	}
 
-	// Print table
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "NAME\tBRANCH\tSTATUS\tSOURCE")
+	// Build list of apps for output
+	type AppInfo struct {
+		Name   string `json:"name"`
+		Branch string `json:"branch"`
+		Status string `json:"status"`
+		Source string `json:"source"`
+	}
 
+	var appList []AppInfo
 	for name, appCfg := range configuredApps {
 		branch := appCfg.Branch
 		if branch == "" && appCfg.Path != "" {
@@ -121,9 +125,13 @@ func runList(cmd *cobra.Command, args []string) error {
 			status = "excluded"
 		}
 
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", name, branch, status, source)
+		appList = append(appList, AppInfo{
+			Name:   name,
+			Branch: branch,
+			Status: status,
+			Source: source,
+		})
 	}
 
-	w.Flush()
-	return nil
+	return output.List(appList)
 }

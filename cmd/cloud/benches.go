@@ -2,9 +2,8 @@ package cloud
 
 import (
 	"fmt"
-	"os"
-	"text/tabwriter"
 
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -38,22 +37,28 @@ func runBenches(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(benches) == 0 {
-		fmt.Println("No benches found")
+		output.Print("No benches found")
 		return nil
 	}
 
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "NAME\tSTATUS\tVERSION\tAPPS\tSITES")
-	for _, bench := range benches {
-		fmt.Fprintf(w, "%s\t%s\t%s\t%d\t%d\n",
-			bench.Name,
-			bench.Status,
-			bench.FrappeVersion,
-			bench.AppCount,
-			bench.SiteCount,
-		)
+	type BenchRow struct {
+		Name    string `json:"name"`
+		Status  string `json:"status"`
+		Version string `json:"version"`
+		Apps    int    `json:"apps"`
+		Sites   int    `json:"sites"`
 	}
-	w.Flush()
 
-	return nil
+	var rows []BenchRow
+	for _, bench := range benches {
+		rows = append(rows, BenchRow{
+			Name:    bench.Name,
+			Status:  bench.Status,
+			Version: bench.FrappeVersion,
+			Apps:    bench.AppCount,
+			Sites:   bench.SiteCount,
+		})
+	}
+
+	return output.List(rows)
 }

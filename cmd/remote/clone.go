@@ -156,7 +156,7 @@ func runClone(cobraCmd *cobra.Command, args []string) error {
 		}
 
 		fmt.Println()
-		fmt.Println("⚠️  SECURITY SETUP REQUIRED")
+		fmt.Println("SECURITY SETUP REQUIRED")
 		fmt.Println()
 		fmt.Println("Remote sync requires API access to modify site customizations.")
 		fmt.Println("Before proceeding, ensure you have API credentials for the site.")
@@ -193,7 +193,7 @@ func runClone(cobraCmd *cobra.Command, args []string) error {
 	if err := client.Ping(); err != nil {
 		return fmt.Errorf("failed to connect to site: %w", err)
 	}
-	fmt.Println("✓ Connected")
+	fmt.Println("Connected")
 
 	// Offer to save credentials globally if not already from global
 	if !fromGlobal && !cloneNonInteractive {
@@ -208,7 +208,7 @@ func runClone(cobraCmd *cobra.Command, args []string) error {
 			}); err != nil {
 				fmt.Fprintf(os.Stderr, "Warning: Failed to save global credentials: %v\n", err)
 			} else {
-				fmt.Printf("✓ Credentials saved to ~/.config/weg/credentials.toml\n")
+				fmt.Println("Credentials saved to ~/.config/weg/credentials.toml")
 			}
 		}
 	}
@@ -218,7 +218,7 @@ func runClone(cobraCmd *cobra.Command, args []string) error {
 	if err != nil {
 		frappeVersion = "unknown"
 	}
-	fmt.Printf("✓ Frappe version: %s\n", frappeVersion)
+	fmt.Printf("Frappe version: %s\n", frappeVersion)
 
 	// Create site config
 	config := remote.NewSiteConfig(siteURL, dirName)
@@ -514,7 +514,7 @@ func runClone(cobraCmd *cobra.Command, args []string) error {
 
 	// Summary
 	fmt.Println()
-	fmt.Printf("✓ Cloned to %s/\n", dirName)
+	fmt.Printf("Cloned to %s/\n", dirName)
 	fmt.Println()
 	fmt.Printf("  Entities: %d\n", len(result.Entities))
 	fmt.Printf("  Modules:  %d\n", len(modules(result.Entities)))
@@ -592,7 +592,7 @@ repos:
 		os.WriteFile(precommitPath, []byte(precommitConfig), 0644)
 	}
 
-	fmt.Println("✓ Workspace initialized")
+	fmt.Println("Workspace initialized")
 }
 
 // writeFileContent writes JSON content to a file path

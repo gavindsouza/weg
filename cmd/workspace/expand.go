@@ -80,7 +80,7 @@ func runExpand(cmd *cobra.Command, args []string) error {
 	if len(result.Errors) > 0 {
 		fmt.Printf("\nErrors:\n")
 		for _, e := range result.Errors {
-			fmt.Printf("  ✗ %s\n", e)
+			fmt.Printf("  x %s\n", e)
 		}
 	}
 

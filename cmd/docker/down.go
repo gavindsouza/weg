@@ -47,6 +47,6 @@ func runDown(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to stop containers: %w", err)
 	}
 
-	fmt.Println("✓ Containers stopped")
+	fmt.Println("Containers stopped")
 	return nil
 }

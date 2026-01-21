@@ -2,11 +2,10 @@ package cloud
 
 import (
 	"fmt"
-	"os"
-	"text/tabwriter"
 	"time"
 
 	"github.com/gavindsouza/weg/internal/cloud"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -86,18 +85,11 @@ func showAccountOverview(client *cloud.Client) error {
 	benches, err := client.ListBenches("")
 	if err == nil && len(benches) > 0 {
 		fmt.Printf("Benches (%d):\n", len(benches))
-		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		fmt.Fprintln(w, "  NAME\tVERSION\tSITES\tAPPS\tSTATUS")
+		t := output.NewTable("Name", "Version", "Sites", "Apps", "Status")
 		for _, b := range benches {
-			fmt.Fprintf(w, "  %s\t%s\t%d\t%d\t%s\n",
-				b.Name,
-				b.FrappeVersion,
-				b.SiteCount,
-				b.AppCount,
-				b.Status,
-			)
+			t.Row(b.Name, b.FrappeVersion, b.SiteCount, b.AppCount, b.Status)
 		}
-		w.Flush()
+		t.Flush()
 		fmt.Println()
 	}
 
@@ -105,17 +97,11 @@ func showAccountOverview(client *cloud.Client) error {
 	sites, err := client.ListSites("")
 	if err == nil && len(sites) > 0 {
 		fmt.Printf("Sites (%d):\n", len(sites))
-		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		fmt.Fprintln(w, "  NAME\tSTATUS\tPLAN\tREGION")
+		t := output.NewTable("Name", "Status", "Plan", "Region")
 		for _, s := range sites {
-			fmt.Fprintf(w, "  %s\t%s\t%s\t%s\n",
-				s.Name,
-				s.Status,
-				s.Plan,
-				s.Region,
-			)
+			t.Row(s.Name, s.Status, s.Plan, s.Region)
 		}
-		w.Flush()
+		t.Flush()
 		fmt.Println()
 	}
 
@@ -150,16 +136,15 @@ func showSiteStatus(client *cloud.Client, siteName string) error {
 	// Show installed apps
 	if len(site.InstalledApps) > 0 {
 		fmt.Println("\nInstalled Apps:")
-		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		fmt.Fprintln(w, "  APP\tBRANCH\tCOMMIT")
+		t := output.NewTable("App", "Branch", "Commit")
 		for _, app := range site.InstalledApps {
 			hash := app.Hash
 			if len(hash) > 7 {
 				hash = hash[:7]
 			}
-			fmt.Fprintf(w, "  %s\t%s\t%s\n", app.App, app.Branch, hash)
+			t.Row(app.App, app.Branch, hash)
 		}
-		w.Flush()
+		t.Flush()
 	}
 
 	// Show running jobs
@@ -175,17 +160,11 @@ func showSiteStatus(client *cloud.Client, siteName string) error {
 	recentJobs, err := client.GetSiteJobs(siteName, 5)
 	if err == nil && len(recentJobs) > 0 {
 		fmt.Println("\nRecent Jobs:")
-		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		fmt.Fprintln(w, "  TYPE\tSTATUS\tDURATION\tSTARTED")
+		t := output.NewTable("Type", "Status", "Duration", "Started")
 		for _, job := range recentJobs {
-			fmt.Fprintf(w, "  %s\t%s\t%s\t%s\n",
-				job.JobType,
-				job.Status,
-				job.Duration,
-				job.Creation,
-			)
+			t.Row(job.JobType, job.Status, job.Duration, job.Creation)
 		}
-		w.Flush()
+		t.Flush()
 	}
 
 	return nil
@@ -206,22 +185,15 @@ func showBenchStatus(client *cloud.Client, benchName string) error {
 		return nil
 	}
 
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "  JOB\tTYPE\tSTATUS\tDURATION\tSTARTED")
+	t := output.NewTable("Job", "Type", "Status", "Duration", "Started")
 	for _, job := range jobs {
 		name := job.Name
 		if len(name) > 15 {
 			name = name[:15] + "..."
 		}
-		fmt.Fprintf(w, "  %s\t%s\t%s\t%s\t%s\n",
-			name,
-			job.JobType,
-			job.Status,
-			job.Duration,
-			job.Creation,
-		)
+		t.Row(name, job.JobType, job.Status, job.Duration, job.Creation)
 	}
-	w.Flush()
+	t.Flush()
 
 	return nil
 }

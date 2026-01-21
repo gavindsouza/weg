@@ -170,7 +170,7 @@ func migrateToench(cwd string, result *config.DetectionResult) error {
 		}
 	}
 
-	PrintInfo("✓ Migrated to bench-centric mode")
+	PrintInfo("Migrated to bench-centric mode")
 	PrintInfo("")
 	PrintInfo("Your bench is now at: %s", cwd)
 	PrintInfo("Run 'direnv allow' to activate the environment")
@@ -283,7 +283,7 @@ func migrateToApp(cwd string, result *config.DetectionResult) error {
 		return fmt.Errorf("failed to create app symlink: %w", err)
 	}
 
-	PrintInfo("✓ Migrated to app-centric mode")
+	PrintInfo("Migrated to app-centric mode")
 	PrintInfo("")
 	PrintInfo("Your app is now the project root: %s", primaryAppPath)
 	PrintInfo("The bench is hidden in: %s", wegDir)

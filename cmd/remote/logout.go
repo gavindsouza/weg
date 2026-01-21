@@ -51,7 +51,7 @@ func runLogout(cobraCmd *cobra.Command, args []string) error {
 	}
 
 	globalDir, _ := remote.GlobalConfigDir()
-	fmt.Printf("✓ Credentials removed for %s\n", siteHost)
+	fmt.Printf("Credentials removed for %s\n", siteHost)
 	fmt.Printf("  (stored at %s/credentials.toml)\n", globalDir)
 
 	return nil

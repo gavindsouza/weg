@@ -13,6 +13,8 @@ import (
 	"github.com/gavindsouza/weg/internal/api"
 	"github.com/gavindsouza/weg/internal/completion"
 	"github.com/gavindsouza/weg/internal/config"
+	"github.com/gavindsouza/weg/internal/output"
+	"github.com/gavindsouza/weg/internal/prompt"
 	"github.com/gavindsouza/weg/internal/state"
 	"github.com/spf13/cobra"
 )
@@ -50,7 +52,7 @@ func init() {
 	restoreCmd.Flags().StringVar(&restoreFiles, "files", "", "Path to files backup archive")
 	restoreCmd.Flags().BoolVar(&restoreClearCache, "clear-cache", true, "Clear cache after restore")
 	restoreCmd.Flags().StringVar(&mariadbRootPassword, "mariadb-root-password", "", "MariaDB root password (for recreating database)")
-	restoreCmd.Flags().BoolVarP(&restoreForce, "force", "f", false, "Skip confirmation")
+	restoreCmd.Flags().BoolVar(&restoreForce, "force", false, "Skip confirmation")
 }
 
 func runRestore(cmd *cobra.Command, args []string) error {
@@ -116,38 +118,38 @@ func runRestore(cmd *cobra.Command, args []string) error {
 	}
 
 	if !restoreForce {
-		fmt.Printf("This will overwrite the database for %s\n", site)
-		fmt.Printf("Database: %s\n", siteConfig.DBName)
-		fmt.Println()
-		if !confirmAction("Continue with restore?") {
+		output.Printf("This will overwrite the database for %s", site)
+		output.Printf("Database: %s", siteConfig.DBName)
+		output.Print("")
+		if !prompt.ConfirmDanger("Continue with restore?") {
 			return fmt.Errorf("restore cancelled")
 		}
 	}
 
-	fmt.Printf("Restoring %s from %s...\n", site, backupFile)
+	output.Infof("Restoring %s from %s...", site, backupFile)
 
 	// Restore database
 	if err := restoreDatabase(benchPath, site, siteConfig, backupFile, useDevbox); err != nil {
 		return fmt.Errorf("failed to restore database: %w", err)
 	}
-	fmt.Println("  Database restored")
+	output.Print("  Database restored")
 
 	// Restore files if specified
 	if restoreFiles != "" {
 		if _, err := os.Stat(restoreFiles); os.IsNotExist(err) {
-			fmt.Printf("Warning: files backup not found: %s\n", restoreFiles)
+			output.Warningf("files backup not found: %s", restoreFiles)
 		} else {
 			if err := restoreFilesBackup(benchPath, site, restoreFiles); err != nil {
-				fmt.Printf("Warning: failed to restore files: %v\n", err)
+				output.Warningf("failed to restore files: %v", err)
 			} else {
-				fmt.Println("  Files restored")
+				output.Print("  Files restored")
 			}
 		}
 	}
 
 	// Clear cache
 	if restoreClearCache {
-		fmt.Println("  Clearing cache...")
+		output.Print("  Clearing cache...")
 		executor := api.NewExecutor(benchPath, site, "Administrator")
 		script := fmt.Sprintf(`import frappe
 import json
@@ -167,13 +169,13 @@ finally:
 `, filepath.Join(benchPath, "sites"), site)
 
 		if _, err := executor.ExecuteRaw(script); err != nil {
-			fmt.Printf("Warning: failed to clear cache: %v\n", err)
+			output.Warningf("failed to clear cache: %v", err)
 		}
 	}
 
-	fmt.Printf("Restore completed for %s\n", site)
-	fmt.Println()
-	fmt.Println("Note: You may want to run 'weg site password' to set the admin password")
+	output.Successf("Restore completed for %s", site)
+	output.Print("")
+	output.Info("You may want to run 'weg site password' to set the admin password")
 
 	return nil
 }
@@ -266,14 +268,6 @@ func restoreFilesBackup(benchPath, site, filesBackup string) error {
 	cmd.Dir = benchPath
 
 	return cmd.Run()
-}
-
-func confirmAction(prompt string) bool {
-	fmt.Printf("%s [y/N]: ", prompt)
-	var response string
-	fmt.Scanln(&response)
-	response = strings.ToLower(strings.TrimSpace(response))
-	return response == "y" || response == "yes"
 }
 
 // loadSiteConfigForRestore loads site config, handling missing files

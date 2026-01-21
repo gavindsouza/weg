@@ -112,7 +112,7 @@ func runLogin(cobraCmd *cobra.Command, args []string) error {
 	if err := client.Ping(); err != nil {
 		return fmt.Errorf("failed to connect: %w", err)
 	}
-	fmt.Println("✓ Connected")
+	fmt.Println("Connected")
 
 	// Save credentials
 	if err := remote.SaveGlobalCredentials(siteHost, &remote.CredentialAuth{
@@ -122,7 +122,7 @@ func runLogin(cobraCmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to save credentials: %w", err)
 	}
 
-	fmt.Printf("✓ Credentials saved for %s\n", siteHost)
+	fmt.Printf("Credentials saved for %s\n", siteHost)
 	fmt.Println()
 	fmt.Println("You can now clone this site without entering credentials:")
 	fmt.Printf("  weg remote clone %s\n", siteURL)

@@ -189,7 +189,7 @@ func runLogin(cmd *cobra.Command, args []string) error {
 		scope = "globally (~/.config/weg/)"
 	}
 
-	fmt.Printf("\n✓ Logged in as %s\n", user.Email)
+	fmt.Printf("\nLogged in as %s\n", user.Email)
 	fmt.Printf("  Cloud: %s\n", cloudName)
 	if team != "" {
 		fmt.Printf("  Team: %s\n", team)

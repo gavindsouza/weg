@@ -9,6 +9,8 @@ import (
 	"github.com/gavindsouza/weg/internal/api"
 	"github.com/gavindsouza/weg/internal/completion"
 	"github.com/gavindsouza/weg/internal/config"
+	"github.com/gavindsouza/weg/internal/output"
+	"github.com/gavindsouza/weg/internal/prompt"
 	"github.com/gavindsouza/weg/internal/state"
 	"github.com/spf13/cobra"
 )
@@ -93,13 +95,10 @@ func runReinstall(cmd *cobra.Command, args []string) error {
 
 	// Confirm
 	if !reinstallForce {
-		fmt.Printf("This will reinstall %s on %s\n", appName, site)
-		fmt.Println("WARNING: All data created by this app will be DELETED!")
-		fmt.Print("Continue? [y/N]: ")
-		var response string
-		fmt.Scanln(&response)
-		if strings.ToLower(response) != "y" {
-			fmt.Println("Cancelled")
+		output.Printf("This will reinstall %s on %s", appName, site)
+		output.Warning("All data created by this app will be DELETED!")
+		if !prompt.Confirm("Continue?") {
+			output.Print("Cancelled")
 			return nil
 		}
 	}
@@ -107,7 +106,7 @@ func runReinstall(cmd *cobra.Command, args []string) error {
 	executor := api.NewExecutor(benchPath, site, "Administrator")
 
 	// First, uninstall the app
-	fmt.Printf("Uninstalling %s from %s...\n", appName, site)
+	output.Infof("Uninstalling %s from %s...", appName, site)
 
 	uninstallScript := fmt.Sprintf(`import frappe
 import json
@@ -139,13 +138,13 @@ finally:
 		if !strings.Contains(uninstallResult.Error, "not installed") {
 			return fmt.Errorf("failed to uninstall app: %s", uninstallResult.Error)
 		}
-		fmt.Printf("App %s was not installed, proceeding with install...\n", appName)
+		output.Infof("App %s was not installed, proceeding with install...", appName)
 	} else {
-		fmt.Printf("Uninstalled %s\n", appName)
+		output.Successf("Uninstalled %s", appName)
 	}
 
 	// Now, install the app
-	fmt.Printf("Installing %s on %s...\n", appName, site)
+	output.Infof("Installing %s on %s...", appName, site)
 
 	installScript := fmt.Sprintf(`import frappe
 import json
@@ -177,7 +176,7 @@ finally:
 	}
 
 	// Clear cache after reinstall
-	fmt.Println("Clearing cache...")
+	output.Info("Clearing cache...")
 
 	clearScript := fmt.Sprintf(`import frappe
 import json
@@ -198,6 +197,6 @@ finally:
 
 	executor.ExecuteRaw(clearScript) // Ignore errors
 
-	fmt.Printf("Successfully reinstalled %s on %s\n", appName, site)
+	output.Successf("Reinstalled %s on %s", appName, site)
 	return nil
 }

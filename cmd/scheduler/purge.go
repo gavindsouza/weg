@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 
 	"github.com/gavindsouza/weg/internal/api"
+	"github.com/gavindsouza/weg/internal/output"
+	"github.com/gavindsouza/weg/internal/prompt"
 	"github.com/spf13/cobra"
 )
 
@@ -31,7 +33,7 @@ Examples:
 func init() {
 	SchedulerCmd.AddCommand(purgeCmd)
 	purgeCmd.Flags().StringVar(&purgeSite, "site", "", "Site to purge jobs for")
-	purgeCmd.Flags().BoolVarP(&purgeForce, "force", "f", false, "Skip confirmation")
+	purgeCmd.Flags().BoolVar(&purgeForce, "force", false, "Skip confirmation")
 }
 
 func runPurge(cmd *cobra.Command, args []string) error {
@@ -41,12 +43,9 @@ func runPurge(cmd *cobra.Command, args []string) error {
 	}
 
 	if !purgeForce {
-		fmt.Printf("This will delete all failed jobs for %s\n", site)
-		var response string
-		fmt.Print("Continue? [y/N]: ")
-		fmt.Scanln(&response)
-		if response != "y" && response != "yes" {
-			fmt.Println("Cancelled")
+		output.Printf("This will delete all failed jobs for %s", site)
+		if !prompt.Confirm("Continue?") {
+			output.Print("Cancelled")
 			return nil
 		}
 	}
@@ -89,9 +88,9 @@ finally:
 	data, ok := result.Data.(map[string]interface{})
 	if ok {
 		deleted, _ := data["deleted"].(float64)
-		fmt.Printf("Purged %d failed jobs\n", int(deleted))
+		output.Successf("Purged %d failed jobs", int(deleted))
 	} else {
-		fmt.Println("Failed jobs purged")
+		output.Success("Failed jobs purged")
 	}
 
 	return nil

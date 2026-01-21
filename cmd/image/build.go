@@ -126,10 +126,10 @@ func runBuild(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Println()
-	fmt.Printf("✓ Image built: %s\n", tag)
+	fmt.Printf("Image built: %s\n", tag)
 
 	if buildPush {
-		fmt.Printf("✓ Image pushed to registry\n")
+		fmt.Println("Image pushed to registry")
 	}
 
 	return nil

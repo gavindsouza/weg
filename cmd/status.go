@@ -216,10 +216,12 @@ func showStateInfo(path string) error {
 	if err != nil {
 		PrintVerbose("Could not check sync status: %v", err)
 	} else if needsSync {
-		fmt.Printf("\n⚠️  Configuration has changed since last sync.\n")
-		fmt.Printf("   Run 'weg sync' to apply changes.\n")
+		fmt.Println()
+		PrintInfo("Configuration has changed since last sync.")
+		PrintInfo("Run 'weg sync' to apply changes.")
 	} else {
-		fmt.Printf("\n✓ Environment is in sync with configuration.\n")
+		fmt.Println()
+		PrintInfo("Environment is in sync with configuration.")
 	}
 
 	return nil

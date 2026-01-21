@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"github.com/gavindsouza/weg/internal/config"
+	"github.com/gavindsouza/weg/internal/output"
+	"github.com/gavindsouza/weg/internal/prompt"
 	"github.com/gavindsouza/weg/tools"
 	"github.com/spf13/cobra"
 )
@@ -153,11 +155,8 @@ func runUpgrade(cmd *cobra.Command, args []string) error {
 
 	// Confirm unless -y
 	if !yes {
-		fmt.Print("Continue? [y/N] ")
-		var response string
-		fmt.Scanln(&response)
-		if strings.ToLower(response) != "y" {
-			PrintInfo("Upgrade cancelled")
+		if !prompt.Confirm("Continue?") {
+			output.Info("Upgrade cancelled")
 			return nil
 		}
 	}

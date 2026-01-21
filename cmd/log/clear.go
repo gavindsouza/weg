@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/gavindsouza/weg/internal/output"
+	"github.com/gavindsouza/weg/internal/prompt"
 	"github.com/spf13/cobra"
 )
 
@@ -50,25 +52,23 @@ func runClear(cmd *cobra.Command, args []string) error {
 
 	logFiles := findLogFiles(benchPath, site, logType)
 	if len(logFiles) == 0 {
-		fmt.Println("No log files found")
+		output.Print("No log files found")
 		return nil
 	}
 
 	if !clearAll {
-		fmt.Printf("This will clear %d log file(s):\n", len(logFiles))
+		output.Printf("This will clear %d log file(s):", len(logFiles))
 		for _, f := range logFiles {
 			info, err := os.Stat(f)
 			size := ""
 			if err == nil {
 				size = formatSize(info.Size())
 			}
-			fmt.Printf("  - %s (%s)\n", filepath.Base(f), size)
+			output.Printf("  - %s (%s)", filepath.Base(f), size)
 		}
-		fmt.Print("\nContinue? [y/N]: ")
-		var response string
-		fmt.Scanln(&response)
-		if response != "y" && response != "Y" {
-			fmt.Println("Cancelled")
+		output.Print("")
+		if !prompt.Confirm("Continue?") {
+			output.Print("Cancelled")
 			return nil
 		}
 	}
@@ -84,13 +84,13 @@ func runClear(cmd *cobra.Command, args []string) error {
 
 		// Truncate the file instead of deleting (keeps the file but empties it)
 		if err := os.Truncate(f, 0); err != nil {
-			fmt.Printf("Failed to clear %s: %v\n", filepath.Base(f), err)
+			output.Warningf("Failed to clear %s: %v", filepath.Base(f), err)
 			continue
 		}
 		cleared++
 	}
 
-	fmt.Printf("Cleared %d log file(s), freed %s\n", cleared, formatSize(totalSize))
+	output.Successf("Cleared %d log file(s), freed %s", cleared, formatSize(totalSize))
 	return nil
 }
 

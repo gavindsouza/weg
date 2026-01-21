@@ -2,10 +2,9 @@ package cloud
 
 import (
 	"fmt"
-	"os"
-	"text/tabwriter"
 
 	"github.com/gavindsouza/weg/internal/cloud"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -43,24 +42,30 @@ func runSites(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(sites) == 0 {
-		fmt.Println("No sites found")
+		output.Print("No sites found")
 		return nil
 	}
 
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "NAME\tSTATUS\tPLAN\tREGION\tCREATED")
-	for _, site := range sites {
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
-			site.Name,
-			site.Status,
-			site.Plan,
-			site.Region,
-			site.CreatedAt,
-		)
+	type SiteRow struct {
+		Name    string `json:"name"`
+		Status  string `json:"status"`
+		Plan    string `json:"plan"`
+		Region  string `json:"region"`
+		Created string `json:"created"`
 	}
-	w.Flush()
 
-	return nil
+	var rows []SiteRow
+	for _, site := range sites {
+		rows = append(rows, SiteRow{
+			Name:    site.Name,
+			Status:  site.Status,
+			Plan:    site.Plan,
+			Region:  site.Region,
+			Created: site.CreatedAt,
+		})
+	}
+
+	return output.List(rows)
 }
 
 // getAuthenticatedClient returns a cloud client for the specified cloud (or default)

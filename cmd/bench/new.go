@@ -173,7 +173,7 @@ node_modules/
 		fmt.Printf("Warning: failed to write .gitignore: %v\n", err)
 	}
 
-	fmt.Println("✓ Bench created successfully!")
+	fmt.Println("Bench created successfully!")
 	fmt.Println()
 	fmt.Println("Next steps:")
 	fmt.Printf("  cd %s\n", benchPath)

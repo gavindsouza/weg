@@ -59,7 +59,7 @@ func runPull(cobraCmd *cobra.Command, args []string) error {
 	if err := client.Ping(); err != nil {
 		return fmt.Errorf("failed to connect: %w", err)
 	}
-	fmt.Println("✓ Connected")
+	fmt.Println("Connected")
 
 	// Fetch entities
 	fmt.Println("Fetching customizations...")
@@ -103,9 +103,9 @@ func runPull(cobraCmd *cobra.Command, args []string) error {
 		gitCommit := exec.Command("git", "commit", "-m", commitMsg)
 		gitCommit.Run()
 
-		fmt.Println("✓ Changes committed")
+		fmt.Println("Changes committed")
 	} else {
-		fmt.Println("✓ Already up to date")
+		fmt.Println("Already up to date")
 	}
 
 	return nil

@@ -113,7 +113,7 @@ func runStatus(cobraCmd *cobra.Command, args []string) error {
 		if err := client.Ping(); err != nil {
 			return fmt.Errorf("failed to connect: %w", err)
 		}
-		fmt.Println("✓ Connected")
+		fmt.Println("Connected")
 
 		// Fetch remote entities and compare with local
 		remoteChanges, err := detectRemoteChanges(client, config, ".")

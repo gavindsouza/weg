@@ -4,10 +4,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/gavindsouza/weg/internal/api"
 	"github.com/gavindsouza/weg/internal/completion"
+	"github.com/gavindsouza/weg/internal/output"
+	"github.com/gavindsouza/weg/internal/prompt"
 	"github.com/spf13/cobra"
 )
 
@@ -33,7 +34,7 @@ var (
 func init() {
 	DocCmd.AddCommand(deleteCmd)
 	deleteCmd.Flags().StringVarP(&deleteSite, "site", "s", "", "Site to delete from")
-	deleteCmd.Flags().BoolVarP(&deleteForce, "force", "f", false, "Skip confirmation")
+	deleteCmd.Flags().BoolVar(&deleteForce, "force", false, "Skip confirmation")
 }
 
 func runDelete(cmd *cobra.Command, args []string) error {
@@ -46,11 +47,9 @@ func runDelete(cmd *cobra.Command, args []string) error {
 	}
 
 	if !deleteForce {
-		fmt.Printf("Delete %s/%s from %s? [y/N]: ", doctype, name, site)
-		var response string
-		fmt.Scanln(&response)
-		if strings.ToLower(response) != "y" {
-			fmt.Println("Cancelled")
+		output.Printf("Delete %s/%s from %s?", doctype, name, site)
+		if !prompt.Confirm("Continue?") {
+			output.Print("Cancelled")
 			return nil
 		}
 	}
@@ -89,6 +88,6 @@ finally:
 		return fmt.Errorf("failed to delete document: %s", result.Error)
 	}
 
-	fmt.Printf("Deleted %s/%s\n", doctype, name)
+	output.Successf("Deleted %s/%s", doctype, name)
 	return nil
 }

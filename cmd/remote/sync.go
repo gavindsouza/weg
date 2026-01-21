@@ -81,7 +81,7 @@ func runSync(cobraCmd *cobra.Command, args []string) error {
 	if err := client.Ping(); err != nil {
 		return fmt.Errorf("failed to connect: %w", err)
 	}
-	fmt.Println("✓ Connected")
+	fmt.Println("Connected")
 
 	// Step 1: Commit local changes FIRST (before pull overwrites them)
 	if hasLocalChanges {
@@ -172,7 +172,7 @@ func runSync(cobraCmd *cobra.Command, args []string) error {
 	fmt.Printf("  Fetched %d entities\n", len(result.Entities))
 
 	fmt.Println()
-	fmt.Println("✓ Sync complete")
+	fmt.Println("Sync complete")
 
 	return nil
 }

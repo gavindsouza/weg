@@ -119,7 +119,7 @@ func runWatch(cmd *cobra.Command, args []string) error {
 						fmt.Printf("  Error: %v\n", err)
 					} else if len(result.Updated) > 0 {
 						for _, f := range result.Updated {
-							fmt.Printf("  ✓ Collapsed: %s\n", f)
+							fmt.Printf("  Collapsed: %s\n", f)
 						}
 					} else if len(result.Unchanged) > 0 {
 						fmt.Println("  (no changes to collapse)")

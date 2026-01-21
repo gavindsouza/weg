@@ -61,7 +61,7 @@ func init() {
 func runRun(cmd *cobra.Command, args []string) error {
 	appURL := args[0]
 
-	PrintInfo("🚀 Weg Magic Runner")
+	PrintInfo("Weg Magic Runner")
 	PrintInfo("==================")
 	PrintInfo("")
 
@@ -110,7 +110,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("not a Frappe app (hooks.py not found)")
 		}
 	}
-	PrintInfo("✓ Detected Frappe app: %s", appName)
+	PrintInfo("Detected Frappe app: %s", appName)
 
 	// Step 3: Read pyproject.toml for compatibility info
 	var appConfig *config.AppConfig
@@ -283,7 +283,7 @@ apps = ["frappe", "%s"]
 
 	// Step 8: Start the server
 	PrintInfo("")
-	PrintInfo("✓ Environment ready!")
+	PrintInfo("Environment ready!")
 	PrintInfo("")
 	PrintInfo("Starting development server...")
 	PrintInfo("Press Ctrl+C to stop")

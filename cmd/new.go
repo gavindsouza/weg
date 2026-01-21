@@ -510,7 +510,7 @@ trim_trailing_whitespace = false
 		PrintVerbose("Warning: failed to create GitHub workflows: %v", err)
 	}
 
-	PrintInfo("✓ App structure created")
+	PrintInfo("App structure created")
 
 	// Initialize weg environment
 	if !newSkipInit {
@@ -564,11 +564,11 @@ apps = ["frappe", "%s"]
 			return fmt.Errorf("failed to initialize devbox environment: %w", err)
 		}
 
-		PrintInfo("✓ Development environment initialized")
+		PrintInfo("Development environment initialized")
 	}
 
 	PrintInfo("")
-	PrintInfo("✓ App created successfully!")
+	PrintInfo("App created successfully!")
 	PrintInfo("")
 	PrintInfo("Next steps:")
 	if targetPath != "." {

@@ -63,7 +63,7 @@ func runCollapse(cmd *cobra.Command, args []string) error {
 		if err := runLinters(cwd); err != nil {
 			return fmt.Errorf("validation failed: %w", err)
 		}
-		fmt.Println("✓ Validation passed")
+		fmt.Println("Validation passed")
 		fmt.Println()
 	}
 
@@ -108,7 +108,7 @@ func runCollapse(cmd *cobra.Command, args []string) error {
 	if len(result.Errors) > 0 {
 		fmt.Printf("\nErrors:\n")
 		for _, e := range result.Errors {
-			fmt.Printf("  ✗ %s\n", e)
+			fmt.Printf("  x %s\n", e)
 		}
 	}
 
@@ -134,7 +134,7 @@ func runLinters(baseDir string) error {
 			fmt.Printf("%s", output)
 			hasErrors = true
 		} else {
-			fmt.Println("  ✓ ruff: no issues")
+			fmt.Println("  ruff: no issues")
 		}
 	} else {
 		fmt.Println("  (ruff not found, skipping Python linting)")
@@ -153,7 +153,7 @@ func runLinters(baseDir string) error {
 				hasErrors = true
 			}
 		} else {
-			fmt.Println("  ✓ eslint: no issues")
+			fmt.Println("  eslint: no issues")
 		}
 	} else {
 		fmt.Println("  (eslint not found, skipping JavaScript linting)")

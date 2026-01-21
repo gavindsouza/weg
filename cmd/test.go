@@ -169,9 +169,9 @@ func runTest(cmd *cobra.Command, args []string) error {
 
 	allPassed := true
 	for _, r := range results {
-		status := "✓ PASS"
+		status := "PASS"
 		if !r.Success {
-			status = "✗ FAIL"
+			status = "FAIL"
 			allPassed = false
 		}
 		PrintInfo("Frappe %s: %s", r.Version, status)

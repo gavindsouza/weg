@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -10,6 +9,8 @@ import (
 
 	"github.com/gavindsouza/weg/internal/config"
 	"github.com/gavindsouza/weg/internal/fsutil"
+	"github.com/gavindsouza/weg/internal/output"
+	"github.com/gavindsouza/weg/internal/prompt"
 	"github.com/gavindsouza/weg/internal/state"
 )
 
@@ -20,11 +21,8 @@ func confirmSync() bool {
 		return true
 	}
 
-	fmt.Print("\nApply these changes? [y/N]: ")
-	reader := bufio.NewReader(os.Stdin)
-	answer, _ := reader.ReadString('\n')
-	answer = strings.TrimSpace(strings.ToLower(answer))
-	return answer == "y" || answer == "yes"
+	output.Print("")
+	return prompt.Confirm("Apply these changes?")
 }
 
 // displayChanges shows the diff of changes that will be applied

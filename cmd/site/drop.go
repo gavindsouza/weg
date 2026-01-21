@@ -1,15 +1,15 @@
 package site
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 
 	"github.com/gavindsouza/weg/internal/completion"
 	"github.com/gavindsouza/weg/internal/config"
+	"github.com/gavindsouza/weg/internal/output"
+	"github.com/gavindsouza/weg/internal/prompt"
 	"github.com/gavindsouza/weg/internal/state"
 	"github.com/spf13/cobra"
 )
@@ -37,7 +37,7 @@ Examples:
 }
 
 func init() {
-	dropCmd.Flags().BoolVarP(&forceDrop, "force", "f", false, "Skip confirmation")
+	dropCmd.Flags().BoolVar(&forceDrop, "force", false, "Skip confirmation")
 	dropCmd.Flags().StringVar(&dropRootPass, "db-root-password", "", "Database root password")
 	dropCmd.Flags().BoolVar(&archived, "archived", false, "Also remove archived sites")
 }
@@ -76,18 +76,14 @@ func runDrop(cmd *cobra.Command, args []string) error {
 
 	// Confirm
 	if !forceDrop {
-		fmt.Printf("This will permanently delete site %s and its database.\n", siteName)
-		fmt.Print("Are you sure? [y/N]: ")
-		reader := bufio.NewReader(os.Stdin)
-		answer, _ := reader.ReadString('\n')
-		answer = strings.TrimSpace(strings.ToLower(answer))
-		if answer != "y" && answer != "yes" {
-			fmt.Println("Cancelled.")
+		output.Printf("This will permanently delete site %s and its database.", siteName)
+		if !prompt.Confirm("Are you sure?") {
+			output.Print("Cancelled.")
 			return nil
 		}
 	}
 
-	fmt.Printf("Dropping site %s...\n", siteName)
+	output.Infof("Dropping site %s...", siteName)
 
 	// Build bench drop-site command
 	cmdArgs := []string{"drop-site", siteName, "--force"}
@@ -110,7 +106,7 @@ func runDrop(cmd *cobra.Command, args []string) error {
 
 	if err := benchCmd.Run(); err != nil {
 		// Try manual removal if bench command fails
-		fmt.Println("bench drop-site failed, attempting manual removal...")
+		output.Warning("bench drop-site failed, attempting manual removal...")
 		if err := os.RemoveAll(sitePath); err != nil {
 			return fmt.Errorf("failed to remove site directory: %w", err)
 		}
@@ -133,15 +129,15 @@ func runDrop(cmd *cobra.Command, args []string) error {
 	if wasDefault && len(st.Sites) > 0 {
 		for name := range st.Sites {
 			st.SetDefaultSite(name)
-			fmt.Printf("Set %s as new default site\n", name)
+			output.Infof("Set %s as new default site", name)
 			break
 		}
 	}
 
 	if err := st.Save(absPath); err != nil {
-		fmt.Printf("Warning: failed to save state: %v\n", err)
+		output.Warningf("failed to save state: %v", err)
 	}
 
-	fmt.Printf("Successfully dropped site %s\n", siteName)
+	output.Successf("Dropped site %s", siteName)
 	return nil
 }

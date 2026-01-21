@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"text/tabwriter"
 
 	"github.com/gavindsouza/weg/internal/config"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/state"
 	"github.com/spf13/cobra"
 )
@@ -115,15 +115,19 @@ func runList(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(allSites) == 0 {
-		fmt.Println("No sites found.")
-		fmt.Println("Create one with: weg site new <name>")
+		output.Print("No sites found.")
+		output.Print("Create one with: weg site new <name>")
 		return nil
 	}
 
-	// Print table
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "NAME\tSTATUS\tAPPS")
+	// Build output list
+	type SiteOutput struct {
+		Name   string `json:"name"`
+		Status string `json:"status"`
+		Apps   string `json:"apps"`
+	}
 
+	var siteList []SiteOutput
 	for _, info := range allSites {
 		status := ""
 		if info.Default {
@@ -152,13 +156,19 @@ func runList(cmd *cobra.Command, args []string) error {
 			}
 		}
 
-		fmt.Fprintf(w, "%s\t%s\t%s\n", info.Name, status, apps)
+		siteList = append(siteList, SiteOutput{
+			Name:   info.Name,
+			Status: status,
+			Apps:   apps,
+		})
 	}
 
-	w.Flush()
+	if err := output.List(siteList); err != nil {
+		return err
+	}
 
-	if defaultSite != "" {
-		fmt.Printf("\n* = default site\n")
+	if defaultSite != "" && output.EffectiveFormat() != output.FormatJSON {
+		output.Print("\n* = default site")
 	}
 
 	return nil

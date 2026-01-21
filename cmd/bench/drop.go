@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"github.com/gavindsouza/weg/internal/config"
+	"github.com/gavindsouza/weg/internal/output"
+	"github.com/gavindsouza/weg/internal/prompt"
 	"github.com/spf13/cobra"
 )
 
@@ -30,7 +32,7 @@ Examples:
 var dropForce bool
 
 func init() {
-	dropCmd.Flags().BoolVarP(&dropForce, "force", "f", false, "Skip confirmation")
+	dropCmd.Flags().BoolVar(&dropForce, "force", false, "Skip confirmation")
 }
 
 func runDrop(cmd *cobra.Command, args []string) error {
@@ -101,24 +103,20 @@ func runDrop(cmd *cobra.Command, args []string) error {
 			}
 		}
 
-		fmt.Print("Are you sure? This cannot be undone. [y/N]: ")
-		reader := bufio.NewReader(os.Stdin)
-		answer, _ := reader.ReadString('\n')
-		answer = strings.TrimSpace(strings.ToLower(answer))
-		if answer != "y" && answer != "yes" {
-			fmt.Println("Cancelled.")
+		if !prompt.Confirm("Are you sure?") {
+			output.Print("Cancelled.")
 			return nil
 		}
 	}
 
-	fmt.Printf("Removing bench %s...\n", benchName)
+	output.Infof("Removing bench %s...", benchName)
 
 	// Remove the directory
 	if err := os.RemoveAll(benchPath); err != nil {
 		return fmt.Errorf("failed to remove bench: %w", err)
 	}
 
-	fmt.Printf("✓ Bench '%s' removed successfully\n", benchName)
+	output.Successf("Bench '%s' removed successfully", benchName)
 	return nil
 }
 
@@ -126,14 +124,14 @@ func handleAppWithWeg(appPath string) error {
 	wegPath := filepath.Join(appPath, ".weg")
 
 	if !dropForce {
-		fmt.Println("This is a Frappe app with a .weg development environment.")
-		fmt.Println()
-		fmt.Println("Options:")
-		fmt.Println("  1. Remove only .weg/ (keep the app)")
-		fmt.Println("  2. Remove everything (app + .weg)")
-		fmt.Println("  3. Cancel")
-		fmt.Println()
-		fmt.Print("Choose [1/2/3]: ")
+		output.Print("This is a Frappe app with a .weg development environment.")
+		output.Print("")
+		output.Print("Options:")
+		output.Print("  1. Remove only .weg/ (keep the app)")
+		output.Print("  2. Remove everything (app + .weg)")
+		output.Print("  3. Cancel")
+		output.Print("")
+		fmt.Fprint(prompt.Writer, "Choose [1/2/3]: ")
 
 		reader := bufio.NewReader(os.Stdin)
 		answer, _ := reader.ReadString('\n')
@@ -141,30 +139,27 @@ func handleAppWithWeg(appPath string) error {
 
 		switch answer {
 		case "1":
-			fmt.Println("Removing .weg/ directory...")
+			output.Info("Removing .weg/ directory...")
 			if err := os.RemoveAll(wegPath); err != nil {
 				return fmt.Errorf("failed to remove .weg: %w", err)
 			}
-			fmt.Println("✓ .weg/ removed. App preserved.")
+			output.Success(".weg/ removed. App preserved.")
 			return nil
 
 		case "2":
-			fmt.Print("Confirm removal of entire app directory? [y/N]: ")
-			confirm, _ := reader.ReadString('\n')
-			confirm = strings.TrimSpace(strings.ToLower(confirm))
-			if confirm != "y" && confirm != "yes" {
-				fmt.Println("Cancelled.")
+			if !prompt.ConfirmDanger("Remove entire app directory?") {
+				output.Print("Cancelled.")
 				return nil
 			}
-			fmt.Println("Removing entire app directory...")
+			output.Info("Removing entire app directory...")
 			if err := os.RemoveAll(appPath); err != nil {
 				return fmt.Errorf("failed to remove app: %w", err)
 			}
-			fmt.Println("✓ App and .weg/ removed.")
+			output.Success("App and .weg/ removed.")
 			return nil
 
 		default:
-			fmt.Println("Cancelled.")
+			output.Print("Cancelled.")
 			return nil
 		}
 	}
@@ -173,6 +168,6 @@ func handleAppWithWeg(appPath string) error {
 	if err := os.RemoveAll(wegPath); err != nil {
 		return fmt.Errorf("failed to remove .weg: %w", err)
 	}
-	fmt.Println("✓ .weg/ removed.")
+	output.Success(".weg/ removed.")
 	return nil
 }

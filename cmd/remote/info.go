@@ -60,9 +60,9 @@ func runInfo(cobraCmd *cobra.Command, args []string) error {
 		fmt.Println("Modules")
 		fmt.Println("-------")
 		for name, mod := range config.Modules {
-			syncStatus := "✓"
+			syncStatus := "+"
 			if !mod.Sync {
-				syncStatus = "✗"
+				syncStatus = "-"
 			}
 			fmt.Printf("  %s %-20s (app: %s)\n", syncStatus, name, mod.App)
 		}
@@ -99,9 +99,9 @@ func runInfo(cobraCmd *cobra.Command, args []string) error {
 }
 
 func printEntityStatus(name string, enabled bool) {
-	status := "✓"
+	status := "+"
 	if !enabled {
-		status = "✗"
+		status = "-"
 	}
 	fmt.Printf("  %s %s\n", status, name)
 }

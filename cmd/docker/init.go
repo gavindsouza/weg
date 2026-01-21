@@ -105,7 +105,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to write docker-compose.yml: %w", err)
 	}
 
-	fmt.Printf("✓ Generated docker-compose.yml\n")
+	fmt.Println("Generated docker-compose.yml")
 	fmt.Printf("  Mode: %s\n", initMode)
 	fmt.Printf("  Web port: %d\n", initWebPort)
 	if !initNoDb {

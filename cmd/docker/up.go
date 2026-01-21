@@ -63,7 +63,7 @@ func runUp(cmd *cobra.Command, args []string) error {
 
 	if upDetached {
 		fmt.Println()
-		fmt.Println("✓ Containers started in background")
+		fmt.Println("Containers started in background")
 		fmt.Println("  weg docker ps      # View status")
 		fmt.Println("  weg docker logs    # View logs")
 		fmt.Println("  weg docker down    # Stop containers")
