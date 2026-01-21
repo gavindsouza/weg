@@ -25,15 +25,20 @@ This command:
   4. Creates a git commit for the changes
 
 Examples:
-  weg pull                # Pull all changes
-  weg pull --dry-run      # Preview changes without applying`,
+  weg pull                       # Pull all changes
+  weg pull -m "Update scripts"   # Pull with custom commit message
+  weg pull --dry-run             # Preview changes without applying`,
 	RunE: runPull,
 }
 
-var pullDryRun bool
+var (
+	pullDryRun  bool
+	pullMessage string
+)
 
 func init() {
 	pullCmd.Flags().BoolVar(&pullDryRun, "dry-run", false, "Preview changes without applying")
+	pullCmd.Flags().StringVarP(&pullMessage, "message", "m", "", "Commit message for pulled changes")
 }
 
 func runPull(cobraCmd *cobra.Command, args []string) error {
@@ -98,8 +103,11 @@ func runPull(cobraCmd *cobra.Command, args []string) error {
 		gitAdd := exec.Command("git", "add", "-A")
 		gitAdd.Run()
 
-		commitMsg := fmt.Sprintf("Pull from %s at %s",
-			config.Site.URL, time.Now().Format("2006-01-02 15:04"))
+		commitMsg := pullMessage
+		if commitMsg == "" {
+			commitMsg = fmt.Sprintf("Pull from %s at %s",
+				config.Site.URL, time.Now().Format("2006-01-02 15:04"))
+		}
 		gitCommit := exec.Command("git", "commit", "-m", commitMsg)
 		gitCommit.Run()
 

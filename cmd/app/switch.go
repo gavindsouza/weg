@@ -7,6 +7,7 @@ import (
 	"github.com/gavindsouza/weg/internal/apps"
 	"github.com/gavindsouza/weg/internal/completion"
 	"github.com/gavindsouza/weg/internal/config"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/state"
 	"github.com/spf13/cobra"
 )
@@ -103,7 +104,7 @@ func runSwitch(cmd *cobra.Command, args []string) error {
 		appState.Branch = branch
 		st.Apps[appName] = appState
 		if err := st.Save(absPath); err != nil {
-			fmt.Printf("Warning: failed to save state: %v\n", err)
+			output.Warningf("Failed to save state: %v", err)
 		}
 	}
 

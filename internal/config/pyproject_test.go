@@ -241,7 +241,7 @@ name = "app3"
 	os.WriteFile(filepath.Join(app3Dir, "pyproject.toml"), []byte(app3Content), 0644)
 
 	// Collect services
-	packages, processes, err := CollectAppServices(appsDir)
+	packages, processes, _, err := CollectAppServices(appsDir)
 	if err != nil {
 		t.Fatalf("CollectAppServices failed: %v", err)
 	}
@@ -322,7 +322,7 @@ command = "redis-worker"
 	}
 
 	// Collect services
-	packages, processes, err := CollectAppServices(appsDir)
+	packages, processes, _, err := CollectAppServices(appsDir)
 	if err != nil {
 		t.Fatalf("CollectAppServices failed: %v", err)
 	}

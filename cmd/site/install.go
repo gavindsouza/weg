@@ -8,6 +8,7 @@ import (
 
 	"github.com/gavindsouza/weg/internal/completion"
 	"github.com/gavindsouza/weg/internal/config"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/state"
 	"github.com/spf13/cobra"
 )
@@ -118,7 +119,7 @@ func runInstall(cmd *cobra.Command, args []string) error {
 	}
 
 	if err := st.Save(absPath); err != nil {
-		fmt.Printf("Warning: failed to save state: %v\n", err)
+		output.Warningf("Failed to save state: %v", err)
 	}
 
 	fmt.Printf("Successfully installed %s on %s\n", appName, siteName)

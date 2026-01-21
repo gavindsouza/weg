@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"syscall"
 	"time"
 )
 
@@ -69,14 +70,38 @@ func NewState() *State {
 	}
 }
 
-// Load reads the state from the .weg directory
+// Load reads the state from the .weg directory with file locking
 func Load(basePath string) (*State, error) {
 	statePath := getStatePath(basePath)
 
+	// Check if file exists first (avoid creating lock file for non-existent state)
+	if _, err := os.Stat(statePath); os.IsNotExist(err) {
+		return NewState(), nil
+	}
+
+	// Acquire shared lock for reading
+	lockPath := statePath + ".lock"
+	lockFile, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0644)
+	if err != nil {
+		// Fall back to unlocked read if we can't create lock
+		return loadStateUnlocked(statePath)
+	}
+	defer lockFile.Close()
+
+	if err := syscall.Flock(int(lockFile.Fd()), syscall.LOCK_SH); err != nil {
+		// Fall back to unlocked read if locking fails
+		return loadStateUnlocked(statePath)
+	}
+	defer syscall.Flock(int(lockFile.Fd()), syscall.LOCK_UN)
+
+	return loadStateUnlocked(statePath)
+}
+
+// loadStateUnlocked reads state without locking (internal helper)
+func loadStateUnlocked(statePath string) (*State, error) {
 	data, err := os.ReadFile(statePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			// Return new state if file doesn't exist
 			return NewState(), nil
 		}
 		return nil, fmt.Errorf("failed to read state file: %w", err)
@@ -98,7 +123,7 @@ func Load(basePath string) (*State, error) {
 	return &state, nil
 }
 
-// Save writes the state to the .weg directory atomically
+// Save writes the state to the .weg directory atomically with file locking
 func (s *State) Save(basePath string) error {
 	wegDir := getWegDir(basePath)
 	statePath := getStatePath(basePath)
@@ -107,6 +132,19 @@ func (s *State) Save(basePath string) error {
 	if err := os.MkdirAll(wegDir, 0755); err != nil {
 		return fmt.Errorf("failed to create .weg directory: %w", err)
 	}
+
+	// Acquire exclusive lock
+	lockPath := statePath + ".lock"
+	lockFile, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to create lock file: %w", err)
+	}
+	defer lockFile.Close()
+
+	if err := syscall.Flock(int(lockFile.Fd()), syscall.LOCK_EX); err != nil {
+		return fmt.Errorf("failed to acquire state lock: %w", err)
+	}
+	defer syscall.Flock(int(lockFile.Fd()), syscall.LOCK_UN)
 
 	// Marshal state to JSON
 	data, err := json.MarshalIndent(s, "", "  ")
@@ -253,6 +291,65 @@ func (s *State) SiteNames() []string {
 		names = append(names, name)
 	}
 	return names
+}
+
+// Validate checks the state for consistency and returns any errors found
+func (s *State) Validate() []error {
+	var errs []error
+
+	// Check version
+	if s.Version == "" {
+		errs = append(errs, fmt.Errorf("state version is empty"))
+	} else if s.Version != StateVersion {
+		errs = append(errs, fmt.Errorf("state version mismatch: got %q, expected %q", s.Version, StateVersion))
+	}
+
+	// Check for apps with empty names
+	for name, app := range s.Apps {
+		if name == "" {
+			errs = append(errs, fmt.Errorf("app with empty name found"))
+		}
+		if app.Name != "" && app.Name != name {
+			errs = append(errs, fmt.Errorf("app %q has mismatched name field %q", name, app.Name))
+		}
+	}
+
+	// Check for sites with empty names
+	for name, site := range s.Sites {
+		if name == "" {
+			errs = append(errs, fmt.Errorf("site with empty name found"))
+		}
+		if site.Name != "" && site.Name != name {
+			errs = append(errs, fmt.Errorf("site %q has mismatched name field %q", name, site.Name))
+		}
+	}
+
+	// Check for multiple default sites
+	defaultCount := 0
+	for _, site := range s.Sites {
+		if site.DefaultSite {
+			defaultCount++
+		}
+	}
+	if defaultCount > 1 {
+		errs = append(errs, fmt.Errorf("multiple default sites found (%d)", defaultCount))
+	}
+
+	// Check that site apps reference known apps
+	for siteName, site := range s.Sites {
+		for _, appName := range site.Apps {
+			if _, ok := s.Apps[appName]; !ok {
+				errs = append(errs, fmt.Errorf("site %q references unknown app %q", siteName, appName))
+			}
+		}
+	}
+
+	return errs
+}
+
+// IsValid returns true if the state passes validation
+func (s *State) IsValid() bool {
+	return len(s.Validate()) == 0
 }
 
 // getWegDir returns the path to the .weg directory

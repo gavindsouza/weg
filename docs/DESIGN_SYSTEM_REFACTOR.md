@@ -1,7 +1,7 @@
 # Weg CLI Design System Refactor Plan
 
 **Created:** 2026-01-21
-**Status:** Phases 1-5 Complete
+**Status:** Complete
 **Scope:** Design system consistency, then logical inconsistencies
 
 ---
@@ -1494,12 +1494,12 @@ func removeApp(cmd *cobra.Command, args []string) error {
 
 ### 6.3 Acceptance Criteria
 
-- [ ] Push/pull symmetry fixed
-- [ ] All destructive ops have confirmation
-- [ ] Partial failures return non-zero
-- [ ] State save errors handled consistently
-- [ ] Incomplete commands completed or removed
-- [ ] State management issues fixed
+- [x] Push/pull symmetry fixed
+- [x] All destructive ops have confirmation
+- [x] Partial failures return non-zero
+- [x] State save errors handled consistently
+- [x] Incomplete commands completed or removed
+- [x] State management issues fixed
 
 ---
 
@@ -1511,7 +1511,7 @@ Phase 2: Errors Package         ████████████████
 Phase 3: Prompt Package         ████████████████████ ✓ Complete
 Phase 4: Flag Conventions       ████████████████████ ✓ Complete
 Phase 5: Apply to Commands      ████████████████████ ✓ Complete
-Phase 6: Logical Fixes          ░░░░░░░░░░░░░░░░░░░░   Pending
+Phase 6: Logical Fixes          ████████████████████ ✓ Complete
 ```
 
 ### Dependencies

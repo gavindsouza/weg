@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/gavindsouza/weg/internal/prompt"
 	"github.com/gavindsouza/weg/internal/remote"
 	"github.com/spf13/cobra"
 )
@@ -138,7 +139,18 @@ func runPush(cobraCmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Delete removed entities
+	// Delete removed entities (with confirmation)
+	if len(deletedEntities) > 0 && !pushForce {
+		fmt.Printf("\nThe following %d entities will be deleted from the remote:\n", len(deletedEntities))
+		for _, e := range deletedEntities {
+			fmt.Printf("  - %s: %s\n", e.entityType, e.name)
+		}
+		if !prompt.ConfirmDanger("Delete these entities from remote?") {
+			fmt.Println("Skipping deletions")
+			deletedEntities = nil
+		}
+	}
+
 	for _, e := range deletedEntities {
 		if err := deleteEntity(client, e); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: Failed to delete %s: %v\n", e.name, err)

@@ -40,10 +40,15 @@ func syncAppServices(benchPath string) error {
 	appsDir := filepath.Join(benchPath, "apps")
 
 	// Collect services from all apps
-	packages, processes, err := config.CollectAppServices(appsDir)
+	packages, processes, warnings, err := config.CollectAppServices(appsDir)
 	if err != nil {
 		PrintVerbose("Warning: failed to collect app services: %v", err)
 		return nil // Non-fatal
+	}
+
+	// Log any parse warnings
+	for _, warn := range warnings {
+		PrintVerbose("Warning: %s", warn)
 	}
 
 	// Add packages to devbox.json

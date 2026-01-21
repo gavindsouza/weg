@@ -122,14 +122,14 @@ func HasWegSection(path string) bool {
 }
 
 // CollectAppServices reads [tool.weg.services] from all apps in appsDir
-// Returns merged packages and processes from all apps
-func CollectAppServices(appsDir string) (packages []string, processes map[string]AppProcessConfig, err error) {
+// Returns merged packages and processes from all apps, along with any parse warnings
+func CollectAppServices(appsDir string) (packages []string, processes map[string]AppProcessConfig, warnings []string, err error) {
 	processes = make(map[string]AppProcessConfig)
 	seenPackages := make(map[string]bool)
 
 	entries, err := os.ReadDir(appsDir)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to read apps directory: %w", err)
+		return nil, nil, nil, fmt.Errorf("failed to read apps directory: %w", err)
 	}
 
 	for _, entry := range entries {
@@ -144,12 +144,13 @@ func CollectAppServices(appsDir string) (packages []string, processes map[string
 
 		data, err := os.ReadFile(pyprojectPath)
 		if err != nil {
-			continue // Skip apps without pyproject.toml
+			continue // Skip apps without pyproject.toml (not a warning, expected)
 		}
 
 		var pf pyprojectFile
 		if err := toml.Unmarshal(data, &pf); err != nil {
-			continue // Skip invalid pyproject.toml
+			warnings = append(warnings, fmt.Sprintf("%s: failed to parse pyproject.toml: %v", entry.Name(), err))
+			continue
 		}
 
 		// Collect packages (deduplicated)
@@ -166,7 +167,7 @@ func CollectAppServices(appsDir string) (packages []string, processes map[string
 		}
 	}
 
-	return packages, processes, nil
+	return packages, processes, warnings, nil
 }
 
 // ValidateAppConfig validates the app configuration

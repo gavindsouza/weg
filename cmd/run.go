@@ -13,6 +13,7 @@ import (
 
 	"github.com/gavindsouza/weg/internal/apps"
 	"github.com/gavindsouza/weg/internal/config"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/services"
 	"github.com/gavindsouza/weg/internal/state"
 	"github.com/gavindsouza/weg/tools"
@@ -279,7 +280,9 @@ apps = ["frappe", "%s"]
 	})
 
 	// Save state
-	st.Save(wegPath)
+	if err := st.Save(wegPath); err != nil {
+		output.Warningf("Failed to save state: %v", err)
+	}
 
 	// Step 8: Start the server
 	PrintInfo("")

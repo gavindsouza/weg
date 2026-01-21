@@ -8,8 +8,12 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
+// ConfigVersion is the current weg.toml format version
+const ConfigVersion = "1"
+
 // BenchConfig represents a weg.toml configuration file
 type BenchConfig struct {
+	Version  string                 `toml:"version,omitempty"` // Config format version
 	Bench    BenchSettings          `toml:"bench"`
 	Frappe   FrappeSettings         `toml:"frappe"`
 	Apps     map[string]AppSettings `toml:"apps"`
@@ -89,6 +93,11 @@ func ParseWegToml(path string) (*BenchConfig, error) {
 	var config BenchConfig
 	if err := toml.Unmarshal(data, &config); err != nil {
 		return nil, fmt.Errorf("failed to parse weg.toml: %w", err)
+	}
+
+	// Check version compatibility
+	if config.Version != "" && config.Version != ConfigVersion {
+		return nil, fmt.Errorf("weg.toml version %q is not supported (expected %q)", config.Version, ConfigVersion)
 	}
 
 	// Apply defaults

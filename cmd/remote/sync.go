@@ -116,6 +116,7 @@ func runSync(cobraCmd *cobra.Command, args []string) error {
 	// Step 2: Push local changes to remote
 	fmt.Println("\n[2/3] Pushing to remote...")
 
+	var pushFailed int
 	if syncDryRun {
 		entities, _ := findLocalEntities(".")
 		fmt.Printf("  Would push %d entities\n", len(entities))
@@ -126,16 +127,15 @@ func runSync(cobraCmd *cobra.Command, args []string) error {
 		}
 
 		pushed := 0
-		failed := 0
 		for _, e := range entities {
 			if err := pushEntity(client, e); err != nil {
 				fmt.Fprintf(os.Stderr, "Error: Failed: %s - %v\n", e.name, err)
-				failed++
+				pushFailed++
 			} else {
 				pushed++
 			}
 		}
-		fmt.Printf("  Pushed: %d, Failed: %d\n", pushed, failed)
+		fmt.Printf("  Pushed: %d, Failed: %d\n", pushed, pushFailed)
 	}
 
 	// Step 3: Pull remote changes (to get any other changes from remote)
@@ -172,7 +172,12 @@ func runSync(cobraCmd *cobra.Command, args []string) error {
 	fmt.Printf("  Fetched %d entities\n", len(result.Entities))
 
 	fmt.Println()
-	fmt.Println("Sync complete")
 
+	if pushFailed > 0 {
+		fmt.Printf("Sync completed with %d failures\n", pushFailed)
+		return fmt.Errorf("%d entities failed to sync", pushFailed)
+	}
+
+	fmt.Println("Sync complete")
 	return nil
 }
