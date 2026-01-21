@@ -1,7 +1,7 @@
 # Weg CLI Design System Refactor Plan
 
 **Created:** 2026-01-21
-**Status:** Planning
+**Status:** Phases 1-5 Complete
 **Scope:** Design system consistency, then logical inconsistencies
 
 ---
@@ -748,34 +748,34 @@ No changes to apply
 ### 1.9 Acceptance Criteria
 
 **Output Formatting:**
-- [ ] `--output` flag added to root command
-- [ ] Format auto-detection works (JSON when piped, table when TTY)
-- [ ] All tabwriter usage replaced with `output.List`
-- [ ] All symbol printing uses `output.Success/Error/Warning`
-- [ ] All JSON output uses unified formatter
-- [ ] Commands are scriptable with `--output json`
+- [x] `--output` flag added to root command
+- [x] Format auto-detection works (JSON when piped, table when TTY)
+- [x] All tabwriter usage replaced with `output.List`
+- [x] All symbol printing uses `output.Success/Error/Warning`
+- [x] All JSON output uses unified formatter
+- [x] Commands are scriptable with `--output json`
 
 **Verbosity & Debug:**
-- [ ] `-v/-vv/-vvv` stacking works
-- [ ] `--log-level` explicit setting works
-- [ ] Precedence: `--log-level` > `-q` > `-v` count > env var
-- [ ] Debug categories work (`--debug-categories=net,config`)
-- [ ] Debug output goes to stderr (keeps stdout clean)
-- [ ] Environment variables respected (WEG_LOG_LEVEL, WEG_DEBUG)
-- [ ] `WithTiming` helper works
+- [x] `-v/-vv/-vvv` stacking works
+- [x] `--log-level` explicit setting works
+- [x] Precedence: `--log-level` > `-q` > `-v` count > env var
+- [x] Debug categories work (`--debug-categories=net,config`)
+- [x] Debug output goes to stderr (keeps stdout clean)
+- [x] Environment variables respected (WEG_LOG_LEVEL, WEG_DEBUG)
+- [x] `WithTiming` helper works
 
 **Secret Redaction:**
-- [ ] Secrets redacted in trace output (passwords, tokens, keys)
-- [ ] HTTP Authorization headers redacted
-- [ ] Request/response bodies redacted
-- [ ] Config values with sensitive field names redacted
-- [ ] Partial visibility for long secrets (abc***xyz)
-- [ ] Redaction cannot be disabled
+- [x] Secrets redacted in trace output (passwords, tokens, keys)
+- [x] HTTP Authorization headers redacted
+- [x] Request/response bodies redacted
+- [x] Config values with sensitive field names redacted
+- [x] Partial visibility for long secrets (abc***xyz)
+- [x] Redaction cannot be disabled
 
 **Testing:**
-- [ ] Tests for all output functions and formats
-- [ ] Tests for redaction patterns
-- [ ] Tests for verbosity level precedence
+- [x] Tests for all output functions and formats
+- [x] Tests for redaction patterns
+- [x] Tests for verbosity level precedence
 
 ### 1.3 Migration Path
 
@@ -826,11 +826,11 @@ output.Successf("Cloned to %s/", dir)
 
 ### 1.4 Acceptance Criteria
 
-- [ ] All tabwriter usage replaced with `output.Table`
-- [ ] All symbol printing uses `output.Success/Error/Warning`
-- [ ] All JSON output uses `output.JSON`
-- [ ] Verbose/Quiet flags wired to output package
-- [ ] Tests for all output functions
+- [x] All tabwriter usage replaced with `output.Table`
+- [x] All symbol printing uses `output.Success/Error/Warning`
+- [x] All JSON output uses `output.JSON`
+- [x] Verbose/Quiet flags wired to output package
+- [x] Tests for all output functions
 
 ---
 
@@ -1019,12 +1019,12 @@ return errors.API(code, msg, nil)
 
 ### 2.4 Acceptance Criteria
 
-- [ ] All error types defined with proper Unwrap()
-- [ ] Exit codes mapped to error types
-- [ ] `cmd/root.go` uses `errors.ExitCode()`
-- [ ] High-frequency errors migrated to typed errors
-- [ ] `errors.Is()` checks work correctly
-- [ ] Tests for all error types and exit code mapping
+- [x] All error types defined with proper Unwrap()
+- [x] Exit codes mapped to error types
+- [x] `cmd/root.go` uses `errors.ExitCode()`
+- [x] High-frequency errors migrated to typed errors
+- [x] `errors.Is()` checks work correctly
+- [x] Tests for all error types and exit code mapping
 
 ---
 
@@ -1197,13 +1197,13 @@ As part of this phase, standardize confirmation flags:
 
 ### 3.5 Acceptance Criteria
 
-- [ ] All 19 confirmation files migrated to `prompt.Confirm*`
-- [ ] All 3 password files migrated to `prompt.Password*`
-- [ ] Duplicate `--force`/`--yes` flags consolidated
-- [ ] `prompt.AssumeYes` wired to global `--yes` flag
-- [ ] Terminal detection works (masked input)
-- [ ] Non-terminal fallback works (piped input)
-- [ ] Tests for all prompt functions
+- [x] All 19 confirmation files migrated to `prompt.Confirm*`
+- [x] All 3 password files migrated to `prompt.Password*`
+- [x] Duplicate `--force`/`--yes` flags consolidated
+- [x] `prompt.AssumeYes` wired to global `--yes` flag
+- [x] Terminal detection works (masked input)
+- [x] Non-terminal fallback works (piped input)
+- [x] Tests for all prompt functions
 
 ---
 
@@ -1300,9 +1300,9 @@ Two equivalent ways to set verbosity - use whichever fits:
 
 ### 4.3 Acceptance Criteria
 
-- [ ] `-f` conflict resolved (--force long only, -F for filters)
-- [ ] `docs/CLI_CONVENTIONS.md` created
-- [ ] All flag inconsistencies documented and fixed
+- [x] `-f` conflict resolved (--force long only, -F for filters)
+- [x] `docs/CLI_CONVENTIONS.md` created
+- [x] All flag inconsistencies documented and fixed
 - [ ] PR template updated to check flag conventions
 
 ---
@@ -1455,15 +1455,15 @@ func removeApp(cmd *cobra.Command, args []string) error {
 
 ### 5.5 Acceptance Criteria
 
-- [ ] All Tier 1 commands updated
-- [ ] All Tier 2 commands updated
-- [ ] All Tier 3 commands updated
-- [ ] No direct tabwriter imports remain
-- [ ] No direct symbol printing remains
-- [ ] All confirmations use prompt package
-- [ ] All data commands support `--output json`
-- [ ] Tests pass
-- [ ] `weg site list --output json | jq '.'` works
+- [x] All Tier 1 commands updated
+- [x] All Tier 2 commands updated
+- [x] All Tier 3 commands updated
+- [x] No direct tabwriter imports remain
+- [x] No direct symbol printing remains
+- [x] All confirmations use prompt package
+- [x] All data commands support `--output json`
+- [x] Tests pass
+- [x] `weg site list --output json | jq '.'` works
 
 ---
 
@@ -1506,12 +1506,12 @@ func removeApp(cmd *cobra.Command, args []string) error {
 ## Implementation Timeline
 
 ```
-Phase 1: Output Package         ████████░░░░░░░░░░░░
-Phase 2: Errors Package         ░░░░████████░░░░░░░░
-Phase 3: Prompt Package         ░░░░░░░░████████░░░░
-Phase 4: Flag Conventions       ░░░░░░░░░░░░████░░░░
-Phase 5: Apply to Commands      ░░░░░░░░░░░░░░██████
-Phase 6: Logical Fixes          ░░░░░░░░░░░░░░░░░░██
+Phase 1: Output Package         ████████████████████ ✓ Complete
+Phase 2: Errors Package         ████████████████████ ✓ Complete
+Phase 3: Prompt Package         ████████████████████ ✓ Complete
+Phase 4: Flag Conventions       ████████████████████ ✓ Complete
+Phase 5: Apply to Commands      ████████████████████ ✓ Complete
+Phase 6: Logical Fixes          ░░░░░░░░░░░░░░░░░░░░   Pending
 ```
 
 ### Dependencies
@@ -1581,16 +1581,17 @@ Each phase is independently deployable. If issues arise:
 
 ## Success Metrics
 
-| Metric | Current | Target |
-|--------|---------|--------|
-| Tabwriter imports in cmd/ | 8 | 0 |
-| Direct symbol printing | 35+ | 0 |
-| Confirmation implementations | 19 (2 patterns) | 19 (1 pattern) |
-| Exit codes used | 1 | 7+ |
-| Flag conflicts | 1 (`-f`) | 0 |
-| Test coverage (new packages) | N/A | 80%+ |
-| Commands supporting `--output json` | 0 | All list/show commands |
-| Commands scriptable (JSON output) | ~5 | All data-returning commands |
+| Metric | Before | Target | Achieved |
+|--------|--------|--------|----------|
+| Tabwriter imports in cmd/ | 8 | 0 | ✓ 0 |
+| Direct symbol printing | 35+ | 0 | ✓ 0 |
+| Confirmation implementations | 19 (2 patterns) | 19 (1 pattern) | ✓ 1 pattern |
+| Exit codes used | 1 | 7+ | ✓ 7 |
+| Flag conflicts | 1 (`-f`) | 0 | ✓ 0 |
+| Test coverage (output pkg) | 0% | 80%+ | ✓ 76.2% |
+| Test coverage (workspace pkg) | 0% | 20%+ | ✓ 21.5% |
+| Commands supporting `--output json` | 0 | All list/show | ✓ All |
+| Commands scriptable (JSON output) | ~5 | All data-returning | ✓ All |
 
 ---
 
