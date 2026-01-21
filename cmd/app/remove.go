@@ -1,22 +1,20 @@
 package app
 
 import (
-	"bufio"
 	"fmt"
-	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/gavindsouza/weg/internal/apps"
 	"github.com/gavindsouza/weg/internal/completion"
 	"github.com/gavindsouza/weg/internal/config"
+	"github.com/gavindsouza/weg/internal/output"
+	"github.com/gavindsouza/weg/internal/prompt"
 	"github.com/gavindsouza/weg/internal/state"
 	"github.com/spf13/cobra"
 )
 
 var (
 	forceRemove bool
-	yesRemove   bool
 )
 
 var removeCmd = &cobra.Command{
@@ -29,15 +27,14 @@ This uninstalls the app and removes it from the configuration.
 
 Examples:
   weg app remove erpnext
-  weg app rm erpnext -y`,
+  weg app rm erpnext --force`,
 	Args:              cobra.ExactArgs(1),
 	RunE:              runRemove,
 	ValidArgsFunction: completion.CompleteInstalledAppNames,
 }
 
 func init() {
-	removeCmd.Flags().BoolVarP(&forceRemove, "force", "f", false, "Force removal without confirmation")
-	removeCmd.Flags().BoolVarP(&yesRemove, "yes", "y", false, "Skip confirmation prompt")
+	removeCmd.Flags().BoolVar(&forceRemove, "force", false, "Skip confirmation prompt")
 }
 
 func runRemove(cmd *cobra.Command, args []string) error {
@@ -86,18 +83,12 @@ func runRemove(cmd *cobra.Command, args []string) error {
 	}
 
 	// Confirm
-	if !forceRemove && !yesRemove {
-		fmt.Printf("Remove app %s? This cannot be undone. [y/N]: ", appName)
-		reader := bufio.NewReader(os.Stdin)
-		answer, _ := reader.ReadString('\n')
-		answer = strings.TrimSpace(strings.ToLower(answer))
-		if answer != "y" && answer != "yes" {
-			fmt.Println("Cancelled.")
-			return nil
-		}
+	if !forceRemove && !prompt.ConfirmDanger("Remove app %s?", appName) {
+		output.Print("Cancelled.")
+		return nil
 	}
 
-	fmt.Printf("Removing %s...\n", appName)
+	output.Infof("Removing %s...", appName)
 
 	// Remove the app
 	opts := apps.InstallOptions{
@@ -115,8 +106,8 @@ func runRemove(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to save state: %w", err)
 	}
 
-	fmt.Printf("Successfully removed %s\n", appName)
-	fmt.Println("Note: Remember to remove the app from weg.toml if desired")
+	output.Successf("Removed %s", appName)
+	output.Info("Note: Remember to remove the app from weg.toml if desired")
 
 	return nil
 }

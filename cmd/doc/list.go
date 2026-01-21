@@ -19,7 +19,7 @@ var listCmd = &cobra.Command{
 Examples:
   weg doc list User
   weg doc list User --limit 50
-  weg doc list User --filters '{"enabled":1}'
+  weg doc list User -F '{"enabled":1}'
   weg doc list User --fields '["name","email","enabled"]'`,
 	Args:              cobra.ExactArgs(1),
 	RunE:              runList,
@@ -37,7 +37,7 @@ var (
 func init() {
 	DocCmd.AddCommand(listCmd)
 	listCmd.Flags().StringVarP(&listSite, "site", "s", "", "Site to query")
-	listCmd.Flags().StringVarP(&listFilters, "filters", "f", "", "JSON filter object")
+	listCmd.Flags().StringVarP(&listFilters, "filters", "F", "", "JSON filter object")
 	listCmd.Flags().StringVar(&listFields, "fields", "", "JSON array of fields")
 	listCmd.Flags().IntVarP(&listLimit, "limit", "l", 20, "Limit results")
 	listCmd.Flags().StringVar(&listOrderBy, "order-by", "", "Order by field")

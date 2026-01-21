@@ -40,7 +40,7 @@ var (
 func init() {
 	AppCmd.AddCommand(reinstallCmd)
 	reinstallCmd.Flags().StringVar(&reinstallSite, "site", "", "Site to reinstall app on")
-	reinstallCmd.Flags().BoolVarP(&reinstallForce, "force", "f", false, "Skip confirmation")
+	reinstallCmd.Flags().BoolVar(&reinstallForce, "force", false, "Skip confirmation")
 }
 
 func runReinstall(cmd *cobra.Command, args []string) error {

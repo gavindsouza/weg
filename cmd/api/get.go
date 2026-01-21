@@ -27,7 +27,7 @@ If doctype/name is provided, returns a single document.
 Examples:
   weg api get User                              # List all Users
   weg api get User/Administrator                # Get specific User
-  weg api get User --filters '{"enabled":1}'    # Filter results
+  weg api get User -F '{"enabled":1}'            # Filter results
   weg api get User --fields '["name","email"]'  # Select fields
   weg api get User --limit 10                   # Limit results
   weg api get "Sales Invoice" --order-by "creation desc"`,
@@ -37,7 +37,7 @@ Examples:
 }
 
 func init() {
-	getCmd.Flags().StringVarP(&getFilters, "filters", "f", "", "JSON filter object")
+	getCmd.Flags().StringVarP(&getFilters, "filters", "F", "", "JSON filter object")
 	getCmd.Flags().StringVar(&getFields, "fields", "", "JSON array of fields to return")
 	getCmd.Flags().IntVarP(&getLimit, "limit", "l", 20, "Maximum number of results")
 	getCmd.Flags().StringVar(&getOrderBy, "order-by", "", "Order by field (e.g. 'creation desc')")
