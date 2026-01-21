@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -29,7 +30,7 @@ func runPush(cmd *cobra.Command, args []string) error {
 		runtime = "podman"
 	}
 
-	fmt.Printf("Pushing %s...\n", imageTag)
+	output.Infof("Pushing %s...\n", imageTag)
 
 	execCmd := exec.Command(runtime, "push", imageTag)
 	execCmd.Stdout = os.Stdout
@@ -39,6 +40,6 @@ func runPush(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("push failed: %w", err)
 	}
 
-	fmt.Printf("Successfully pushed %s\n", imageTag)
+	output.Successf("Successfully pushed %s\n", imageTag)
 	return nil
 }

@@ -80,7 +80,7 @@ func runInstall(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("app %s is not installed. Run 'weg app get %s' first", appName, appName)
 	}
 
-	fmt.Printf("Installing %s on %s...\n", appName, siteName)
+	output.Infof("Installing %s on %s...", appName, siteName)
 
 	// Run bench install-app
 	benchCmd := exec.Command("bench", "--site", siteName, "install-app", appName)
@@ -122,6 +122,6 @@ func runInstall(cmd *cobra.Command, args []string) error {
 		output.Warningf("Failed to save state: %v", err)
 	}
 
-	fmt.Printf("Successfully installed %s on %s\n", appName, siteName)
+	output.Successf("Successfully installed %s on %s", appName, siteName)
 	return nil
 }

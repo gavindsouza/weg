@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/gavindsouza/weg/internal/config"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/prompt"
 	"github.com/spf13/cobra"
 )
@@ -96,7 +97,7 @@ func runDeploy(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	fmt.Printf("Deploying %s to %s...\n", appName, siteName)
+	output.Infof("Deploying %s to %s...\n", appName, siteName)
 
 	if deployDryRun {
 		fmt.Println("\nDry run - no changes applied")

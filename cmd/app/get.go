@@ -8,6 +8,7 @@ import (
 
 	"github.com/gavindsouza/weg/internal/apps"
 	"github.com/gavindsouza/weg/internal/config"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/state"
 	"github.com/spf13/cobra"
 )
@@ -70,7 +71,7 @@ func runGet(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("app %s is already installed", appName)
 	}
 
-	fmt.Printf("Installing %s...\n", appName)
+	output.Infof("Installing %s...", appName)
 
 	// Install the app
 	opts := apps.InstallOptions{
@@ -97,11 +98,11 @@ func runGet(cmd *cobra.Command, args []string) error {
 	// Also update config file
 	if result.Context == config.ContextWegBench {
 		if err := addAppToWegToml(absPath, appName, appURL, branch); err != nil {
-			fmt.Printf("Warning: failed to update weg.toml: %v\n", err)
+			output.Warningf("Failed to update weg.toml: %v", err)
 		}
 	}
 
-	fmt.Printf("Successfully installed %s\n", appName)
+	output.Successf("Installed %s", appName)
 	return nil
 }
 

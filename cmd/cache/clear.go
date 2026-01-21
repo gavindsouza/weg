@@ -7,6 +7,7 @@ import (
 
 	"github.com/gavindsouza/weg/internal/api"
 	"github.com/gavindsouza/weg/internal/config"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/state"
 	"github.com/spf13/cobra"
 )
@@ -107,7 +108,7 @@ func runClear(cmd *cobra.Command, args []string) error {
 
 	// Clear cache for each site
 	for _, site := range sites {
-		fmt.Printf("Clearing cache for %s...\n", site)
+		output.Infof("Clearing cache for %s...\n", site)
 
 		executor := api.NewExecutor(benchPath, site, "Administrator")
 

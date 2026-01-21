@@ -8,6 +8,7 @@ import (
 
 	"github.com/gavindsouza/weg/internal/api"
 	"github.com/gavindsouza/weg/internal/completion"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -53,7 +54,7 @@ func runImport(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("no fixtures directory found at %s", fixturesPath)
 	}
 
-	fmt.Printf("Importing fixtures for %s into %s...\n", appName, site)
+	output.Infof("Importing fixtures for %s into %s...\n", appName, site)
 
 	executor := api.NewExecutor(benchPath, site, "Administrator")
 

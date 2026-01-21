@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"time"
 
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/remote"
 	"github.com/spf13/cobra"
 )
@@ -59,7 +60,7 @@ func runPull(cobraCmd *cobra.Command, args []string) error {
 	}
 
 	// Connect
-	fmt.Printf("Connecting to %s...\n", config.Site.URL)
+	output.Infof("Connecting to %s...\n", config.Site.URL)
 	client := remote.NewClientFromConfig(config, creds)
 	if err := client.Ping(); err != nil {
 		return fmt.Errorf("failed to connect: %w", err)
@@ -83,7 +84,7 @@ func runPull(cobraCmd *cobra.Command, args []string) error {
 	}
 
 	// Write entities
-	fmt.Printf("Updating %d entities...\n", len(result.Entities))
+	output.Infof("Updating %d entities...\n", len(result.Entities))
 	for _, entity := range result.Entities {
 		if err := remote.WriteEntity(".", entity); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: Failed to write %s: %v\n", entity.Name, err)

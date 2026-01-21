@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/gavindsouza/weg/internal/config"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/state"
 	"github.com/spf13/cobra"
 )
@@ -97,7 +98,7 @@ func runMigrate(cmd *cobra.Command, args []string) error {
 
 	// Run migrations for each site
 	for _, site := range sites {
-		fmt.Printf("Running migrations for %s...\n", site)
+		output.Infof("Running migrations for %s...\n", site)
 
 		cmdArgs := []string{"frappe", "--site", site, "migrate"}
 		if err := runBench(benchPath, cmdArgs); err != nil {

@@ -10,6 +10,7 @@ import (
 
 	"github.com/gavindsouza/weg/internal/api"
 	"github.com/gavindsouza/weg/internal/config"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/state"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
@@ -112,7 +113,7 @@ func runPassword(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("password must be at least 4 characters")
 	}
 
-	fmt.Printf("Setting password for %s on %s...\n", user, site)
+	output.Infof("Setting password for %s on %s...", user, site)
 
 	// Execute password update
 	executor := api.NewExecutor(benchPath, site, "Administrator")

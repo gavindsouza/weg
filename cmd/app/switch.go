@@ -72,7 +72,7 @@ func runSwitch(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	fmt.Printf("Switching %s from %s to %s...\n", appName, currentBranch, branch)
+	output.Infof("Switching %s from %s to %s...", appName, currentBranch, branch)
 
 	// Checkout the new branch
 	if err := apps.Checkout(appPath, branch); err != nil {
@@ -108,7 +108,7 @@ func runSwitch(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	fmt.Printf("Successfully switched %s to %s\n", appName, branch)
+	output.Successf("Successfully switched %s to %s", appName, branch)
 	fmt.Println("Note: Remember to update weg.toml and run 'weg build' if needed")
 
 	return nil

@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/prompt"
 	"github.com/gavindsouza/weg/internal/remote"
 	"github.com/spf13/cobra"
@@ -111,7 +112,7 @@ func runPush(cobraCmd *cobra.Command, args []string) error {
 	}
 
 	// Connect
-	fmt.Printf("Connecting to %s...\n", config.Site.URL)
+	output.Infof("Connecting to %s...\n", config.Site.URL)
 	client := remote.NewClientFromConfig(config, creds)
 	if err := client.Ping(); err != nil {
 		return fmt.Errorf("failed to connect: %w", err)
@@ -125,7 +126,7 @@ func runPush(cobraCmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	fmt.Printf("Pushing %d changes...\n", totalChanges)
+	output.Infof("Pushing %d changes...\n", totalChanges)
 	pushed := 0
 	deleted := 0
 	failed := 0

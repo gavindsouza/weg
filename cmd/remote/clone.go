@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/remote"
 	"github.com/gavindsouza/weg/internal/workspace"
 	"github.com/schollz/progressbar/v3"
@@ -187,7 +188,7 @@ func runClone(cobraCmd *cobra.Command, args []string) error {
 	}
 
 	// Create client and test connection
-	fmt.Printf("Connecting to %s...\n", siteURL)
+	output.Infof("Connecting to %s...\n", siteURL)
 	client := remote.NewClient(siteURL, apiKey, apiSecret)
 
 	if err := client.Ping(); err != nil {
@@ -416,7 +417,7 @@ func runClone(cobraCmd *cobra.Command, args []string) error {
 				gitCommit.Dir = dirName
 				gitCommit.Run()
 			} else {
-				fmt.Printf("Reconstructing %d commits from version history...\n", len(commitPlan))
+				output.Infof("Reconstructing %d commits from version history...\n", len(commitPlan))
 
 				bar := progressbar.NewOptions(len(commitPlan),
 					progressbar.OptionSetDescription("Creating commits"),

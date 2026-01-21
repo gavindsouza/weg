@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/gavindsouza/weg/internal/api"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -67,7 +68,7 @@ func runClear(cmd *cobra.Command, args []string) error {
 				// Clear node_modules in app source
 				nodeDir := filepath.Join(appsDir, e.Name(), "node_modules")
 				if _, err := os.Stat(nodeDir); err == nil {
-					fmt.Printf("Removing %s/node_modules...\n", e.Name())
+					output.Infof("Removing %s/node_modules...\n", e.Name())
 					os.RemoveAll(nodeDir)
 					cleared++
 				}

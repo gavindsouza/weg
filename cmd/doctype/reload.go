@@ -8,6 +8,7 @@ import (
 
 	"github.com/gavindsouza/weg/internal/api"
 	"github.com/gavindsouza/weg/internal/completion"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -45,7 +46,7 @@ func runReload(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	fmt.Printf("Reloading %s.%s.%s on %s...\n", appName, moduleName, doctype, site)
+	output.Infof("Reloading %s.%s.%s on %s...\n", appName, moduleName, doctype, site)
 
 	executor := api.NewExecutor(benchPath, site, "Administrator")
 

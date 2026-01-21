@@ -13,6 +13,7 @@ import (
 
 	"github.com/gavindsouza/weg/internal/completion"
 	"github.com/gavindsouza/weg/internal/config"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/state"
 	"github.com/spf13/cobra"
 )
@@ -129,7 +130,7 @@ func runBackup(cmd *cobra.Command, args []string) error {
 
 	// Backup each site
 	for _, site := range sites {
-		fmt.Printf("Backing up %s...\n", site)
+		output.Infof("Backing up %s...", site)
 
 		siteConfig, err := loadSiteConfig(benchPath, site)
 		if err != nil {

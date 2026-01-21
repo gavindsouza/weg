@@ -9,6 +9,7 @@ import (
 	"github.com/gavindsouza/weg/internal/api"
 	"github.com/gavindsouza/weg/internal/completion"
 	"github.com/gavindsouza/weg/internal/config"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/state"
 	"github.com/spf13/cobra"
 )
@@ -54,7 +55,7 @@ func runExport(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("app %s not found", appName)
 	}
 
-	fmt.Printf("Exporting fixtures for %s from %s...\n", appName, site)
+	output.Infof("Exporting fixtures for %s from %s...\n", appName, site)
 
 	executor := api.NewExecutor(benchPath, site, "Administrator")
 

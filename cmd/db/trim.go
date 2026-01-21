@@ -8,6 +8,7 @@ import (
 
 	"github.com/gavindsouza/weg/internal/api"
 	"github.com/gavindsouza/weg/internal/config"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/state"
 	"github.com/spf13/cobra"
 )
@@ -77,7 +78,7 @@ func runTrim(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("no site specified and no default site found")
 	}
 
-	fmt.Printf("Trimming log tables for %s (keeping last %d days)...\n", site, trimDays)
+	output.Infof("Trimming log tables for %s (keeping last %d days)...\n", site, trimDays)
 
 	executor := api.NewExecutor(benchPath, site, "Administrator")
 

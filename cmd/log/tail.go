@@ -10,6 +10,7 @@ import (
 	"syscall"
 
 	"github.com/gavindsouza/weg/internal/config"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/state"
 	"github.com/spf13/cobra"
 )
@@ -63,7 +64,7 @@ func runTail(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("no log files found for type '%s'", logType)
 	}
 
-	fmt.Printf("Tailing logs for %s (type: %s)...\n", site, logType)
+	output.Infof("Tailing logs for %s (type: %s)...\n", site, logType)
 	fmt.Println("Press Ctrl+C to stop")
 
 	// Use tail -f to follow logs

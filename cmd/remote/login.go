@@ -10,6 +10,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/remote"
 	"github.com/spf13/cobra"
 )
@@ -107,7 +108,7 @@ func runLogin(cobraCmd *cobra.Command, args []string) error {
 	}
 
 	// Test connection
-	fmt.Printf("Testing connection to %s...\n", siteURL)
+	output.Infof("Testing connection to %s...\n", siteURL)
 	client := remote.NewClient(siteURL, apiKey, apiSecret)
 	if err := client.Ping(); err != nil {
 		return fmt.Errorf("failed to connect: %w", err)

@@ -52,6 +52,7 @@ This creates a git-backed directory mirroring the site's customizations, enablin
 - **Declarative configuration** via `weg.toml` or `pyproject.toml`
 - **Modern tooling** - devbox (Nix), uv (fast Python), process-compose
 - **Direct API access** - `weg api` without HTTP overhead
+- **Container support** - Docker Compose generation and production image builds
 - **70+ commands** covering all common Frappe development workflows
 - **Works from anywhere** - run commands from any subdirectory within your project
 
@@ -182,6 +183,24 @@ weg cloud deploy mysite          # Deploy to cloud
 weg cloud logs mysite            # View site logs
 ```
 
+### Docker & Containers
+
+```bash
+# Docker Compose for local development
+weg docker init                  # Generate docker-compose.yml
+weg docker init --mode prod      # Generate for production
+weg docker up                    # Start containers
+weg docker down                  # Stop containers
+weg docker logs                  # View container logs
+weg docker ps                    # List running containers
+
+# Build production images
+weg image build                  # Build container image
+weg image build --tag myapp:v1   # Custom tag
+weg image build --push           # Build and push to registry
+weg image list                   # List local images
+```
+
 ## Configuration
 
 Weg uses `weg.toml` for bench-centric projects or `pyproject.toml [tool.weg]` for app-centric projects.
@@ -229,6 +248,8 @@ default = "dev.localhost"
 
 ## Customizing Services
 
+### Process Compose (Development)
+
 Weg generates `process-compose.yaml` for running development services. You can customize it by creating `process-compose.override.yaml`:
 
 ```yaml
@@ -252,17 +273,56 @@ processes:
 
 The override file is automatically included when present (uses process-compose's native include feature).
 
+### Docker Compose (Containerized)
+
+For containerized development or production deployments, generate a Docker Compose configuration:
+
+```bash
+weg docker init                    # Development mode
+weg docker init --mode prod        # Production mode
+weg docker init --no-db            # External database
+weg docker init --web-port 8080    # Custom port
+```
+
+This generates a `docker-compose.yml` with all required services (web, workers, scheduler, socketio, database, Redis). Customize by editing the generated file or using Docker Compose overrides.
+
+### Building Production Images
+
+Build OCI-compliant container images for deployment:
+
+```bash
+weg image build                           # Build with defaults
+weg image build --target web              # Build specific service
+weg image build --platform linux/arm64    # Build for ARM
+weg image build --push --registry ghcr.io # Build and push
+```
+
+The generated images use multi-stage builds with specialized targets (web, worker, scheduler, socketio) optimized for production.
+
 ## Shell Completions
+
+The easiest way to enable completions:
+
+```bash
+# Bash - add to ~/.bashrc
+eval "$(weg completion bash)"
+
+# Zsh - add to ~/.zshrc
+eval "$(weg completion zsh)"
+
+# Fish - run once
+weg completion fish | source
+# Or persist: weg completion fish > ~/.config/fish/completions/weg.fish
+```
+
+For faster shell startup (optional), you can cache the completions:
 
 ```bash
 # Bash
-weg completion bash > /etc/bash_completion.d/weg
+weg completion bash > ~/.local/share/bash-completion/completions/weg
 
-# Zsh
-weg completion zsh > "${fpath[1]}/_weg"
-
-# Fish
-weg completion fish > ~/.config/fish/completions/weg.fish
+# Zsh (if using Oh My Zsh)
+weg completion zsh > ~/.oh-my-zsh/completions/_weg
 ```
 
 ## vs bench
@@ -274,6 +334,7 @@ weg completion fish > ~/.config/fish/completions/weg.fish
 | Python management | uv (fast) | pip |
 | System dependencies | devbox/Nix (reproducible) | Manual |
 | Process management | process-compose | honcho/supervisord |
+| Container support | Built-in (Docker Compose + image builds) | frappe_docker (separate) |
 | API access | Direct (no HTTP) | Via HTTP |
 | Remote site editing | Built-in (git-backed) | Not available |
 | Cloud integration | Built-in | Separate tool |

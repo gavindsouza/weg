@@ -9,6 +9,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -50,7 +51,7 @@ func runWatch(cmd *cobra.Command, args []string) error {
 		watchArgs = append(watchArgs, "--apps", appName)
 	}
 
-	fmt.Printf("Starting asset watcher for site %s...\n", site)
+	output.Infof("Starting asset watcher for site %s...\n", site)
 	fmt.Println("Press Ctrl+C to stop")
 
 	// Run frappe watch via bench_helper

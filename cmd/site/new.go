@@ -84,7 +84,7 @@ func runNew(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	fmt.Printf("Creating site %s...\n", siteName)
+	output.Infof("Creating site %s...", siteName)
 
 	// Build bench new-site command
 	cmdArgs := []string{"new-site", siteName, "--admin-password", adminPassword}
@@ -105,7 +105,7 @@ func runNew(cmd *cobra.Command, args []string) error {
 
 	// Install apps
 	for _, appName := range installApps {
-		fmt.Printf("Installing %s on %s...\n", appName, siteName)
+		output.Infof("Installing %s on %s...", appName, siteName)
 
 		installCmd := exec.Command("bench", "--site", siteName, "install-app", appName)
 		installCmd.Dir = benchPath
@@ -137,7 +137,7 @@ func runNew(cmd *cobra.Command, args []string) error {
 		output.Warningf("Failed to save state: %v", err)
 	}
 
-	fmt.Printf("Successfully created site %s\n", siteName)
+	output.Successf("Successfully created site %s", siteName)
 
 	if setDefault {
 		fmt.Printf("Set %s as default site\n", siteName)

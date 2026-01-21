@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/workspace"
 	"github.com/spf13/cobra"
 )
@@ -75,7 +76,7 @@ func runWatch(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to watch directory: %w", err)
 	}
 
-	fmt.Printf("Watching %s/ for changes...\n", workspace.WorkspaceDir)
+	output.Infof("Watching %s/ for changes...\n", workspace.WorkspaceDir)
 	fmt.Println("Press Ctrl+C to stop.")
 	fmt.Println()
 

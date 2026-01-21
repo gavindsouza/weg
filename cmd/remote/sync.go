@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/remote"
 	"github.com/spf13/cobra"
 )
@@ -76,7 +77,7 @@ func runSync(cobraCmd *cobra.Command, args []string) error {
 	}
 
 	// Connect
-	fmt.Printf("Connecting to %s...\n", config.Site.URL)
+	output.Infof("Connecting to %s...\n", config.Site.URL)
 	client := remote.NewClientFromConfig(config, creds)
 	if err := client.Ping(); err != nil {
 		return fmt.Errorf("failed to connect: %w", err)

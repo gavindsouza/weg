@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/gavindsouza/weg/internal/config"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/state"
 	"github.com/spf13/cobra"
 )
@@ -65,7 +66,7 @@ func runAssets(cmd *cobra.Command, args []string) error {
 		buildArgs = append(buildArgs, "--production")
 	}
 
-	fmt.Printf("Building assets for site %s...\n", site)
+	output.Infof("Building assets for site %s...\n", site)
 
 	// Run frappe build via bench_helper
 	sitesDir := filepath.Join(benchPath, "sites")

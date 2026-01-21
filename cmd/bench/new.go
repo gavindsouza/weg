@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/gavindsouza/weg/internal/config"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/tools"
 	"github.com/spf13/cobra"
 )
@@ -86,7 +87,7 @@ func runNew(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("database %s is not supported for Frappe %s", database, version)
 	}
 
-	fmt.Printf("Creating bench at %s...\n", benchPath)
+	output.Infof("Creating bench at %s...\n", benchPath)
 	fmt.Printf("  Frappe version: %s\n", version)
 	fmt.Printf("  Database: %s\n", database)
 	fmt.Println()
