@@ -8,6 +8,7 @@ import (
 	"os"
 
 	internalconfig "github.com/gavindsouza/weg/internal/config"
+	"github.com/gavindsouza/weg/internal/errors"
 	"github.com/gavindsouza/weg/internal/output"
 
 	"github.com/gavindsouza/weg/cmd/api"
@@ -134,7 +135,7 @@ Learn more at https://github.com/gavindsouza/weg`,
 func Execute() {
 	err := rootCmd.Execute()
 	if err != nil {
-		os.Exit(1)
+		os.Exit(errors.ExitCode(err))
 	}
 }
 
