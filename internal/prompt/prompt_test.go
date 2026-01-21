@@ -19,7 +19,7 @@ func setupTest(input string) func() {
 	oldAssumeYes := AssumeYes
 
 	Reader = mockReader(input)
-	ResetReader() // Clear cached bufio.Reader
+	ResetReader()       // Clear cached bufio.Reader
 	Writer = io.Discard // suppress output during tests
 
 	return func() {

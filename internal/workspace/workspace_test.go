@@ -94,7 +94,7 @@ func TestGetCodeFieldsForEntity(t *testing.T) {
 	}{
 		{"server_script", 1},
 		{"client_script", 1},
-		{"report", 3}, // report_script, javascript, query
+		{"report", 3},       // report_script, javascript, query
 		{"print_format", 2}, // html, css
 		{"unknown_type", 0},
 	}

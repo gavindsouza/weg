@@ -134,7 +134,7 @@ func TestRedact(t *testing.T) {
 		want  string
 	}{
 		{"", ""},
-		{"short", "***"},        // < 8 chars
+		{"short", "***"},          // < 8 chars
 		{"exactly8", "exa***ly8"}, // exactly 8 chars
 		{"longsecretvalue", "lon***lue"},
 		{"abcdefghij", "abc***hij"},
@@ -1302,11 +1302,11 @@ func TestStepf(t *testing.T) {
 
 func TestRedactHeaders(t *testing.T) {
 	headers := http.Header{
-		"Authorization":  []string{"Bearer token123456789012345"},
-		"Content-Type":   []string{"application/json"},
-		"X-Api-Key":      []string{"secret-api-key-12345678901"},
-		"X-Request-Id":   []string{"abc123"},
-		"Cookie":         []string{"session=secretsessionvalue12345"},
+		"Authorization": []string{"Bearer token123456789012345"},
+		"Content-Type":  []string{"application/json"},
+		"X-Api-Key":     []string{"secret-api-key-12345678901"},
+		"X-Request-Id":  []string{"abc123"},
+		"Cookie":        []string{"session=secretsessionvalue12345"},
 	}
 
 	redacted := RedactHeaders(headers)
