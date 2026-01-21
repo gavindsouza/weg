@@ -156,7 +156,7 @@ weg scheduler jobs               # List pending jobs
 
 ```bash
 # Direct API calls without HTTP overhead
-weg api call frappe.client.get_count --doctype User
+weg api call frappe.client.get_count doctype=User
 weg doc get User Administrator   # Get a document
 weg doc list User --limit 10     # List documents
 weg doctype list                 # List all doctypes
@@ -275,29 +275,13 @@ The override file is automatically included when present (uses process-compose's
 
 ### Docker Compose (Containerized)
 
-For containerized development or production deployments, generate a Docker Compose configuration:
+For containerized development or production, use `weg docker init` to generate a `docker-compose.yml` with all required services (web, workers, scheduler, socketio, database, Redis).
 
-```bash
-weg docker init                    # Development mode
-weg docker init --mode prod        # Production mode
-weg docker init --no-db            # External database
-weg docker init --web-port 8080    # Custom port
-```
+Options include `--mode prod` for production settings, `--no-db` for external databases, and `--web-port` to customize ports. Edit the generated file directly or use Docker Compose overrides for further customization.
 
-This generates a `docker-compose.yml` with all required services (web, workers, scheduler, socketio, database, Redis). Customize by editing the generated file or using Docker Compose overrides.
+### Container Images
 
-### Building Production Images
-
-Build OCI-compliant container images for deployment:
-
-```bash
-weg image build                           # Build with defaults
-weg image build --target web              # Build specific service
-weg image build --platform linux/arm64    # Build for ARM
-weg image build --push --registry ghcr.io # Build and push
-```
-
-The generated images use multi-stage builds with specialized targets (web, worker, scheduler, socketio) optimized for production.
+Use `weg image build` to create OCI-compliant production images. The multi-stage Dockerfile generates specialized targets (web, worker, scheduler, socketio) optimized for deployment to Docker, Podman, or Kubernetes.
 
 ## Shell Completions
 
@@ -342,7 +326,7 @@ weg completion zsh > ~/.oh-my-zsh/completions/_weg
 ## Requirements
 
 - Go 1.21+ (for building from source)
-- [devbox](https://www.jetpack.io/devbox) (installed automatically on first use)
+- [devbox](https://www.jetify.com/devbox) (installed automatically on first use)
 - Git
 
 ## License
