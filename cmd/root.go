@@ -8,6 +8,7 @@ import (
 	"os"
 
 	internalconfig "github.com/gavindsouza/weg/internal/config"
+	"github.com/gavindsouza/weg/internal/output"
 
 	"github.com/gavindsouza/weg/cmd/api"
 	"github.com/gavindsouza/weg/cmd/app"
@@ -32,11 +33,17 @@ import (
 
 // Global flags
 var (
-	verbose    bool
-	quiet      bool
-	yes        bool
-	configPath string
-	chdir      string
+	verboseCount    int    // Track -v flags (supports -v, -vv, -vvv)
+	logLevel        string // --log-level flag
+	quiet           bool
+	yes             bool
+	configPath      string
+	chdir           string
+	outputFormat    string // --output flag
+	debugCategories string // --debug-categories flag
+
+	// Backward compatibility: verbose is derived from verboseCount
+	verbose bool
 )
 
 // Detected paths (set in PersistentPreRunE)
@@ -64,6 +71,11 @@ Quick start:
 Learn more at https://github.com/gavindsouza/weg`,
 	Version: Version,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		// Configure output package first
+		if err := configureOutput(); err != nil {
+			return err
+		}
+
 		// Store original directory
 		var err error
 		originalDir, err = os.Getwd()
@@ -131,13 +143,16 @@ func init() {
 
 	// Global persistent flags
 	rootCmd.PersistentFlags().StringVarP(&chdir, "chdir", "C", "", "Run as if weg was started in <path>")
-	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose output")
+	rootCmd.PersistentFlags().CountVarP(&verboseCount, "verbose", "v", "Increase verbosity (-v, -vv, -vvv)")
+	rootCmd.PersistentFlags().StringVar(&logLevel, "log-level", "", "Set log level: quiet, normal, verbose, debug, trace")
 	rootCmd.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, "Suppress non-essential output")
 	rootCmd.PersistentFlags().BoolVarP(&yes, "yes", "y", false, "Assume yes for all prompts")
 	rootCmd.PersistentFlags().StringVar(&configPath, "config", "", "Path to config file (default: auto-detect)")
+	rootCmd.PersistentFlags().StringVarP(&outputFormat, "output", "o", "auto", "Output format: auto, json, table, plain, quiet")
+	rootCmd.PersistentFlags().StringVar(&debugCategories, "debug-categories", "", "Filter debug output: all,config,state,net,git,fs,exec")
 
-	// Mark quiet and verbose as mutually exclusive
-	rootCmd.MarkFlagsMutuallyExclusive("verbose", "quiet")
+	// Mark quiet and log-level as mutually exclusive with each other
+	// (verbose count is handled differently)
 
 	// Add subcommand groups
 	rootCmd.AddCommand(api.ApiCmd)
@@ -165,6 +180,49 @@ func init() {
 func initConfig() {
 	// Config initialization happens here
 	// Will be expanded as needed
+}
+
+// configureOutput sets up the output package based on flags and environment.
+func configureOutput() error {
+	// Parse output format
+	format, err := output.ParseFormat(outputFormat)
+	if err != nil {
+		return err
+	}
+	output.CurrentFormat = format
+
+	// Determine verbosity level
+	// Precedence: --log-level > -q > -v count > env var
+	if logLevel != "" {
+		level, err := output.ParseVerbosity(logLevel)
+		if err != nil {
+			return err
+		}
+		output.Level = level
+	} else if quiet {
+		output.Level = output.VerbosityQuiet
+	} else if verboseCount >= 3 {
+		output.Level = output.VerbosityTrace
+	} else if verboseCount >= 2 {
+		output.Level = output.VerbosityDebug
+	} else if verboseCount >= 1 {
+		output.Level = output.VerbosityVerbose
+	} else {
+		output.Level = output.VerbosityNormal
+	}
+
+	// Parse debug categories
+	if debugCategories != "" {
+		output.ParseDebugCategories(debugCategories)
+	}
+
+	// Load from environment variables (lowest precedence, won't override flags)
+	output.LoadFromEnv()
+
+	// Set backward-compatible verbose flag
+	verbose = output.Level >= output.VerbosityVerbose
+
+	return nil
 }
 
 // IsVerbose returns true if verbose mode is enabled

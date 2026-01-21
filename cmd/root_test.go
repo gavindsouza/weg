@@ -35,10 +35,13 @@ func TestRootCommand_GlobalFlags(t *testing.T) {
 		defValue string
 	}{
 		{"chdir", "C", ""},
-		{"verbose", "v", "false"},
+		{"verbose", "v", "0"}, // CountVar, not BoolVar
 		{"quiet", "q", "false"},
 		{"yes", "y", "false"},
 		{"config", "", ""},
+		{"output", "o", "auto"},
+		{"log-level", "", ""},
+		{"debug-categories", "", ""},
 	}
 
 	for _, f := range flags {
