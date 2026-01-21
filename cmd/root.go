@@ -10,6 +10,7 @@ import (
 	internalconfig "github.com/gavindsouza/weg/internal/config"
 	"github.com/gavindsouza/weg/internal/errors"
 	"github.com/gavindsouza/weg/internal/output"
+	"github.com/gavindsouza/weg/internal/prompt"
 
 	"github.com/gavindsouza/weg/cmd/api"
 	"github.com/gavindsouza/weg/cmd/app"
@@ -222,6 +223,9 @@ func configureOutput() error {
 
 	// Set backward-compatible verbose flag
 	verbose = output.Level >= output.VerbosityVerbose
+
+	// Configure prompt package
+	prompt.AssumeYes = yes
 
 	return nil
 }
