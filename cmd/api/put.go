@@ -33,11 +33,6 @@ func init() {
 }
 
 func runPut(cmd *cobra.Command, args []string) error {
-	benchPath, site, err := detectBenchAndSite()
-	if err != nil {
-		return err
-	}
-
 	// Parse doctype/name
 	arg := args[0]
 	if !strings.Contains(arg, "/") {
@@ -49,14 +44,33 @@ func runPut(cmd *cobra.Command, args []string) error {
 	name := parts[1]
 
 	// Parse document data
-	var doc map[string]interface{}
+	var doc map[string]any
 	if err := json.Unmarshal([]byte(putData), &doc); err != nil {
 		return fmt.Errorf("invalid JSON data: %w", err)
 	}
 
-	// Add doctype and name to document
+	// Remote mode
+	if isRemoteMode() {
+		if err := validateRemoteAuth(); err != nil {
+			return err
+		}
+
+		client := NewRemoteClient(apiURL, apiKey, apiSecret)
+		result, err := client.Update(doctype, name, doc)
+		if err != nil {
+			return err
+		}
+		return printRemoteResult(result)
+	}
+
+	// Local mode - add doctype and name to document
 	doc["doctype"] = doctype
 	doc["name"] = name
+
+	benchPath, site, err := detectBenchAndSite()
+	if err != nil {
+		return err
+	}
 
 	executor := internalapi.NewExecutor(benchPath, site, apiUser)
 	result, err := executor.Save(doc)

@@ -41,15 +41,8 @@ func init() {
 }
 
 func runCall(cmd *cobra.Command, args []string) error {
-	benchPath, site, err := detectBenchAndSite()
-	if err != nil {
-		return err
-	}
-
-	executor := internalapi.NewExecutor(benchPath, site, apiUser)
-
 	method := args[0]
-	kwargs := make(map[string]interface{})
+	kwargs := make(map[string]any)
 
 	// Parse --args JSON if provided
 	if callArgs != "" {
@@ -80,7 +73,7 @@ func runCall(cmd *cobra.Command, args []string) error {
 		value := parts[1]
 
 		// Try to parse as JSON for complex values
-		var jsonValue interface{}
+		var jsonValue any
 		if err := json.Unmarshal([]byte(value), &jsonValue); err == nil {
 			kwargs[key] = jsonValue
 		} else {
@@ -88,6 +81,27 @@ func runCall(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	// Remote mode
+	if isRemoteMode() {
+		if err := validateRemoteAuth(); err != nil {
+			return err
+		}
+
+		client := NewRemoteClient(apiURL, apiKey, apiSecret)
+		result, err := client.Call(method, kwargs)
+		if err != nil {
+			return err
+		}
+		return printRemoteResult(result)
+	}
+
+	// Local mode
+	benchPath, site, err := detectBenchAndSite()
+	if err != nil {
+		return err
+	}
+
+	executor := internalapi.NewExecutor(benchPath, site, apiUser)
 	result, err := executor.Call(method, kwargs)
 	if err != nil {
 		return err

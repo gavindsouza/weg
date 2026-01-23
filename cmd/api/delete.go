@@ -22,11 +22,6 @@ Examples:
 }
 
 func runDelete(cmd *cobra.Command, args []string) error {
-	benchPath, site, err := detectBenchAndSite()
-	if err != nil {
-		return err
-	}
-
 	// Parse doctype/name
 	arg := args[0]
 	if !strings.Contains(arg, "/") {
@@ -36,6 +31,31 @@ func runDelete(cmd *cobra.Command, args []string) error {
 	parts := strings.SplitN(arg, "/", 2)
 	doctype := parts[0]
 	name := parts[1]
+
+	// Remote mode
+	if isRemoteMode() {
+		if err := validateRemoteAuth(); err != nil {
+			return err
+		}
+
+		client := NewRemoteClient(apiURL, apiKey, apiSecret)
+		result, err := client.Delete(doctype, name)
+		if err != nil {
+			return err
+		}
+
+		if result.Success {
+			fmt.Printf("Deleted %s/%s\n", doctype, name)
+			return nil
+		}
+		return fmt.Errorf("API error: %s", result.Error)
+	}
+
+	// Local mode
+	benchPath, site, err := detectBenchAndSite()
+	if err != nil {
+		return err
+	}
 
 	executor := internalapi.NewExecutor(benchPath, site, apiUser)
 	result, err := executor.Delete(doctype, name)

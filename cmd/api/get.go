@@ -44,13 +44,6 @@ func init() {
 }
 
 func runGet(cmd *cobra.Command, args []string) error {
-	benchPath, site, err := detectBenchAndSite()
-	if err != nil {
-		return err
-	}
-
-	executor := internalapi.NewExecutor(benchPath, site, apiUser)
-
 	// Parse doctype and optional name
 	arg := args[0]
 	var doctype, name string
@@ -63,28 +56,56 @@ func runGet(cmd *cobra.Command, args []string) error {
 		doctype = arg
 	}
 
+	// Parse filters and fields
+	var filters map[string]any
+	var fields []string
+
+	if getFilters != "" {
+		if err := json.Unmarshal([]byte(getFilters), &filters); err != nil {
+			return fmt.Errorf("invalid filters JSON: %w", err)
+		}
+	}
+
+	if getFields != "" {
+		if err := json.Unmarshal([]byte(getFields), &fields); err != nil {
+			return fmt.Errorf("invalid fields JSON: %w", err)
+		}
+	}
+
+	// Remote mode
+	if isRemoteMode() {
+		if err := validateRemoteAuth(); err != nil {
+			return err
+		}
+
+		client := NewRemoteClient(apiURL, apiKey, apiSecret)
+		var result *RemoteResult
+		var err error
+
+		if name != "" {
+			result, err = client.GetDoc(doctype, name)
+		} else {
+			result, err = client.GetList(doctype, filters, fields, getLimit, getOrderBy)
+		}
+
+		if err != nil {
+			return err
+		}
+		return printRemoteResult(result)
+	}
+
+	// Local mode
+	benchPath, site, err := detectBenchAndSite()
+	if err != nil {
+		return err
+	}
+
+	executor := internalapi.NewExecutor(benchPath, site, apiUser)
 	var result *internalapi.Result
 
 	if name != "" {
-		// Get single document
 		result, err = executor.GetDoc(doctype, name)
 	} else {
-		// Get list of documents
-		var filters map[string]interface{}
-		var fields []string
-
-		if getFilters != "" {
-			if err := json.Unmarshal([]byte(getFilters), &filters); err != nil {
-				return fmt.Errorf("invalid filters JSON: %w", err)
-			}
-		}
-
-		if getFields != "" {
-			if err := json.Unmarshal([]byte(getFields), &fields); err != nil {
-				return fmt.Errorf("invalid fields JSON: %w", err)
-			}
-		}
-
 		result, err = executor.GetList(doctype, filters, fields, getLimit, getOrderBy)
 	}
 
@@ -95,21 +116,33 @@ func runGet(cmd *cobra.Command, args []string) error {
 	return printResult(result)
 }
 
-// printResult formats and prints the result
+// printResult formats and prints the result (local mode)
 func printResult(result *internalapi.Result) error {
 	if !result.Success {
 		return fmt.Errorf("API error: %s", result.Error)
 	}
+	return printData(result.Data)
+}
 
+// printRemoteResult formats and prints the result (remote mode)
+func printRemoteResult(result *RemoteResult) error {
+	if !result.Success {
+		return fmt.Errorf("API error: %s", result.Error)
+	}
+	return printData(result.Data)
+}
+
+// printData outputs data as JSON
+func printData(data any) error {
 	var output []byte
 	var err error
 
 	if apiRaw {
 		// Compact JSON for piping
-		output, err = json.Marshal(result.Data)
+		output, err = json.Marshal(data)
 	} else {
 		// Pretty-printed JSON for humans
-		output, err = json.MarshalIndent(result.Data, "", "  ")
+		output, err = json.MarshalIndent(data, "", "  ")
 	}
 	if err != nil {
 		return err

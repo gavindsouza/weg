@@ -11,27 +11,35 @@ import (
 
 // Shared flags for all api subcommands
 var (
-	apiSite string
-	apiUser string
-	apiRaw  bool
+	apiSite   string
+	apiUser   string
+	apiRaw    bool
+	apiURL    string
+	apiKey    string
+	apiSecret string
 )
 
 // ApiCmd is the parent command for all api operations
 var ApiCmd = &cobra.Command{
 	Use:   "api",
 	Short: "Make API calls to Frappe sites",
-	Long: `Execute Frappe API calls directly without HTTP.
+	Long: `Execute Frappe API calls to local or remote sites.
 
 This command provides REST-style subcommands for document CRUD operations
 and a generic 'call' command for invoking any whitelisted method.
 
-Commands execute as Administrator by default. Use --user to change.
+Local mode (default): Executes directly via Python, as Administrator.
+Remote mode (--url): Uses HTTP API with API key authentication.
 
 Examples:
+  # Local site
   weg api get User                    # List all Users
   weg api get User/Administrator      # Get specific document
   weg api call frappe.ping            # Call a method
-  weg api post User -d '{"email":"test@example.com"}'`,
+
+  # Remote site
+  weg api --url https://site.frappe.cloud --api-key KEY --api-secret SECRET get User
+  weg api -U https://site.frappe.cloud -k KEY -K SECRET call frappe.ping`,
 }
 
 func init() {
@@ -39,6 +47,11 @@ func init() {
 	ApiCmd.PersistentFlags().StringVarP(&apiSite, "site", "s", "", "Target site (default: auto-detect)")
 	ApiCmd.PersistentFlags().StringVarP(&apiUser, "user", "u", "Administrator", "Execute as user")
 	ApiCmd.PersistentFlags().BoolVar(&apiRaw, "raw", false, "Output raw JSON without formatting")
+
+	// Remote site flags
+	ApiCmd.PersistentFlags().StringVarP(&apiURL, "url", "U", "", "Remote site URL (enables HTTP mode)")
+	ApiCmd.PersistentFlags().StringVarP(&apiKey, "api-key", "k", "", "API key for remote auth")
+	ApiCmd.PersistentFlags().StringVarP(&apiSecret, "api-secret", "K", "", "API secret for remote auth")
 
 	// Register subcommands
 	ApiCmd.AddCommand(getCmd)
@@ -106,4 +119,17 @@ func findFirstSite(benchPath string) (string, error) {
 		}
 	}
 	return "", fmt.Errorf("no sites found")
+}
+
+// isRemoteMode returns true if --url flag is set
+func isRemoteMode() bool {
+	return apiURL != ""
+}
+
+// validateRemoteAuth checks that API credentials are provided for remote mode
+func validateRemoteAuth() error {
+	if apiKey == "" || apiSecret == "" {
+		return fmt.Errorf("remote mode requires --api-key and --api-secret")
+	}
+	return nil
 }
