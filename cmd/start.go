@@ -235,15 +235,17 @@ func updateRuntimeSiteConfig(benchPath string, benchConfig *config.BenchConfig, 
 		SocketIO: ports.SocketIO,
 	}
 
-	var cfg map[string]interface{}
+	var cfg map[string]any
 	if benchConfig != nil {
-		cfg = benchConfig.GenerateCommonSiteConfig(runtimePorts)
+		cfg = benchConfig.GenerateCommonSiteConfig(benchPath, runtimePorts)
 	} else {
 		// Fallback to defaults with runtime ports
-		cfg = map[string]interface{}{
-			"redis_cache":    "redis://localhost:6379/0",
-			"redis_queue":    "redis://localhost:6379/1",
-			"redis_socketio": "redis://localhost:6379/2",
+		// Use Unix socket for Redis (no port conflicts with system redis)
+		redisSocketPath := filepath.Join(benchPath, ".devbox", "virtenv", "redis", "redis.sock")
+		cfg = map[string]any{
+			"redis_cache":    fmt.Sprintf("unix://%s?db=0", redisSocketPath),
+			"redis_queue":    fmt.Sprintf("unix://%s?db=1", redisSocketPath),
+			"redis_socketio": fmt.Sprintf("unix://%s?db=2", redisSocketPath),
 			"webserver_port": ports.Web,
 			"socketio_port":  ports.SocketIO,
 			"developer_mode": 1,

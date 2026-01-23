@@ -152,13 +152,16 @@ func applyBenchDefaults(config *BenchConfig, path string) {
 }
 
 // GenerateCommonSiteConfig generates the common_site_config.json content from BenchConfig
-func (c *BenchConfig) GenerateCommonSiteConfig(runtimePorts *RuntimePorts) map[string]interface{} {
-	cfg := make(map[string]interface{})
+// benchPath is required to construct Unix socket paths for Redis
+func (c *BenchConfig) GenerateCommonSiteConfig(benchPath string, runtimePorts *RuntimePorts) map[string]any {
+	cfg := make(map[string]any)
 
-	// Redis configuration - for devbox, use single redis with different DBs
-	cfg["redis_cache"] = "redis://localhost:6379/0"
-	cfg["redis_queue"] = "redis://localhost:6379/1"
-	cfg["redis_socketio"] = "redis://localhost:6379/2"
+	// Redis configuration - use Unix socket for devbox projects (no port conflicts)
+	// Socket path: .devbox/virtenv/redis/redis.sock
+	redisSocketPath := filepath.Join(benchPath, ".devbox", "virtenv", "redis", "redis.sock")
+	cfg["redis_cache"] = fmt.Sprintf("unix://%s?db=0", redisSocketPath)
+	cfg["redis_queue"] = fmt.Sprintf("unix://%s?db=1", redisSocketPath)
+	cfg["redis_socketio"] = fmt.Sprintf("unix://%s?db=2", redisSocketPath)
 
 	// Web port - use runtime port if available, otherwise config default
 	if runtimePorts != nil && runtimePorts.Web > 0 {

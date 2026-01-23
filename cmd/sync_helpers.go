@@ -208,17 +208,18 @@ func ensureCommonSiteConfig(benchPath string, benchConfig *config.BenchConfig) e
 	sitesDir := filepath.Join(benchPath, "sites")
 	configPath := filepath.Join(sitesDir, "common_site_config.json")
 
-	var cfg map[string]interface{}
+	var cfg map[string]any
 
 	if benchConfig != nil {
 		// Generate config from weg.toml settings
-		cfg = benchConfig.GenerateCommonSiteConfig(nil)
+		cfg = benchConfig.GenerateCommonSiteConfig(benchPath, nil)
 	} else {
-		// Use defaults
-		cfg = map[string]interface{}{
-			"redis_cache":    "redis://localhost:6379/0",
-			"redis_queue":    "redis://localhost:6379/1",
-			"redis_socketio": "redis://localhost:6379/2",
+		// Use defaults with Unix socket for Redis (no port conflicts)
+		redisSocketPath := filepath.Join(benchPath, ".devbox", "virtenv", "redis", "redis.sock")
+		cfg = map[string]any{
+			"redis_cache":    fmt.Sprintf("unix://%s?db=0", redisSocketPath),
+			"redis_queue":    fmt.Sprintf("unix://%s?db=1", redisSocketPath),
+			"redis_socketio": fmt.Sprintf("unix://%s?db=2", redisSocketPath),
 			"webserver_port": 8000,
 			"socketio_port":  9000,
 			"developer_mode": 1,

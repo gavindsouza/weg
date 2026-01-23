@@ -265,44 +265,47 @@ func checkSiteConfig(benchPath string) checkResult {
 }
 
 func checkServices(benchPath string) checkResult {
-	// Check if devbox services are running
-	cmd := exec.Command("devbox", "services", "ls", "-c", benchPath)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return checkResult{"Services", false, fmt.Sprintf("Cannot check devbox services: %v", err)}
-	}
+	// Check for Unix socket files - these indicate services are running
+	// Socket-based services don't have port conflicts with system services
+	mariadbSocket := filepath.Join(benchPath, ".devbox", "virtenv", "mariadb", "run", "mysql.sock")
+	redisSocket := filepath.Join(benchPath, ".devbox", "virtenv", "redis", "redis.sock")
 
-	outputStr := string(output)
+	mariadbRunning := isSocketRunning(mariadbSocket)
+	redisRunning := isSocketRunning(redisSocket)
 
-	// Parse output line by line to check mariadb status
-	mariadbRunning := false
-	redisRunning := false
-	for _, line := range strings.Split(outputStr, "\n") {
-		fields := strings.Fields(line)
-		if len(fields) >= 2 {
-			name := fields[0]
-			status := fields[1]
-			if name == "mariadb" && status == "Running" {
-				mariadbRunning = true
-			}
-			if name == "redis" && status == "Running" {
-				redisRunning = true
-			}
-		}
-	}
+	// Build detailed status for each service
+	var lines []string
+	allOk := true
 
-	if !mariadbRunning {
-		// Check if there's any output at all
-		if len(strings.TrimSpace(outputStr)) == 0 {
-			return checkResult{"Services", false, "No services output. Run 'weg start'."}
-		}
-		return checkResult{"Services", false, "MariaDB not running. Run 'weg start'."}
+	if mariadbRunning {
+		lines = append(lines, "[x] MariaDB")
+	} else {
+		lines = append(lines, "[ ] MariaDB - not running")
+		allOk = false
 	}
 
 	if redisRunning {
-		return checkResult{"Services", true, "MariaDB and Redis running"}
+		lines = append(lines, "[x] Redis")
+	} else {
+		lines = append(lines, "[ ] Redis - not running")
+		allOk = false
 	}
-	return checkResult{"Services", true, "MariaDB running (Redis managed by devbox)"}
+
+	message := strings.Join(lines, "\n    ")
+	if !allOk {
+		message += "\n    Run 'weg start' to start services."
+	}
+
+	return checkResult{"Services", allOk, message}
+}
+
+// isSocketRunning checks if a Unix socket file exists and is actually a socket
+func isSocketRunning(socketPath string) bool {
+	info, err := os.Stat(socketPath)
+	if err != nil {
+		return false
+	}
+	return info.Mode()&os.ModeSocket != 0
 }
 
 func checkRuntime(benchPath string) checkResult {
