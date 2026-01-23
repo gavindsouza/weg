@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	internalapi "github.com/gavindsouza/weg/internal/api"
+	"github.com/gavindsouza/weg/internal/remote"
 	"github.com/spf13/cobra"
 )
 
@@ -51,12 +52,13 @@ func runPut(cmd *cobra.Command, args []string) error {
 
 	// Remote mode
 	if isRemoteMode() {
-		if err := validateRemoteAuth(); err != nil {
+		key, secret, err := resolveRemoteCredentials()
+		if err != nil {
 			return err
 		}
 
-		client := NewRemoteClient(apiURL, apiKey, apiSecret)
-		result, err := client.Update(doctype, name, doc)
+		client := remote.NewClient(apiURL, key, secret)
+		result, err := remoteUpdate(client, doctype, name, doc)
 		if err != nil {
 			return err
 		}

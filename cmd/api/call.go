@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	internalapi "github.com/gavindsouza/weg/internal/api"
+	"github.com/gavindsouza/weg/internal/remote"
 	"github.com/spf13/cobra"
 )
 
@@ -83,12 +84,13 @@ func runCall(cmd *cobra.Command, args []string) error {
 
 	// Remote mode
 	if isRemoteMode() {
-		if err := validateRemoteAuth(); err != nil {
+		key, secret, err := resolveRemoteCredentials()
+		if err != nil {
 			return err
 		}
 
-		client := NewRemoteClient(apiURL, apiKey, apiSecret)
-		result, err := client.Call(method, kwargs)
+		client := remote.NewClient(apiURL, key, secret)
+		result, err := remoteCall(client, method, kwargs)
 		if err != nil {
 			return err
 		}

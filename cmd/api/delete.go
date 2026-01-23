@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	internalapi "github.com/gavindsouza/weg/internal/api"
+	"github.com/gavindsouza/weg/internal/remote"
 	"github.com/spf13/cobra"
 )
 
@@ -34,12 +35,13 @@ func runDelete(cmd *cobra.Command, args []string) error {
 
 	// Remote mode
 	if isRemoteMode() {
-		if err := validateRemoteAuth(); err != nil {
+		key, secret, err := resolveRemoteCredentials()
+		if err != nil {
 			return err
 		}
 
-		client := NewRemoteClient(apiURL, apiKey, apiSecret)
-		result, err := client.Delete(doctype, name)
+		client := remote.NewClient(apiURL, key, secret)
+		result, err := remoteDelete(client, doctype, name)
 		if err != nil {
 			return err
 		}

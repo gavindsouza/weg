@@ -212,7 +212,7 @@ func LoadCredentials(dir string) (*Credentials, error) {
 	config, _ := LoadSiteConfig(dir)
 	var siteHost string
 	if config != nil {
-		siteHost = extractHost(config.Site.URL)
+		siteHost = ExtractHost(config.Site.URL)
 	}
 
 	return LoadCredentialsForSite(dir, siteHost)
@@ -264,8 +264,8 @@ func LoadCredentialsForSite(dir string, siteHost string) (*Credentials, error) {
 	return nil, fmt.Errorf("no credentials found (checked: env, local .weg/credentials.toml, global ~/.config/weg/credentials.toml)")
 }
 
-// extractHost extracts hostname from a URL
-func extractHost(urlStr string) string {
+// ExtractHost extracts hostname from a URL
+func ExtractHost(urlStr string) string {
 	// Simple extraction - handle common cases
 	urlStr = strings.TrimPrefix(urlStr, "https://")
 	urlStr = strings.TrimPrefix(urlStr, "http://")

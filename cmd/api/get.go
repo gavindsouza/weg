@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	internalapi "github.com/gavindsouza/weg/internal/api"
+	"github.com/gavindsouza/weg/internal/remote"
 	"github.com/spf13/cobra"
 )
 
@@ -74,22 +75,23 @@ func runGet(cmd *cobra.Command, args []string) error {
 
 	// Remote mode
 	if isRemoteMode() {
-		if err := validateRemoteAuth(); err != nil {
-			return err
+		key, secret, credErr := resolveRemoteCredentials()
+		if credErr != nil {
+			return credErr
 		}
 
-		client := NewRemoteClient(apiURL, apiKey, apiSecret)
+		client := remote.NewClient(apiURL, key, secret)
 		var result *RemoteResult
-		var err error
+		var remoteErr error
 
 		if name != "" {
-			result, err = client.GetDoc(doctype, name)
+			result, remoteErr = remoteGetDoc(client, doctype, name)
 		} else {
-			result, err = client.GetList(doctype, filters, fields, getLimit, getOrderBy)
+			result, remoteErr = remoteGetList(client, doctype, filters, fields, getLimit, getOrderBy)
 		}
 
-		if err != nil {
-			return err
+		if remoteErr != nil {
+			return remoteErr
 		}
 		return printRemoteResult(result)
 	}

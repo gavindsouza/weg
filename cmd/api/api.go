@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/gavindsouza/weg/internal/config"
+	"github.com/gavindsouza/weg/internal/remote"
 	"github.com/gavindsouza/weg/internal/state"
 	"github.com/spf13/cobra"
 )
@@ -31,15 +32,23 @@ and a generic 'call' command for invoking any whitelisted method.
 Local mode (default): Executes directly via Python, as Administrator.
 Remote mode (--url): Uses HTTP API with API key authentication.
 
+Credential resolution for remote mode (highest priority first):
+  1. CLI flags: --api-key and --api-secret
+  2. Environment: WEG_API_KEY and WEG_API_SECRET
+  3. Global config: ~/.config/weg/credentials.toml (keyed by hostname)
+
 Examples:
   # Local site
   weg api get User                    # List all Users
   weg api get User/Administrator      # Get specific document
   weg api call frappe.ping            # Call a method
 
-  # Remote site
-  weg api --url https://site.frappe.cloud --api-key KEY --api-secret SECRET get User
-  weg api -U https://site.frappe.cloud -k KEY -K SECRET call frappe.ping`,
+  # Remote site (explicit credentials)
+  weg api -U https://site.frappe.cloud -k KEY -K SECRET get User
+
+  # Remote site (credentials from env or config)
+  export WEG_API_KEY=xxx WEG_API_SECRET=yyy
+  weg api -U https://site.frappe.cloud get User`,
 }
 
 func init() {
@@ -126,10 +135,22 @@ func isRemoteMode() bool {
 	return apiURL != ""
 }
 
-// validateRemoteAuth checks that API credentials are provided for remote mode
-func validateRemoteAuth() error {
-	if apiKey == "" || apiSecret == "" {
-		return fmt.Errorf("remote mode requires --api-key and --api-secret")
+// resolveRemoteCredentials resolves API credentials using the standard hierarchy:
+// 1. CLI flags (--api-key, --api-secret)
+// 2. Environment (WEG_API_KEY, WEG_API_SECRET)
+// 3. Global config (~/.config/weg/credentials.toml by hostname)
+func resolveRemoteCredentials() (key, secret string, err error) {
+	// 1. CLI flags have highest priority
+	if apiKey != "" && apiSecret != "" {
+		return apiKey, apiSecret, nil
 	}
-	return nil
+
+	// 2. Use existing credential resolution (env → global config)
+	siteHost := remote.ExtractHost(apiURL)
+	creds, err := remote.LoadCredentialsForSite(".", siteHost)
+	if err == nil && creds.Auth.APIKey != "" && creds.Auth.APISecret != "" {
+		return creds.Auth.APIKey, creds.Auth.APISecret, nil
+	}
+
+	return "", "", fmt.Errorf("no credentials found for %s\n\nProvide via:\n  - Flags: --api-key and --api-secret\n  - Environment: WEG_API_KEY and WEG_API_SECRET\n  - Config: ~/.config/weg/credentials.toml", siteHost)
 }

@@ -289,9 +289,9 @@ func TestExtractHost(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		result := extractHost(tt.url)
+		result := ExtractHost(tt.url)
 		if result != tt.expected {
-			t.Errorf("extractHost(%s) = %s, expected %s", tt.url, result, tt.expected)
+			t.Errorf("ExtractHost(%s) = %s, expected %s", tt.url, result, tt.expected)
 		}
 	}
 }
