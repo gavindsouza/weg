@@ -113,7 +113,7 @@ func RunBench(args []string) error {
 
 	// Run via devbox from sites directory
 	sitesDir := filepath.Join(benchPath, "sites")
-	shellCmd := fmt.Sprintf("cd %s && ../.venv/bin/python -m frappe.utils.bench_helper %s",
+	shellCmd := fmt.Sprintf("cd %s && ../env/bin/python -m frappe.utils.bench_helper %s",
 		sitesDir, strings.Join(benchArgs, " "))
 
 	execCmd := exec.Command("devbox", "run", "-c", benchPath, "--", "sh", "-c", shellCmd)

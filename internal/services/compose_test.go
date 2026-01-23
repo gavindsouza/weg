@@ -153,9 +153,9 @@ func TestGenerateProcessComposeVenvPython(t *testing.T) {
 
 	config := GenerateProcessCompose(opts)
 
-	// Commands should use .venv/bin/python instead of bench
+	// Commands should use env/bin/python instead of bench
 	web := config.Processes["web"]
-	if !strings.Contains(web.Command, ".venv/bin/python") {
+	if !strings.Contains(web.Command, "env/bin/python") {
 		t.Errorf("Web command should use venv python: %s", web.Command)
 	}
 	if !strings.Contains(web.Command, "frappe.utils.bench_helper") {

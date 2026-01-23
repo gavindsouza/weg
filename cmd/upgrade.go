@@ -316,7 +316,7 @@ func reinstallPythonDeps(benchPath string) error {
 	}
 
 	// Remove existing venv to force fresh install with new Python
-	venvPath := filepath.Join(benchPath, ".venv")
+	venvPath := filepath.Join(benchPath, "env")
 	os.RemoveAll(venvPath)
 
 	// Install each app
@@ -397,7 +397,7 @@ func runMigrations(benchPath string, result *config.DetectionResult) error {
 		siteName := entry.Name()
 		PrintVerbose("  Migrating %s...", siteName)
 
-		shellCmd := fmt.Sprintf("cd %s && ../.venv/bin/python -m frappe.utils.bench_helper frappe --site %s migrate",
+		shellCmd := fmt.Sprintf("cd %s && ../env/bin/python -m frappe.utils.bench_helper frappe --site %s migrate",
 			sitesDir, siteName)
 
 		cmd := exec.Command("devbox", "run", "-c", benchPath, "--", "sh", "-c", shellCmd)

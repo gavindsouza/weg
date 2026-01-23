@@ -247,7 +247,7 @@ finally:
 
 // executeScript runs a Python script via devbox
 func (e *Executor) executeScript(script string) (*Result, error) {
-	venvPython := filepath.Join(e.BenchPath, ".venv", "bin", "python")
+	venvPython := filepath.Join(e.BenchPath, "env", "bin", "python")
 
 	// Write script to temp file
 	tmpFile, err := os.CreateTemp("", "weg-api-*.py")

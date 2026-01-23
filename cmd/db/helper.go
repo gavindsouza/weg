@@ -9,7 +9,7 @@ import (
 // runBenchHelper runs a bench command in the given bench path
 func runBenchHelper(benchPath string, args []string) error {
 	sitesDir := filepath.Join(benchPath, "sites")
-	venvPython := filepath.Join(benchPath, ".venv", "bin", "python")
+	venvPython := filepath.Join(benchPath, "env", "bin", "python")
 
 	// Build the command: python -m frappe.utils.bench_helper frappe <args>
 	cmdArgs := append([]string{"-m", "frappe.utils.bench_helper"}, args...)

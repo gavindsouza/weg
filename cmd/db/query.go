@@ -132,7 +132,7 @@ finally:
 	pythonPathEnv := strings.Join(pythonPaths, ":")
 
 	// Execute via Python
-	pyCmd := exec.Command(filepath.Join(benchPath, ".venv", "bin", "python"), "-c", pythonCode)
+	pyCmd := exec.Command(filepath.Join(benchPath, "env", "bin", "python"), "-c", pythonCode)
 	pyCmd.Dir = filepath.Join(benchPath, "sites")
 	pyCmd.Env = append(os.Environ(), "PYTHONPATH="+pythonPathEnv)
 	pyCmd.Stderr = os.Stderr

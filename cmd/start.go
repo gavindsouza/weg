@@ -162,7 +162,7 @@ func runStart(cmd *cobra.Command, args []string) error {
 	}
 
 	// For devbox projects, don't include redis (devbox services handles it)
-	// and use .venv Python for bench commands
+	// and use env Python for bench commands
 	devboxJSON := filepath.Join(benchPath, "devbox.json")
 	if _, err := os.Stat(devboxJSON); err == nil {
 		opts.IncludeRedis = false

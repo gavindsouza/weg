@@ -344,7 +344,7 @@ build/
 .eggs/
 
 # Virtual environments
-.venv/
+env/
 venv/
 env/
 

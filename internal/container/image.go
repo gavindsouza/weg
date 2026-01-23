@@ -148,7 +148,7 @@ __pycache__
 .eggs
 dist
 build
-.venv
+env
 venv
 env
 node_modules

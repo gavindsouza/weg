@@ -173,9 +173,9 @@ func checkDirectories(benchPath string) checkResult {
 }
 
 func checkPythonEnv(benchPath string) checkResult {
-	venvPython := filepath.Join(benchPath, ".venv", "bin", "python")
+	venvPython := filepath.Join(benchPath, "env", "bin", "python")
 	if _, err := os.Stat(venvPython); os.IsNotExist(err) {
-		return checkResult{"Python venv", false, ".venv not found. Run 'devbox install' in the bench directory."}
+		return checkResult{"Python venv", false, "env not found. Run 'devbox install' in the bench directory."}
 	}
 
 	// Check if frappe is installed

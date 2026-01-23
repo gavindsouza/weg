@@ -62,7 +62,7 @@ type ComposeOptions struct {
 	IncludeWatch  bool
 	FrappeVersion string
 	NodePath      string         // Path to node binary (for devbox)
-	UseVenvPython bool           // Use .venv/bin/python for bench commands (devbox projects)
+	UseVenvPython bool           // Use env/bin/python for bench commands (devbox projects)
 	RunID         string         // Unique run ID for process identification
 	Workers       map[string]int // Queue name -> instance count ("all" = all queues)
 }
@@ -98,7 +98,7 @@ func GenerateProcessCompose(opts ComposeOptions) *ProcessComposeConfig {
 			// Use explicit Python path for devbox projects
 			// Run from sites directory using bench_helper
 			// bench_helper wraps frappe commands, so we need "frappe <cmd>"
-			return fmt.Sprintf("cd sites && ../.venv/bin/python -m frappe.utils.bench_helper frappe %s", args)
+			return fmt.Sprintf("cd sites && ../env/bin/python -m frappe.utils.bench_helper frappe %s", args)
 		}
 		return fmt.Sprintf("bench %s", args)
 	}

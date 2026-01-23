@@ -96,7 +96,7 @@ func ResolveDefaultSiteWithFallback(benchPath string) string {
 // GetVenvPython returns the path to the venv Python interpreter.
 // Falls back to "python3" if the venv doesn't exist.
 func GetVenvPython(benchPath string) string {
-	pythonBin := filepath.Join(benchPath, ".venv", "bin", "python")
+	pythonBin := filepath.Join(benchPath, "env", "bin", "python")
 	if _, err := os.Stat(pythonBin); os.IsNotExist(err) {
 		return "python3"
 	}

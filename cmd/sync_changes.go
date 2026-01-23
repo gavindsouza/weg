@@ -501,7 +501,7 @@ func createSite(sitesDir string, cfg *config.SiteConfig, appsToInstall []string)
 	// NOTE: frappe commands must run from the sites directory (where apps.txt is)
 	PrintVerbose("Running new-site for %s...", cfg.Name)
 	shellCmd := fmt.Sprintf(
-		`cd %s && ../.venv/bin/python -m frappe.utils.bench_helper frappe new-site %s --admin-password=admin --db-root-password= --db-socket=%s%s`,
+		`cd %s && ../env/bin/python -m frappe.utils.bench_helper frappe new-site %s --admin-password=admin --db-root-password= --db-socket=%s%s`,
 		sitesDir, cfg.Name, mysqlSocket, installAppFlags,
 	)
 
@@ -603,7 +603,7 @@ eval "$(devbox generate direnv --print-envrc -e VENV_DIR=$VENV_DIR -e UV_PYTHON=
 		}
 	}
 
-	// Devbox's Python plugin automatically creates .venv, no need to create env/
+	// Devbox's Python plugin automatically creates env, no need to create env/
 
 	return nil
 }

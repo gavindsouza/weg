@@ -165,7 +165,7 @@ dist/
 build/
 env/
 venv/
-.venv/
+env/
 node_modules/
 *.log
 `

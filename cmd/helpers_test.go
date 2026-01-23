@@ -17,7 +17,7 @@ func TestGetVenvPython(t *testing.T) {
 		{
 			name: "venv exists",
 			setup: func(dir string) {
-				venvBin := filepath.Join(dir, ".venv", "bin")
+				venvBin := filepath.Join(dir, "env", "bin")
 				os.MkdirAll(venvBin, 0755)
 				os.WriteFile(filepath.Join(venvBin, "python"), []byte("#!/bin/bash\n"), 0755)
 			},
@@ -39,7 +39,7 @@ func TestGetVenvPython(t *testing.T) {
 			result := GetVenvPython(dir)
 
 			if tt.wantVenv {
-				expected := filepath.Join(dir, ".venv", "bin", "python")
+				expected := filepath.Join(dir, "env", "bin", "python")
 				if result != expected {
 					t.Errorf("GetVenvPython() = %v, want %v", result, expected)
 				}
