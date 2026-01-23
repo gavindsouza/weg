@@ -217,6 +217,7 @@ func (m *Manager) killOrphanedProcesses() {
 		filepath.Join(m.BenchPath, "apps/frappe/socketio.js"),  // socketio
 		filepath.Join(m.BenchPath, "apps/frappe/node_modules"), // esbuild, yarn
 		filepath.Join(m.BenchPath, ".devbox"),                  // devbox-spawned node/yarn
+		filepath.Join(m.BenchPath, ".venv"),                    // workers, scheduler, watch
 	}
 
 	for _, pattern := range patterns {
