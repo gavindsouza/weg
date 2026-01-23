@@ -101,11 +101,20 @@ func printResult(result *internalapi.Result) error {
 		return fmt.Errorf("API error: %s", result.Error)
 	}
 
-	output, err := internalapi.FormatJSON(result.Data)
+	var output []byte
+	var err error
+
+	if apiRaw {
+		// Compact JSON for piping
+		output, err = json.Marshal(result.Data)
+	} else {
+		// Pretty-printed JSON for humans
+		output, err = json.MarshalIndent(result.Data, "", "  ")
+	}
 	if err != nil {
 		return err
 	}
 
-	fmt.Println(output)
+	fmt.Println(string(output))
 	return nil
 }
