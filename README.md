@@ -323,6 +323,15 @@ weg completion zsh > ~/.oh-my-zsh/completions/_weg
 | Remote site editing | Built-in (git-backed) | Not available |
 | Cloud integration | Built-in | Separate tool |
 
+## Development
+
+```bash
+git clone https://github.com/gavindsouza/weg
+cd weg
+git config core.hooksPath .githooks
+go build -o weg .
+```
+
 ## Requirements
 
 - Go 1.21+ (for building from source)
