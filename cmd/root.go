@@ -25,6 +25,7 @@ import (
 	"github.com/gavindsouza/weg/cmd/fixtures"
 	"github.com/gavindsouza/weg/cmd/image"
 	"github.com/gavindsouza/weg/cmd/log"
+	wegmcp "github.com/gavindsouza/weg/cmd/mcp"
 	"github.com/gavindsouza/weg/cmd/remote"
 	"github.com/gavindsouza/weg/cmd/scheduler"
 	"github.com/gavindsouza/weg/cmd/site"
@@ -175,6 +176,8 @@ func init() {
 	rootCmd.AddCommand(scheduler.SchedulerCmd)
 	rootCmd.AddCommand(site.SiteCmd)
 	rootCmd.AddCommand(user.UserCmd)
+	wegmcp.Version = Version
+	rootCmd.AddCommand(wegmcp.McpCmd)
 	rootCmd.AddCommand(workspace.WorkspaceCmd)
 }
 

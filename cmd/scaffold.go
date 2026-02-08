@@ -81,7 +81,27 @@ func scaffoldAI(projectPath string) error {
 	fmt.Println("Scaffolding AI agent configuration...")
 
 	// Create CLAUDE.md
-	claudeMD := `# Frappe App Development Guidelines
+	claudeMD := `# weg CLI — Use These Commands for All Frappe Operations
+
+NEVER manually activate the bench environment, write scripts that import frappe directly, or use ` + "`bench`" + ` commands.
+NEVER modify files inside ` + "`.weg/`" + ` — it is managed infrastructure.
+
+## Instead of...                              → Use...
+
+| Anti-pattern                                 | weg command                         |
+|----------------------------------------------|-------------------------------------|
+| ` + "`bench --site X migrate`" + `                       | ` + "`weg db migrate`" + `                    |
+| ` + "`bench --site X clear-cache`" + `                   | ` + "`weg cache clear`" + `                   |
+| ` + "`bench build`" + `                                  | ` + "`weg build`" + `                         |
+| ` + "`cd .weg && env/bin/python -c \"import...\"`" + `   | ` + "`weg py \"print(frappe.get_all(...))\"`" + ` |
+| ` + "`curl localhost:8000/api/resource/...`" + `         | ` + "`weg api get DocType/name`" + `           |
+| ` + "`mysql -e \"SELECT...\"`" + `                       | ` + "`weg api get DocType --filters '{}'`" + ` |
+
+For full command reference: ` + "`weg --help`" + ` | For subcommand help: ` + "`weg <cmd> --help`" + `
+
+---
+
+# Frappe App Development Guidelines
 
 This project is a Frappe Framework application. Follow these guidelines strictly.
 
