@@ -1,0 +1,31 @@
+Commands for managing Frappe sites in the current project.
+
+Examples:
+  weg site list              # List all sites
+  weg site new <name>        # Create a new site
+  weg site drop <name>       # Delete a site
+  weg site use <name>        # Set default site
+
+Usage:
+  site [command]
+
+Available Commands:
+  backup      Backup a Frappe site
+  browse      Open site in browser with auto-login
+  completion  Generate the autocompletion script for the specified shell
+  config      Manage site configuration
+  drop        Delete a site
+  help        Help about any command
+  hosts       Manage /etc/hosts entries for sites
+  install     Install an app on a site
+  list        List all sites
+  maintenance Manage site maintenance mode
+  new         Create a new site
+  password    Set or reset a user password
+  restore     Restore a Frappe site from backup
+  use         Set the default site
+
+Flags:
+  -h, --help   help for site
+
+Use "site [command] --help" for more information about a command.

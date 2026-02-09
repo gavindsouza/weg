@@ -1,0 +1,24 @@
+Model Context Protocol (MCP) server that exposes weg commands as
+structured tools for AI assistants like Claude Code.
+
+Subcommands:
+  serve     Start the MCP server on stdio
+  install   Generate/update .mcp.json configuration
+
+Quick start:
+  weg mcp install        # Add weg to .mcp.json
+  weg mcp serve          # Start server (used by AI tools)
+
+Usage:
+  mcp [command]
+
+Available Commands:
+  completion  Generate the autocompletion script for the specified shell
+  help        Help about any command
+  install     Generate/update .mcp.json with weg server config
+  serve       Start the MCP server on stdio
+
+Flags:
+  -h, --help   help for mcp
+
+Use "mcp [command] --help" for more information about a command.

@@ -1,0 +1,26 @@
+Commands for managing Frappe apps in the current project.
+
+Examples:
+  weg app list              # List installed apps
+  weg app get <url>         # Install an app
+  weg app remove <name>     # Remove an app
+  weg app switch <branch>   # Switch app branch
+
+Usage:
+  app [command]
+
+Available Commands:
+  completion  Generate the autocompletion script for the specified shell
+  exclude     Exclude an app from sync
+  get         Install an app
+  help        Help about any command
+  include     Include an excluded app
+  list        List apps in the project
+  reinstall   Reinstall an app (uninstall + install)
+  remove      Remove an app
+  switch      Switch an app to a different branch
+
+Flags:
+  -h, --help   help for app
+
+Use "app [command] --help" for more information about a command.

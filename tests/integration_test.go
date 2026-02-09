@@ -94,15 +94,7 @@ func TestRemoteSiteSetupWorkflow(t *testing.T) {
 
 // TestOutputFormatConsistency tests that output formatting works correctly across different formats
 func TestOutputFormatConsistency(t *testing.T) {
-	// Save and restore output state
-	oldWriter := output.Writer
-	oldFormat := output.CurrentFormat
-	oldLevel := output.Level
-	defer func() {
-		output.Writer = oldWriter
-		output.CurrentFormat = oldFormat
-		output.Level = oldLevel
-	}()
+	output.SaveForTest(t)
 
 	type TestItem struct {
 		Name   string `json:"name"`
@@ -506,16 +498,7 @@ func TestCodeFieldMapping(t *testing.T) {
 
 // TestOutputVerbosityLevels tests that verbosity levels work correctly together
 func TestOutputVerbosityLevels(t *testing.T) {
-	// Save and restore state
-	oldWriter := output.Writer
-	oldLevel := output.Level
-	oldFormat := output.CurrentFormat
-	defer func() {
-		output.Writer = oldWriter
-		output.Level = oldLevel
-		output.CurrentFormat = oldFormat
-	}()
-
+	output.SaveForTest(t)
 	output.CurrentFormat = output.FormatTable
 
 	t.Run("quiet mode suppresses Print", func(t *testing.T) {

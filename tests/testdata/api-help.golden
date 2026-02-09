@@ -1,0 +1,49 @@
+Execute Frappe API calls to local or remote sites.
+
+This command provides REST-style subcommands for document CRUD operations
+and a generic 'call' command for invoking any whitelisted method.
+
+Local mode (default): Executes directly via Python, as Administrator.
+Remote mode (--url): Uses HTTP API with API key authentication.
+
+Credential resolution for remote mode (highest priority first):
+  1. CLI flags: --api-key and --api-secret
+  2. Environment: WEG_API_KEY and WEG_API_SECRET
+  3. Global config: ~/.config/weg/credentials.toml (keyed by hostname)
+
+Examples:
+  # Local site
+  weg api get User                    # List all Users
+  weg api get User/Administrator      # Get specific document
+  weg api call frappe.ping            # Call a method
+
+  # Remote site (explicit credentials)
+  weg api -U https://site.frappe.cloud -k KEY -K SECRET get User
+
+  # Remote site (credentials from env or config)
+  export WEG_API_KEY=xxx WEG_API_SECRET=yyy
+  weg api -U https://site.frappe.cloud get User
+
+Usage:
+  api [command]
+
+Available Commands:
+  call        Call a Frappe method
+  completion  Generate the autocompletion script for the specified shell
+  delete      Delete a document
+  get         Get document(s) from Frappe
+  help        Help about any command
+  post        Create a new document
+  put         Update an existing document
+  run         Run a method on a document
+
+Flags:
+  -k, --api-key string      API key for remote auth
+  -K, --api-secret string   API secret for remote auth
+  -h, --help                help for api
+      --raw                 Output raw JSON without formatting
+  -s, --site string         Target site (default: auto-detect)
+  -U, --url string          Remote site URL (enables HTTP mode)
+  -u, --user string         Execute as user (default "Administrator")
+
+Use "api [command] --help" for more information about a command.
