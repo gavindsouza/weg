@@ -10,18 +10,22 @@ import (
 	"strings"
 
 	"github.com/gavindsouza/weg/internal/config"
+	wegerrors "github.com/gavindsouza/weg/internal/errors"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/state"
 	mcplib "github.com/mark3labs/mcp-go/mcp"
 )
 
 // runWegCommand runs a weg subcommand and returns its combined output.
-func runWegCommand(args ...string) (string, error) {
+func runWegCommand(ctx context.Context, args ...string) (string, error) {
+	defer output.WithTiming(output.DebugExec, fmt.Sprintf("weg %s", strings.Join(args, " ")))()
+
 	exe, err := os.Executable()
 	if err != nil {
 		return "", fmt.Errorf("failed to find weg binary: %w", err)
 	}
 
-	cmd := exec.Command(exe, args...)
+	cmd := exec.CommandContext(ctx, exe, args...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		// Include output in error for context
@@ -43,10 +47,10 @@ func siteArgs(site string) []string {
 
 // --- Tier 1: Subprocess handlers ---
 
-func handleWegPy(_ context.Context, request mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
+func handleWegPy(ctx context.Context, request mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
 	code, err := request.RequireString("code")
 	if err != nil {
-		return mcplib.NewToolResultError(err.Error()), nil
+		return toolParamError(err)
 	}
 	site := request.GetString("site", "")
 
@@ -54,17 +58,17 @@ func handleWegPy(_ context.Context, request mcplib.CallToolRequest) (*mcplib.Cal
 	args = append(args, siteArgs(site)...)
 	args = append(args, code)
 
-	out, err := runWegCommand(args...)
+	out, err := runWegCommand(ctx, args...)
 	if err != nil {
-		return mcplib.NewToolResultError(err.Error()), nil
+		return toolError(err)
 	}
 	return mcplib.NewToolResultText(out), nil
 }
 
-func handleWegApiGet(_ context.Context, request mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
+func handleWegApiGet(ctx context.Context, request mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
 	doctype, err := request.RequireString("doctype")
 	if err != nil {
-		return mcplib.NewToolResultError(err.Error()), nil
+		return toolParamError(err)
 	}
 	site := request.GetString("site", "")
 	filters := request.GetString("filters", "")
@@ -86,17 +90,17 @@ func handleWegApiGet(_ context.Context, request mcplib.CallToolRequest) (*mcplib
 		}
 	}
 
-	out, err := runWegCommand(args...)
+	out, err := runWegCommand(ctx, args...)
 	if err != nil {
-		return mcplib.NewToolResultError(err.Error()), nil
+		return toolError(err)
 	}
 	return mcplib.NewToolResultText(out), nil
 }
 
-func handleWegApiCall(_ context.Context, request mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
+func handleWegApiCall(ctx context.Context, request mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
 	method, err := request.RequireString("method")
 	if err != nil {
-		return mcplib.NewToolResultError(err.Error()), nil
+		return toolParamError(err)
 	}
 	site := request.GetString("site", "")
 	extraArgs := request.GetString("args", "")
@@ -104,38 +108,37 @@ func handleWegApiCall(_ context.Context, request mcplib.CallToolRequest) (*mcpli
 	args := []string{"api", "call", method, "--raw"}
 	args = append(args, siteArgs(site)...)
 	if extraArgs != "" {
-		// Pass extra args as additional CLI arguments
-		args = append(args, strings.Fields(extraArgs)...)
+		args = append(args, tokenizeArgs(extraArgs)...)
 	}
 
-	out, err := runWegCommand(args...)
+	out, err := runWegCommand(ctx, args...)
 	if err != nil {
-		return mcplib.NewToolResultError(err.Error()), nil
+		return toolError(err)
 	}
 	return mcplib.NewToolResultText(out), nil
 }
 
-func handleWegExec(_ context.Context, request mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
+func handleWegExec(ctx context.Context, request mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
 	command, err := request.RequireString("command")
 	if err != nil {
-		return mcplib.NewToolResultError(err.Error()), nil
+		return toolParamError(err)
 	}
 	site := request.GetString("site", "")
 
 	args := []string{"exec"}
 	args = append(args, siteArgs(site)...)
-	args = append(args, strings.Fields(command)...)
+	args = append(args, tokenizeArgs(command)...)
 
-	out, err := runWegCommand(args...)
+	out, err := runWegCommand(ctx, args...)
 	if err != nil {
-		return mcplib.NewToolResultError(err.Error()), nil
+		return toolError(err)
 	}
 	return mcplib.NewToolResultText(out), nil
 }
 
 // --- Tier 2: Common dev operations ---
 
-func handleWegTest(_ context.Context, request mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
+func handleWegTest(ctx context.Context, request mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
 	app := request.GetString("app", "")
 	module := request.GetString("module", "")
 	site := request.GetString("site", "")
@@ -149,14 +152,14 @@ func handleWegTest(_ context.Context, request mcplib.CallToolRequest) (*mcplib.C
 		args = append(args, "--module", module)
 	}
 
-	out, err := runWegCommand(args...)
+	out, err := runWegCommand(ctx, args...)
 	if err != nil {
-		return mcplib.NewToolResultError(err.Error()), nil
+		return toolError(err)
 	}
 	return mcplib.NewToolResultText(out), nil
 }
 
-func handleWegBuild(_ context.Context, request mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
+func handleWegBuild(ctx context.Context, request mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
 	app := request.GetString("app", "")
 
 	args := []string{"build"}
@@ -171,14 +174,14 @@ func handleWegBuild(_ context.Context, request mcplib.CallToolRequest) (*mcplib.
 		}
 	}
 
-	out, err := runWegCommand(args...)
+	out, err := runWegCommand(ctx, args...)
 	if err != nil {
-		return mcplib.NewToolResultError(err.Error()), nil
+		return toolError(err)
 	}
 	return mcplib.NewToolResultText(out), nil
 }
 
-func handleWegMigrate(_ context.Context, request mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
+func handleWegMigrate(ctx context.Context, request mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
 	site := request.GetString("site", "")
 
 	args := []string{"db", "migrate"}
@@ -186,37 +189,37 @@ func handleWegMigrate(_ context.Context, request mcplib.CallToolRequest) (*mcpli
 		args = append(args, site)
 	}
 
-	out, err := runWegCommand(args...)
+	out, err := runWegCommand(ctx, args...)
 	if err != nil {
-		return mcplib.NewToolResultError(err.Error()), nil
+		return toolError(err)
 	}
 	return mcplib.NewToolResultText(out), nil
 }
 
-func handleWegCacheClear(_ context.Context, request mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
+func handleWegCacheClear(ctx context.Context, request mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
 	site := request.GetString("site", "")
 
 	args := []string{"cache", "clear"}
 	args = append(args, siteArgs(site)...)
 
-	out, err := runWegCommand(args...)
+	out, err := runWegCommand(ctx, args...)
 	if err != nil {
-		return mcplib.NewToolResultError(err.Error()), nil
+		return toolError(err)
 	}
 	return mcplib.NewToolResultText(out), nil
 }
 
 // --- Tier 3: In-process introspection handlers ---
 
-func handleWegStatus(_ context.Context, _ mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
+func handleWegStatus(ctx context.Context, _ mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
 	absPath, err := filepath.Abs(".")
 	if err != nil {
-		return mcplib.NewToolResultError(fmt.Sprintf("failed to get working directory: %v", err)), nil
+		return toolError(fmt.Errorf("failed to get working directory: %w", err))
 	}
 
 	result, err := config.DetectContext(absPath)
 	if err != nil {
-		return mcplib.NewToolResultError(fmt.Sprintf("failed to detect context: %v", err)), nil
+		return toolError(fmt.Errorf("failed to detect context: %w", err))
 	}
 
 	status := map[string]interface{}{
@@ -257,47 +260,42 @@ func handleWegStatus(_ context.Context, _ mcplib.CallToolRequest) (*mcplib.CallT
 	return mcplib.NewToolResultText(string(data)), nil
 }
 
-func handleWegDoctypeShow(_ context.Context, request mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
+func handleWegDoctypeShow(ctx context.Context, request mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
 	doctype, err := request.RequireString("doctype")
 	if err != nil {
-		return mcplib.NewToolResultError(err.Error()), nil
+		return toolParamError(err)
 	}
 	site := request.GetString("site", "")
 
 	args := []string{"doctype", "show", doctype, "--json"}
 	args = append(args, siteArgs(site)...)
 
-	out, err := runWegCommand(args...)
+	out, err := runWegCommand(ctx, args...)
 	if err != nil {
-		return mcplib.NewToolResultError(err.Error()), nil
+		return toolError(err)
 	}
 	return mcplib.NewToolResultText(out), nil
 }
 
-func handleWegSiteList(_ context.Context, _ mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
+func handleWegSiteList(ctx context.Context, _ mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
 	absPath, err := filepath.Abs(".")
 	if err != nil {
-		return mcplib.NewToolResultError(fmt.Sprintf("failed to get working directory: %v", err)), nil
+		return toolError(fmt.Errorf("failed to get working directory: %w", err))
 	}
 
 	result, err := config.DetectContext(absPath)
 	if err != nil {
-		return mcplib.NewToolResultError(fmt.Sprintf("failed to detect context: %v", err)), nil
+		return toolError(fmt.Errorf("failed to detect context: %w", err))
 	}
 
-	var benchPath string
-	switch result.Context {
-	case config.ContextWegApp:
-		benchPath = filepath.Join(absPath, ".weg")
-	case config.ContextWegBench:
-		benchPath = absPath
-	default:
-		return mcplib.NewToolResultError("not a weg-managed project"), nil
+	if !result.IsWegManaged() {
+		return toolError(wegerrors.NotInProject(absPath))
 	}
+	benchPath := result.BenchPath
 
-	st, err := state.Load(absPath)
+	st, err := state.Load(benchPath)
 	if err != nil {
-		return mcplib.NewToolResultError(fmt.Sprintf("failed to load state: %v", err)), nil
+		return toolError(fmt.Errorf("failed to load state: %w", err))
 	}
 
 	type siteInfo struct {
@@ -334,30 +332,25 @@ func handleWegSiteList(_ context.Context, _ mcplib.CallToolRequest) (*mcplib.Cal
 	return mcplib.NewToolResultText(string(data)), nil
 }
 
-func handleWegAppList(_ context.Context, _ mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
+func handleWegAppList(ctx context.Context, _ mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
 	absPath, err := filepath.Abs(".")
 	if err != nil {
-		return mcplib.NewToolResultError(fmt.Sprintf("failed to get working directory: %v", err)), nil
+		return toolError(fmt.Errorf("failed to get working directory: %w", err))
 	}
 
 	result, err := config.DetectContext(absPath)
 	if err != nil {
-		return mcplib.NewToolResultError(fmt.Sprintf("failed to detect context: %v", err)), nil
+		return toolError(fmt.Errorf("failed to detect context: %w", err))
 	}
 
-	var benchPath string
-	switch result.Context {
-	case config.ContextWegApp:
-		benchPath = filepath.Join(absPath, ".weg")
-	case config.ContextWegBench:
-		benchPath = absPath
-	default:
-		return mcplib.NewToolResultError("not a weg-managed project"), nil
+	if !result.IsWegManaged() {
+		return toolError(wegerrors.NotInProject(absPath))
 	}
+	benchPath := result.BenchPath
 
-	st, err := state.Load(absPath)
+	st, err := state.Load(benchPath)
 	if err != nil {
-		return mcplib.NewToolResultError(fmt.Sprintf("failed to load state: %v", err)), nil
+		return toolError(fmt.Errorf("failed to load state: %w", err))
 	}
 
 	type appInfo struct {
