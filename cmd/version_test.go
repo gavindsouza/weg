@@ -129,7 +129,6 @@ func TestRunVersionCmd_UnknownCommit(t *testing.T) {
 	}
 }
 
-
 func TestGetAppVersion(t *testing.T) {
 	tests := []struct {
 		name        string

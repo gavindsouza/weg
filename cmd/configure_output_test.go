@@ -58,10 +58,10 @@ func TestConfigureOutput_DefaultNoFlags(t *testing.T) {
 
 func TestConfigureOutput_VerboseEscalation(t *testing.T) {
 	tests := []struct {
-		name         string
-		count        int
-		wantLevel    output.Verbosity
-		wantVerbose  bool
+		name        string
+		count       int
+		wantLevel   output.Verbosity
+		wantVerbose bool
 	}{
 		{"v", 1, output.VerbosityVerbose, true},
 		{"vv", 2, output.VerbosityDebug, true},

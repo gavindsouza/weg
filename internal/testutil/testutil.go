@@ -13,9 +13,9 @@ type Bench struct {
 	path string
 	apps []string
 	// sites maps site name to its config content
-	sites      map[string]string
-	wegToml    string
-	stateJSON  string
+	sites     map[string]string
+	wegToml   string
+	stateJSON string
 }
 
 // NewBench creates a test bench builder. Call Build() to materialize.

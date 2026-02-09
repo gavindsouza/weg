@@ -135,4 +135,3 @@ func getAppVersion(benchPath, appName string) string {
 
 	return ""
 }
-
