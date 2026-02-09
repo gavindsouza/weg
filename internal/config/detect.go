@@ -3,6 +3,8 @@ package config
 import (
 	"os"
 	"path/filepath"
+
+	"github.com/gavindsouza/weg/internal/output"
 )
 
 // Context represents the type of directory we're operating in
@@ -50,6 +52,8 @@ type DetectionResult struct {
 
 // DetectContext analyzes a directory to determine its context
 func DetectContext(path string) (*DetectionResult, error) {
+	defer output.WithTiming(output.DebugConfig, "DetectContext")()
+
 	absPath, err := filepath.Abs(path)
 	if err != nil {
 		return nil, err
@@ -65,6 +69,7 @@ func DetectContext(path string) (*DetectionResult, error) {
 		result.Context = ContextWegBench
 		result.ConfigPath = filepath.Join(absPath, "weg.toml")
 		result.BenchPath = absPath
+		output.Debugf(output.DebugConfig, "detected context=%s path=%s", result.Context, absPath)
 		return result, nil
 	}
 
@@ -91,6 +96,7 @@ func DetectContext(path string) (*DetectionResult, error) {
 	if HasWegSection(absPath) {
 		result.Context = ContextWegApp
 		result.AppName = filepath.Base(absPath)
+		result.BenchPath = filepath.Join(absPath, ".weg")
 		result.ConfigPath = filepath.Join(absPath, "pyproject.toml")
 		return result, nil
 	}
@@ -229,6 +235,11 @@ func dirExists(path string) bool {
 func fileExists(path string) bool {
 	info, err := os.Stat(path)
 	return err == nil && !info.IsDir()
+}
+
+// IsWegManaged returns true if this is a weg-managed project (app or bench)
+func (r *DetectionResult) IsWegManaged() bool {
+	return r.Context == ContextWegApp || r.Context == ContextWegBench
 }
 
 // ContextDescription returns a user-friendly description of the context

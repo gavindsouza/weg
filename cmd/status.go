@@ -53,11 +53,29 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	// Context info
 	fmt.Printf("Context:  %s\n", result.ContextDescription())
 	fmt.Printf("Path:     %s\n", absPath)
+	if result.BenchPath != "" {
+		fmt.Printf("Bench:    %s\n", result.BenchPath)
+	}
 	if result.ConfigPath != "" {
 		fmt.Printf("Config:   %s\n", result.ConfigPath)
 	}
 	if result.AppName != "" {
 		fmt.Printf("App:      %s\n", result.AppName)
+	}
+
+	// Show default site if in a managed project
+	if result.IsWegManaged() {
+		if site := ResolveDefaultSite(absPath); site != "" {
+			fmt.Printf("Site:     %s (default)\n", site)
+		}
+	}
+
+	// Warn about ambiguous configuration signals
+	if result.IsWegManaged() {
+		if config.HasWegToml(absPath) && config.HasWegSection(absPath) {
+			fmt.Printf("\n⚠ Both weg.toml and pyproject.toml [tool.weg] detected.\n")
+			fmt.Printf("  weg.toml takes precedence. Remove one to avoid confusion.\n")
+		}
 	}
 
 	// Handle different contexts

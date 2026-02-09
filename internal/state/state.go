@@ -7,8 +7,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"syscall"
 	"time"
+
+	"github.com/gavindsouza/weg/internal/output"
 )
 
 const (
@@ -72,6 +75,7 @@ func NewState() *State {
 
 // Load reads the state from the .weg directory with file locking
 func Load(basePath string) (*State, error) {
+	defer output.WithTiming(output.DebugState, "state.Load")()
 	statePath := getStatePath(basePath)
 
 	// Check if file exists first (avoid creating lock file for non-existent state)
@@ -125,6 +129,7 @@ func loadStateUnlocked(statePath string) (*State, error) {
 
 // Save writes the state to the .weg directory atomically with file locking
 func (s *State) Save(basePath string) error {
+	defer output.WithTiming(output.DebugState, "state.Save")()
 	wegDir := getWegDir(basePath)
 	statePath := getStatePath(basePath)
 
@@ -281,6 +286,7 @@ func (s *State) AppNames() []string {
 	for name := range s.Apps {
 		names = append(names, name)
 	}
+	sort.Strings(names)
 	return names
 }
 
@@ -290,6 +296,7 @@ func (s *State) SiteNames() []string {
 	for name := range s.Sites {
 		names = append(names, name)
 	}
+	sort.Strings(names)
 	return names
 }
 
