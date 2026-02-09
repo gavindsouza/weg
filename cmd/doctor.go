@@ -22,7 +22,11 @@ Checks:
   - Required services (mariadb, redis)
   - Site configuration
   - Asset symlinks
-  - Python environment`,
+  - Python environment
+
+Examples:
+  weg doctor       # Run all checks in current project
+  weg doctor -v    # Run with verbose output`,
 	RunE: runDoctor,
 }
 

@@ -1,10 +1,11 @@
 # Weg
 
+[![Go](https://img.shields.io/badge/Go-1.24+-00ADD8?logo=go&logoColor=white)](https://go.dev)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 The fast way to develop Frappe apps.
 
-## What is Weg?
-
-Weg means "way" in German and "speed" in Marathi/Sanskrit — the fast way to develop Frappe applications. It's a modern replacement for Frappe's `bench` CLI with declarative configuration and faster tooling.
+Weg means "way" in German and "speed" in Marathi/Sanskrit — a modern replacement for Frappe's `bench` CLI with declarative configuration and faster tooling.
 
 ## Three Development Modes
 
@@ -53,6 +54,7 @@ This creates a git-backed directory mirroring the site's customizations, enablin
 - **Modern tooling** - devbox (Nix), uv (fast Python), process-compose
 - **Direct API access** - `weg api` without HTTP overhead
 - **Container support** - Docker Compose generation and production image builds
+- **MCP server** - AI assistant integration via Model Context Protocol
 - **70+ commands** covering all common Frappe development workflows
 - **Works from anywhere** - run commands from any subdirectory within your project
 
@@ -210,9 +212,9 @@ Weg uses `weg.toml` for bench-centric projects or `pyproject.toml [tool.weg]` fo
 ```toml
 [frappe]
 version = "15"
+database = "mariadb"
 
-[[apps]]
-name = "erpnext"
+[apps.erpnext]
 url = "https://github.com/frappe/erpnext"
 branch = "version-15"
 
@@ -222,15 +224,9 @@ default = true
 apps = ["frappe", "erpnext"]
 
 [services.workers]
-# Scale background workers per queue
 short = 1
 default = 2
 long = 1
-# Custom queues are also supported
-notifications = 2
-exports = 1
-# "all" consumes all standard queues (short, default, long)
-# all = 1
 ```
 
 ### pyproject.toml (app-centric)
@@ -323,18 +319,23 @@ weg completion zsh > ~/.oh-my-zsh/completions/_weg
 | Remote site editing | Built-in (git-backed) | Not available |
 | Cloud integration | Built-in | Separate tool |
 
-## Development
+## AI Integration
+
+Weg includes an MCP (Model Context Protocol) server that lets AI assistants manage your Frappe environment:
 
 ```bash
-git clone https://github.com/gavindsouza/weg
-cd weg
-git config core.hooksPath .githooks
-go build -o weg .
+weg mcp install   # Configure for Claude Code / other MCP clients
 ```
+
+The MCP server exposes 12 tools for running Python, calling APIs, managing sites, and more — replacing common anti-patterns like manual `bench` activation or direct `frappe` imports.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, testing, and code style guidelines.
 
 ## Requirements
 
-- Go 1.21+ (for building from source)
+- Go 1.24+ (for building from source)
 - [devbox](https://www.jetify.com/devbox) (installed automatically on first use)
 - Git
 
