@@ -58,15 +58,32 @@ func newDefaultRedactor() *Redactor {
 		regexp.MustCompile(`(?i)basic\s+[a-zA-Z0-9+/=]+`),
 		// API key patterns (key:secret format)
 		regexp.MustCompile(`[a-zA-Z0-9]{16,}:[a-zA-Z0-9]{16,}`),
+		// JWT tokens (eyJ prefix = base64 of {"
+		regexp.MustCompile(`eyJ[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}`),
+		// AWS access key IDs
+		regexp.MustCompile(`AKIA[0-9A-Z]{16}`),
+		// GitHub tokens (classic PAT, fine-grained PAT, OAuth)
+		regexp.MustCompile(`gh[ps]_[a-zA-Z0-9]{36,}`),
+		regexp.MustCompile(`github_pat_[a-zA-Z0-9_]{22,}`),
+		regexp.MustCompile(`gho_[a-zA-Z0-9]{36,}`),
 	}
 
 	return r
 }
 
 // IsSecretField checks if a field name indicates a secret value.
+// Uses substring matching so "db_password_hash" matches "password".
 func (r *Redactor) IsSecretField(name string) bool {
 	lower := strings.ToLower(name)
-	return r.secretFields[lower]
+	if r.secretFields[lower] {
+		return true
+	}
+	for field := range r.secretFields {
+		if strings.Contains(lower, field) {
+			return true
+		}
+	}
+	return false
 }
 
 // Redact masks a secret value.

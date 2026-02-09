@@ -163,6 +163,18 @@ func TestIsSecretField(t *testing.T) {
 		}
 	}
 
+	// Substring matching: compound field names containing secret keywords
+	substringSecrets := []string{
+		"db_password", "db_password_hash", "admin_password",
+		"api_token_v2", "access_token_expiry", "refresh_token_hash",
+	}
+
+	for _, name := range substringSecrets {
+		if !IsSecretField(name) {
+			t.Errorf("IsSecretField(%q) = false, want true (substring match)", name)
+		}
+	}
+
 	nonSecrets := []string{
 		"name", "email", "status", "url", "path",
 	}
@@ -1116,6 +1128,31 @@ func TestRedactString(t *testing.T) {
 			input:    `no secrets here`,
 			contains: "no secrets here",
 			desc:     "non-matching strings should pass through",
+		},
+		{
+			input:    `token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U`,
+			contains: "***",
+			desc:     "JWT token should be redacted",
+		},
+		{
+			input:    `aws_key: AKIAIOSFODNN7EXAMPLE`,
+			contains: "***",
+			desc:     "AWS access key ID should be redacted",
+		},
+		{
+			input:    `token: ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij`,
+			contains: "***",
+			desc:     "GitHub classic PAT should be redacted",
+		},
+		{
+			input:    `token: github_pat_ABCDEFGHIJKLMNOPQRSTUVw`,
+			contains: "***",
+			desc:     "GitHub fine-grained PAT should be redacted",
+		},
+		{
+			input:    `token: gho_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij`,
+			contains: "***",
+			desc:     "GitHub OAuth token should be redacted",
 		},
 	}
 
