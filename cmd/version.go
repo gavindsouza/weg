@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/gavindsouza/weg/internal/config"
 	"github.com/gavindsouza/weg/internal/state"
@@ -108,7 +109,7 @@ func getAppVersion(benchPath, appName string) string {
 			`__version__="`,
 			`__version__='`,
 		} {
-			if idx := indexOf(content, line); idx != -1 {
+			if idx := strings.Index(content, line); idx != -1 {
 				start := idx + len(line)
 				end := start
 				for end < len(content) && content[end] != '"' && content[end] != '\'' {
@@ -135,11 +136,3 @@ func getAppVersion(benchPath, appName string) string {
 	return ""
 }
 
-func indexOf(s, substr string) int {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return i
-		}
-	}
-	return -1
-}

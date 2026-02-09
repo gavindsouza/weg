@@ -37,19 +37,13 @@ func ResolveBenchPathFrom(path string) (*BenchContext, error) {
 		return nil, fmt.Errorf("failed to detect context: %w", err)
 	}
 
-	var benchPath string
-	switch result.Context {
-	case config.ContextWegBench:
-		benchPath = absPath
-	case config.ContextWegApp:
-		benchPath = filepath.Join(absPath, ".weg")
-	default:
+	if !result.IsWegManaged() {
 		return nil, fmt.Errorf("not a weg-managed project")
 	}
 
 	return &BenchContext{
 		AbsPath:   absPath,
-		BenchPath: benchPath,
+		BenchPath: result.BenchPath,
 		Context:   result.Context,
 		Result:    result,
 	}, nil

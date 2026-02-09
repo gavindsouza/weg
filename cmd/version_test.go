@@ -129,60 +129,6 @@ func TestRunVersionCmd_UnknownCommit(t *testing.T) {
 	}
 }
 
-func TestIndexOf(t *testing.T) {
-	tests := []struct {
-		name     string
-		s        string
-		substr   string
-		expected int
-	}{
-		{
-			name:     "found at start",
-			s:        "hello world",
-			substr:   "hello",
-			expected: 0,
-		},
-		{
-			name:     "found in middle",
-			s:        "hello world",
-			substr:   "world",
-			expected: 6,
-		},
-		{
-			name:     "not found",
-			s:        "hello world",
-			substr:   "foo",
-			expected: -1,
-		},
-		{
-			name:     "empty string",
-			s:        "",
-			substr:   "foo",
-			expected: -1,
-		},
-		{
-			name:     "empty substr",
-			s:        "hello",
-			substr:   "",
-			expected: 0,
-		},
-		{
-			name:     "version pattern",
-			s:        `__version__ = "1.2.3"`,
-			substr:   `__version__ = "`,
-			expected: 0,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := indexOf(tt.s, tt.substr)
-			if result != tt.expected {
-				t.Errorf("indexOf(%q, %q) = %d, expected %d", tt.s, tt.substr, result, tt.expected)
-			}
-		})
-	}
-}
 
 func TestGetAppVersion(t *testing.T) {
 	tests := []struct {

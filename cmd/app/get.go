@@ -2,10 +2,12 @@ package app
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 
+	"github.com/BurntSushi/toml"
 	"github.com/gavindsouza/weg/internal/apps"
 	"github.com/gavindsouza/weg/internal/config"
 	"github.com/gavindsouza/weg/internal/output"
@@ -49,17 +51,11 @@ func runGet(cmd *cobra.Command, args []string) error {
 	// Parse app specification
 	appURL, appName := parseAppSpec(appSpec)
 
-	var benchPath, appsDir string
-	switch result.Context {
-	case config.ContextWegBench:
-		benchPath = absPath
-		appsDir = filepath.Join(benchPath, "apps")
-	case config.ContextWegApp:
-		benchPath = filepath.Join(absPath, ".weg")
-		appsDir = filepath.Join(benchPath, "apps")
-	default:
+	if !result.IsWegManaged() {
 		return fmt.Errorf("not a weg-managed project")
 	}
+	benchPath := result.BenchPath
+	appsDir := filepath.Join(benchPath, "apps")
 
 	// Check if already installed
 	st, err := state.Load(absPath)
@@ -134,14 +130,29 @@ func extractAppName(url string) string {
 }
 
 func addAppToWegToml(path, name, url, branch string) error {
-	// This is a simplified version - in practice would use proper TOML manipulation
-	// For now, we just note that the config should be updated
-	fmt.Printf("Note: Add the following to weg.toml:\n\n")
-	fmt.Printf("[apps.%s]\n", name)
-	fmt.Printf("url = \"%s\"\n", url)
-	if branch != "" {
-		fmt.Printf("branch = \"%s\"\n", branch)
+	wegPath := filepath.Join(path, "weg.toml")
+	cfg, err := config.ParseWegToml(path)
+	if err != nil {
+		return fmt.Errorf("failed to read weg.toml: %w", err)
 	}
-	fmt.Println()
+
+	if cfg.Apps == nil {
+		cfg.Apps = make(map[string]config.AppSettings)
+	}
+	cfg.Apps[name] = config.AppSettings{
+		URL:    url,
+		Branch: branch,
+	}
+
+	f, err := os.Create(wegPath)
+	if err != nil {
+		return fmt.Errorf("failed to write weg.toml: %w", err)
+	}
+	defer f.Close()
+
+	if err := toml.NewEncoder(f).Encode(cfg); err != nil {
+		return fmt.Errorf("failed to encode weg.toml: %w", err)
+	}
+
 	return nil
 }
