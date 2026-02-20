@@ -228,13 +228,13 @@ func LinkLocalApp(name, sourcePath string, opts InstallOptions) error {
 
 // InstallAppOnSite installs an app on a Frappe site
 func InstallAppOnSite(siteName, appName string, opts InstallOptions) error {
-	// Run via bench_helper from sites directory using env Python
 	sitesDir := filepath.Join(opts.BenchPath, "sites")
-	shellCmd := fmt.Sprintf("cd %s && ../env/bin/python -m frappe.utils.bench_helper frappe --site %s install-app %s",
-		sitesDir, siteName, appName)
+	pythonPath := filepath.Join(opts.BenchPath, "env", "bin", "python")
 
-	cmd := exec.Command("devbox", "run", "-c", opts.BenchPath, "--", "sh", "-c", shellCmd)
-	cmd.Dir = opts.BenchPath
+	cmd := exec.Command("devbox", "run", "-c", opts.BenchPath, "--",
+		pythonPath, "-m", "frappe.utils.bench_helper",
+		"frappe", "--site", siteName, "install-app", appName)
+	cmd.Dir = sitesDir
 	if opts.Verbose {
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
@@ -244,13 +244,13 @@ func InstallAppOnSite(siteName, appName string, opts InstallOptions) error {
 
 // UninstallAppFromSite uninstalls an app from a Frappe site
 func UninstallAppFromSite(siteName, appName string, opts InstallOptions) error {
-	// Run via bench_helper from sites directory using env Python
 	sitesDir := filepath.Join(opts.BenchPath, "sites")
-	shellCmd := fmt.Sprintf("cd %s && ../env/bin/python -m frappe.utils.bench_helper frappe --site %s uninstall-app %s --yes",
-		sitesDir, siteName, appName)
+	pythonPath := filepath.Join(opts.BenchPath, "env", "bin", "python")
 
-	cmd := exec.Command("devbox", "run", "-c", opts.BenchPath, "--", "sh", "-c", shellCmd)
-	cmd.Dir = opts.BenchPath
+	cmd := exec.Command("devbox", "run", "-c", opts.BenchPath, "--",
+		pythonPath, "-m", "frappe.utils.bench_helper",
+		"frappe", "--site", siteName, "uninstall-app", appName, "--yes")
+	cmd.Dir = sitesDir
 	if opts.Verbose {
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr

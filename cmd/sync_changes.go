@@ -486,26 +486,34 @@ func createSite(sitesDir string, cfg *config.SiteConfig, appsToInstall []string)
 		return fmt.Errorf("MariaDB socket not found at %s after 30 seconds. Try running 'devbox services stop' and then 'weg sync' again", mysqlSocket)
 	}
 
-	// Build install-app flags for non-frappe apps
-	var installAppFlags string
+	// Build command arguments safely (no shell interpolation)
+	adminPass := cfg.AdminPass
+	if adminPass == "" {
+		adminPass = "admin"
+	}
+	pythonPath := filepath.Join(benchPath, "env", "bin", "python")
+	args := []string{
+		"run", "-c", benchPath, "--",
+		pythonPath, "-m", "frappe.utils.bench_helper",
+		"frappe", "new-site", cfg.Name,
+		"--admin-password=" + adminPass,
+		"--db-root-password=",
+		"--db-socket=" + mysqlSocket,
+	}
 	for _, app := range appsToInstall {
 		if app != "frappe" {
-			// Convert to module name (hyphens to underscores)
 			moduleName := strings.ReplaceAll(app, "-", "_")
-			installAppFlags += fmt.Sprintf(" --install-app=%s", moduleName)
+			args = append(args, "--install-app="+moduleName)
 		}
 	}
 
-	// Create the site using bench new-site via the venv Python
-	// Use the devbox mariadb socket and empty root password
 	// NOTE: frappe commands must run from the sites directory (where apps.txt is)
 	PrintVerbose("Running new-site for %s...", cfg.Name)
-	shellCmd := fmt.Sprintf(
-		`cd %s && ../env/bin/python -m frappe.utils.bench_helper frappe new-site %s --admin-password=admin --db-root-password= --db-socket=%s%s`,
-		sitesDir, cfg.Name, mysqlSocket, installAppFlags,
-	)
-
-	if err := runCmdInDir(benchPath, "devbox", "run", "--", "sh", "-c", shellCmd); err != nil {
+	cmd := exec.Command("devbox", args...)
+	cmd.Dir = sitesDir
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to create site: %w", err)
 	}
 

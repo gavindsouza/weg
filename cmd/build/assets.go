@@ -71,10 +71,12 @@ func runAssets(cmd *cobra.Command, args []string) error {
 
 	// Run frappe build via bench_helper
 	sitesDir := filepath.Join(benchPath, "sites")
-	shellCmd := fmt.Sprintf("cd %s && ../env/bin/python -m frappe.utils.bench_helper frappe %s",
-		sitesDir, strings.Join(buildArgs, " "))
+	pythonPath := filepath.Join(benchPath, "env", "bin", "python")
+	devboxArgs := []string{"run", "-c", benchPath, "--", pythonPath, "-m", "frappe.utils.bench_helper", "frappe"}
+	devboxArgs = append(devboxArgs, buildArgs...)
 
-	buildCmd := exec.Command("devbox", "run", "-c", benchPath, "--", "sh", "-c", shellCmd)
+	buildCmd := exec.Command("devbox", devboxArgs...)
+	buildCmd.Dir = sitesDir
 	buildCmd.Stdout = os.Stdout
 	buildCmd.Stderr = os.Stderr
 

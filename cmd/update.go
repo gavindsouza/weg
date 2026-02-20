@@ -330,9 +330,12 @@ func analyzeChanges(repoPath, oldCommit, newCommit string) changeAnalysis {
 // runMigrateForUpdate runs database migrations during update
 func runMigrateForUpdate(benchPath string) error {
 	sitesDir := filepath.Join(benchPath, "sites")
-	shellCmd := fmt.Sprintf("cd %s && ../env/bin/python -m frappe.utils.bench_helper frappe --site all migrate", sitesDir)
+	pythonPath := filepath.Join(benchPath, "env", "bin", "python")
 
-	cmd := exec.Command("devbox", "run", "-c", benchPath, "--", "sh", "-c", shellCmd)
+	cmd := exec.Command("devbox", "run", "-c", benchPath, "--",
+		pythonPath, "-m", "frappe.utils.bench_helper",
+		"frappe", "--site", "all", "migrate")
+	cmd.Dir = sitesDir
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
@@ -345,11 +348,13 @@ func isServicesRunning(benchPath string) bool {
 }
 
 func runBuildAll(benchPath string) error {
-	// Run frappe build via bench_helper
 	sitesDir := filepath.Join(benchPath, "sites")
-	shellCmd := fmt.Sprintf("cd %s && ../env/bin/python -m frappe.utils.bench_helper frappe build", sitesDir)
+	pythonPath := filepath.Join(benchPath, "env", "bin", "python")
 
-	buildCmd := exec.Command("devbox", "run", "-c", benchPath, "--", "sh", "-c", shellCmd)
+	buildCmd := exec.Command("devbox", "run", "-c", benchPath, "--",
+		pythonPath, "-m", "frappe.utils.bench_helper",
+		"frappe", "build")
+	buildCmd.Dir = sitesDir
 	buildCmd.Stdout = os.Stdout
 	buildCmd.Stderr = os.Stderr
 

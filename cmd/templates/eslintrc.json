@@ -1,0 +1,28 @@
+{
+	"env": {
+		"browser": true,
+		"node": true,
+		"es2022": true
+	},
+	"parserOptions": {
+		"ecmaVersion": "latest",
+		"sourceType": "module"
+	},
+	"extends": "eslint:recommended",
+	"rules": {
+		"indent": ["error", "tab"],
+		"linebreak-style": ["error", "unix"],
+		"no-console": "warn",
+		"no-unused-vars": ["error", { "argsIgnorePattern": "^_" }]
+	},
+	"globals": {
+		"frappe": "readonly",
+		"$": "readonly",
+		"__": "readonly",
+		"locals": "readonly",
+		"cur_frm": "readonly",
+		"cur_dialog": "readonly",
+		"cur_page": "readonly",
+		"cur_list": "readonly"
+	}
+}

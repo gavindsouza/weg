@@ -6,7 +6,6 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
-	"strings"
 	"syscall"
 
 	"github.com/gavindsouza/weg/internal/output"
@@ -56,10 +55,12 @@ func runWatch(cmd *cobra.Command, args []string) error {
 
 	// Run frappe watch via bench_helper
 	sitesDir := filepath.Join(benchPath, "sites")
-	shellCmd := fmt.Sprintf("cd %s && ../env/bin/python -m frappe.utils.bench_helper frappe %s",
-		sitesDir, strings.Join(watchArgs, " "))
+	pythonPath := filepath.Join(benchPath, "env", "bin", "python")
+	devboxArgs := []string{"run", "-c", benchPath, "--", pythonPath, "-m", "frappe.utils.bench_helper", "frappe"}
+	devboxArgs = append(devboxArgs, watchArgs...)
 
-	watchCmd := exec.Command("devbox", "run", "-c", benchPath, "--", "sh", "-c", shellCmd)
+	watchCmd := exec.Command("devbox", devboxArgs...)
+	watchCmd.Dir = sitesDir
 	watchCmd.Stdout = os.Stdout
 	watchCmd.Stderr = os.Stderr
 

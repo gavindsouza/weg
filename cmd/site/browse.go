@@ -78,10 +78,12 @@ func runBrowse(cmd *cobra.Command, args []string) error {
 
 	// Run frappe browse via devbox
 	sitesDir := filepath.Join(benchPath, "sites")
-	shellCmd := fmt.Sprintf("cd %s && ../env/bin/python -m frappe.utils.bench_helper frappe --site %s browse --user %s",
-		sitesDir, site, browseUser)
+	pythonPath := filepath.Join(benchPath, "env", "bin", "python")
 
-	execCmd := exec.Command("devbox", "run", "-c", benchPath, "--", "sh", "-c", shellCmd)
+	execCmd := exec.Command("devbox", "run", "-c", benchPath, "--",
+		pythonPath, "-m", "frappe.utils.bench_helper",
+		"frappe", "--site", site, "browse", "--user", browseUser)
+	execCmd.Dir = sitesDir
 	execCmd.Stdout = os.Stdout
 	execCmd.Stderr = os.Stderr
 	execCmd.Stdin = os.Stdin

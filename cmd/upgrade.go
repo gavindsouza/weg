@@ -398,11 +398,11 @@ func runMigrations(benchPath string, result *config.DetectionResult) error {
 		siteName := entry.Name()
 		PrintVerbose("  Migrating %s...", siteName)
 
-		shellCmd := fmt.Sprintf("cd %s && ../env/bin/python -m frappe.utils.bench_helper frappe --site %s migrate",
-			sitesDir, siteName)
-
-		cmd := exec.Command("devbox", "run", "-c", benchPath, "--", "sh", "-c", shellCmd)
-		cmd.Dir = benchPath
+		pythonPath := filepath.Join(benchPath, "env", "bin", "python")
+		cmd := exec.Command("devbox", "run", "-c", benchPath, "--",
+			pythonPath, "-m", "frappe.utils.bench_helper",
+			"frappe", "--site", siteName, "migrate")
+		cmd.Dir = sitesDir
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		if err := cmd.Run(); err != nil {

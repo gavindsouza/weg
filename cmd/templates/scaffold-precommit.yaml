@@ -1,0 +1,46 @@
+# Pre-commit hooks for Frappe app development
+# Install: pip install pre-commit && pre-commit install
+
+repos:
+  # Frappe-specific semgrep rules
+  - repo: https://github.com/frappe/semgrep-rules
+    rev: v0.5.0
+    hooks:
+      - id: frappe-correctness
+        name: Frappe Correctness
+      - id: frappe-ux
+        name: Frappe UX
+      - id: frappe-translate
+        name: Frappe Translation
+
+  # Python linting with Ruff
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.6
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+      - id: ruff-format
+
+  # General hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: '\.md$'
+      - id: end-of-file-fixer
+        exclude: '\.json$'
+      - id: check-yaml
+      - id: check-json
+      - id: check-added-large-files
+        args: [--maxkb=500]
+      - id: check-merge-conflict
+      - id: debug-statements
+
+  # Security scanning
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.8.2
+    hooks:
+      - id: bandit
+        args: [-c, pyproject.toml, -r]
+        additional_dependencies: ["bandit[toml]"]
+        exclude: test_.*\.py$
