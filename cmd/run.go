@@ -40,6 +40,7 @@ Examples:
   weg run https://github.com/frappe/erpnext
   weg run https://github.com/frappe/hrms --version 15
   weg run git@github.com:myorg/myapp.git --db postgres
+  weg run frappe/hrms --branch version-15
   weg run ./local-app-directory`,
 	Args: cobra.ExactArgs(1),
 	RunE: runRun,
@@ -48,20 +49,25 @@ Examples:
 var (
 	runVersion   string
 	runDatabase  string
+	runBranch    string
 	runKeep      bool
 	runDirectory string
+	runSkipDeps  bool
 )
 
 func init() {
 	rootCmd.AddCommand(runCmd)
 	runCmd.Flags().StringVar(&runVersion, "version", "", "Frappe version to use (14, 15, 16)")
 	runCmd.Flags().StringVar(&runDatabase, "db", "", "Database to use (mariadb, postgres, sqlite)")
+	runCmd.Flags().StringVarP(&runBranch, "branch", "b", "", "Branch or tag to clone")
 	runCmd.Flags().BoolVar(&runKeep, "keep", false, "Keep the environment after exit (don't cleanup)")
 	runCmd.Flags().StringVar(&runDirectory, "dir", "", "Directory to create environment in (default: temp)")
+	runCmd.Flags().BoolVar(&runSkipDeps, "skip-deps", false, "Skip dependency resolution; install only frappe and the target app")
 }
 
 func runRun(cmd *cobra.Command, args []string) error {
-	appURL := args[0]
+	// Resolve app spec using shared resolver
+	appSpec := apps.ResolveAppSpec(args[0], runBranch)
 
 	PrintInfo("Weg Magic Runner")
 	PrintInfo("==================")
@@ -73,18 +79,13 @@ func runRun(cmd *cobra.Command, args []string) error {
 	var isTemp bool
 	var err error
 
-	if isLocalPath(appURL) {
+	appName = appSpec.Name
+
+	if appSpec.IsLocal {
 		// Local directory
-		appPath, err = filepath.Abs(appURL)
-		if err != nil {
-			return fmt.Errorf("invalid path: %w", err)
-		}
-		appName = filepath.Base(appPath)
+		appPath = appSpec.URL
 		PrintInfo("Using local app: %s", appPath)
 	} else {
-		// Git URL - clone to temp directory
-		appName = extractAppNameFromURL(appURL)
-
 		if runDirectory != "" {
 			appPath = filepath.Join(runDirectory, appName)
 		} else {
@@ -96,8 +97,13 @@ func runRun(cmd *cobra.Command, args []string) error {
 			isTemp = true
 		}
 
-		PrintInfo("Cloning %s...", appURL)
-		if err := apps.CloneRepo(appURL, "", appPath, false); err != nil {
+		source := appSpec.URL
+		if source == "" {
+			return errors.Usagef("cannot resolve app URL for %q — use a full URL or org/repo format", appName)
+		}
+
+		PrintInfo("Cloning %s...", appSpec)
+		if err := apps.CloneRepo(source, appSpec.Branch, appPath, false); err != nil {
 			return fmt.Errorf("failed to clone repository: %w", err)
 		}
 		PrintInfo("Cloned to: %s", appPath)
@@ -253,6 +259,52 @@ apps = ["frappe", "%s"]
 		InstalledAt: time.Now(),
 	}
 
+	// Resolve and install transitive dependencies (unless --skip-deps)
+	if !runSkipDeps {
+		PrintInfo("Resolving dependencies for %s...", appName)
+		installed := map[string]bool{"frappe": true, appName: true}
+
+		resolveOpts := apps.ResolveOptions{
+			BenchPath:     wegPath,
+			AppsDir:       appsDir,
+			AllowRemote:   true,
+			InstalledApps: installed,
+			Verbose:       true,
+			LogFunc: func(format string, a ...any) {
+				PrintInfo(format, a...)
+			},
+		}
+
+		resolveResult, err := apps.ResolveDependencies(appSpec, resolveOpts)
+		if err != nil {
+			PrintVerbose("Dependency resolution failed: %v — continuing without transitive deps", err)
+		} else if len(resolveResult.InstallOrder) > 0 {
+			apps.PrintResolveResult(resolveResult)
+
+			// Add deps to the weg.toml and install them
+			for _, dep := range resolveResult.InstallOrder {
+				PrintInfo("Installing dependency: %s...", dep.Name)
+				depBranch := dep.Branch
+				if depBranch == "" {
+					depBranch = fmt.Sprintf("version-%s", frappeVersion)
+				}
+				if err := apps.InstallApp(dep.Name, dep.URL, depBranch, installOpts); err != nil {
+					PrintVerbose("Warning: failed to install dependency %s: %v", dep.Name, err)
+					continue
+				}
+				st.Apps[dep.Name] = state.AppState{
+					Name:        dep.Name,
+					URL:         dep.URL,
+					Branch:      depBranch,
+					InstalledAt: time.Now(),
+				}
+				PrintInfo("Installed dependency: %s", dep.Name)
+			}
+		} else {
+			PrintInfo("No additional dependencies to resolve")
+		}
+	}
+
 	// Create site
 	PrintInfo("Creating site %s...", siteName)
 	if err := os.MkdirAll(filepath.Join(sitesDir, siteName), 0755); err != nil {
@@ -350,42 +402,6 @@ apps = ["frappe", "%s"]
 	}
 
 	return nil
-}
-
-func isLocalPath(path string) bool {
-	// Check if it's a local path
-	if strings.HasPrefix(path, "/") || strings.HasPrefix(path, "./") || strings.HasPrefix(path, "../") {
-		return true
-	}
-	if strings.HasPrefix(path, "~") {
-		return true
-	}
-	// Check if the path exists locally
-	if _, err := os.Stat(path); err == nil {
-		return true
-	}
-	return false
-}
-
-func extractAppNameFromURL(url string) string {
-	// Extract app name from git URL
-	// https://github.com/frappe/erpnext -> erpnext
-	// git@github.com:frappe/erpnext.git -> erpnext
-
-	url = strings.TrimSuffix(url, ".git")
-	parts := strings.Split(url, "/")
-	if len(parts) > 0 {
-		name := parts[len(parts)-1]
-		// Handle git@ URLs
-		if strings.Contains(name, ":") {
-			colonParts := strings.Split(name, ":")
-			if len(colonParts) > 1 {
-				name = colonParts[len(colonParts)-1]
-			}
-		}
-		return name
-	}
-	return "app"
 }
 
 func promptVersion() (string, error) {

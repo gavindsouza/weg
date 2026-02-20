@@ -4,10 +4,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
-	"strings"
 
 	"github.com/BurntSushi/toml"
+	"github.com/gavindsouza/weg/internal/apps"
 	"github.com/gavindsouza/weg/internal/config"
 	"github.com/gavindsouza/weg/internal/errors"
 	"github.com/spf13/cobra"
@@ -49,62 +48,23 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to detect context: %w", err)
 	}
 
-	appSpec := args[0]
+	rawSpec := args[0]
 	branch := ""
 	if len(args) > 1 {
 		branch = args[1]
 	}
 
-	// Parse app specification
-	appURL, appName, isLocal := parseAppSpec(appSpec)
+	// Parse app specification using shared resolver
+	appSpec := apps.ResolveAppSpec(rawSpec, branch)
 
 	switch result.Context {
 	case config.ContextWegApp:
-		return addToAppConfig(absPath, appName, appURL, branch, isLocal)
+		return addToAppConfig(absPath, appSpec.Name, appSpec.URL, appSpec.Branch, appSpec.IsLocal)
 	case config.ContextWegBench:
-		return addToBenchConfig(absPath, appName, appURL, branch, isLocal)
+		return addToBenchConfig(absPath, appSpec.Name, appSpec.URL, appSpec.Branch, appSpec.IsLocal)
 	default:
 		return errors.NotInProject(absPath)
 	}
-}
-
-// parseAppSpec parses an app specification and returns URL, name, and whether it's local
-func parseAppSpec(spec string) (url, name string, isLocal bool) {
-	// Check if it's a local path
-	if strings.HasPrefix(spec, "./") || strings.HasPrefix(spec, "/") || strings.HasPrefix(spec, "..") {
-		absPath, _ := filepath.Abs(spec)
-		return absPath, filepath.Base(absPath), true
-	}
-
-	// Check if it's a full URL
-	if strings.HasPrefix(spec, "http://") || strings.HasPrefix(spec, "https://") || strings.HasPrefix(spec, "git@") {
-		name = extractAppName(spec)
-		return spec, name, false
-	}
-
-	// Check if it's a short GitHub reference (user/repo)
-	if matched, _ := regexp.MatchString(`^[a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+$`, spec); matched {
-		url = fmt.Sprintf("https://github.com/%s", spec)
-		parts := strings.Split(spec, "/")
-		return url, parts[1], false
-	}
-
-	// Assume it's just an app name (for future marketplace support)
-	return "", spec, false
-}
-
-// extractAppName extracts the app name from a git URL
-func extractAppName(url string) string {
-	// Remove .git suffix
-	url = strings.TrimSuffix(url, ".git")
-
-	// Get last part of URL
-	parts := strings.Split(url, "/")
-	if len(parts) > 0 {
-		return parts[len(parts)-1]
-	}
-
-	return url
 }
 
 // addToAppConfig adds an app to pyproject.toml [tool.weg.dependencies]

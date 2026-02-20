@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
-	"strings"
 
 	"github.com/BurntSushi/toml"
 	"github.com/gavindsouza/weg/internal/apps"
@@ -16,19 +14,27 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var getSkipDeps bool
+
 var getCmd = &cobra.Command{
 	Use:   "get <app-url-or-name> [branch]",
 	Short: "Install an app",
 	Long: `Install a Frappe app into the current project.
 
-This is equivalent to 'weg add' followed by 'weg sync'.
+Automatically resolves and installs transitive dependencies.
+Use --skip-deps to install only the specified app.
 
 Examples:
   weg app get https://github.com/frappe/erpnext
   weg app get frappe/erpnext
-  weg app get frappe/erpnext version-15`,
+  weg app get frappe/erpnext version-15
+  weg app get frappe/hrms --skip-deps`,
 	Args: cobra.RangeArgs(1, 2),
 	RunE: runGet,
+}
+
+func init() {
+	getCmd.Flags().BoolVar(&getSkipDeps, "skip-deps", false, "Skip dependency resolution; install only the specified app")
 }
 
 func runGet(cmd *cobra.Command, args []string) error {
@@ -43,14 +49,16 @@ func runGet(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to detect context: %w", err)
 	}
 
-	appSpec := args[0]
+	rawSpec := args[0]
 	branch := ""
 	if len(args) > 1 {
 		branch = args[1]
 	}
 
-	// Parse app specification
-	appURL, appName := parseAppSpec(appSpec)
+	// Parse app specification using shared resolver
+	appSpec := apps.ResolveAppSpec(rawSpec, branch)
+	appName := appSpec.Name
+	appURL := appSpec.URL
 
 	if !result.IsWegManaged() {
 		return wegerrors.NotInProject(absPath)
@@ -77,7 +85,7 @@ func runGet(cmd *cobra.Command, args []string) error {
 		Verbose:   true,
 	}
 
-	if err := apps.InstallApp(appName, appURL, branch, opts); err != nil {
+	if err := apps.InstallApp(appName, appURL, appSpec.Branch, opts); err != nil {
 		return fmt.Errorf("failed to install %s: %w", appName, err)
 	}
 
@@ -85,49 +93,73 @@ func runGet(cmd *cobra.Command, args []string) error {
 	st.AddApp(state.AppState{
 		Name:   appName,
 		URL:    appURL,
-		Branch: branch,
+		Branch: appSpec.Branch,
 	})
 
 	if err := st.Save(absPath); err != nil {
 		return wegerrors.State("save", err)
 	}
 
+	// Resolve and install transitive dependencies (default behavior)
+	if !getSkipDeps {
+		output.Infof("Resolving dependencies for %s...", appName)
+
+		installed := make(map[string]bool)
+		installed[appName] = true
+		installed["frappe"] = true
+		for name := range st.Apps {
+			installed[name] = true
+		}
+
+		resolveOpts := apps.ResolveOptions{
+			BenchPath:     benchPath,
+			AppsDir:       appsDir,
+			AllowRemote:   true,
+			InstalledApps: installed,
+			Verbose:       true,
+			LogFunc:       output.Infof,
+		}
+
+		resolveResult, err := apps.ResolveDependencies(appSpec, resolveOpts)
+		if err != nil {
+			output.Warningf("Dependency resolution failed: %v", err)
+			output.Warningf("The app itself was installed successfully; install dependencies manually")
+		} else {
+			apps.PrintResolveResult(resolveResult)
+
+			for _, dep := range resolveResult.InstallOrder {
+				output.Infof("Installing dependency: %s...", dep.Name)
+				if err := apps.InstallApp(dep.Name, dep.URL, dep.Branch, opts); err != nil {
+					output.Warningf("Failed to install dependency %s: %v", dep.Name, err)
+					continue
+				}
+				st.AddApp(state.AppState{
+					Name:   dep.Name,
+					URL:    dep.URL,
+					Branch: dep.Branch,
+				})
+				if err := st.Save(absPath); err != nil {
+					output.Warningf("Failed to save state after installing %s: %v", dep.Name, err)
+				}
+				if result.Context == config.ContextWegBench {
+					if err := addAppToWegToml(absPath, dep.Name, dep.URL, dep.Branch); err != nil {
+						output.Warningf("Failed to update weg.toml for %s: %v", dep.Name, err)
+					}
+				}
+				output.Successf("Installed dependency %s", dep.Name)
+			}
+		}
+	}
+
 	// Also update config file
 	if result.Context == config.ContextWegBench {
-		if err := addAppToWegToml(absPath, appName, appURL, branch); err != nil {
+		if err := addAppToWegToml(absPath, appName, appURL, appSpec.Branch); err != nil {
 			output.Warningf("Failed to update weg.toml: %v", err)
 		}
 	}
 
 	output.Successf("Installed %s", appName)
 	return nil
-}
-
-func parseAppSpec(spec string) (url, name string) {
-	// Check if it's a full URL
-	if strings.HasPrefix(spec, "http://") || strings.HasPrefix(spec, "https://") || strings.HasPrefix(spec, "git@") {
-		name = extractAppName(spec)
-		return spec, name
-	}
-
-	// Check if it's a short GitHub reference (user/repo)
-	if matched, _ := regexp.MatchString(`^[a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+$`, spec); matched {
-		url = fmt.Sprintf("https://github.com/%s", spec)
-		parts := strings.Split(spec, "/")
-		return url, parts[1]
-	}
-
-	// Assume it's just an app name
-	return "", spec
-}
-
-func extractAppName(url string) string {
-	url = strings.TrimSuffix(url, ".git")
-	parts := strings.Split(url, "/")
-	if len(parts) > 0 {
-		return parts[len(parts)-1]
-	}
-	return url
 }
 
 func addAppToWegToml(path, name, url, branch string) error {
