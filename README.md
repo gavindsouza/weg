@@ -1,7 +1,7 @@
 # Weg
 
 [![Go](https://img.shields.io/badge/Go-1.24+-00ADD8?logo=go&logoColor=white)](https://go.dev)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: Apache 2.0](https://img.shields.io/github/license/gavindsouza/weg)](LICENSE)
 
 The fast way to develop Frappe apps.
 
