@@ -67,7 +67,7 @@ func TestParseVerbosity(t *testing.T) {
 }
 
 func TestParseDebugCategories(t *testing.T) {
-	// Reset state
+	SaveForTest(t)
 	DebugCategories = nil
 
 	ParseDebugCategories("config,net,state")
@@ -84,9 +84,6 @@ func TestParseDebugCategories(t *testing.T) {
 	if DebugCategories[DebugGit] {
 		t.Error("expected git category to be disabled")
 	}
-
-	// Cleanup
-	DebugCategories = nil
 }
 
 func TestTable(t *testing.T) {
@@ -217,13 +214,7 @@ func TestRedactMap(t *testing.T) {
 }
 
 func TestList_JSON(t *testing.T) {
-	// Save and restore state
-	oldFormat := CurrentFormat
-	oldWriter := Writer
-	defer func() {
-		CurrentFormat = oldFormat
-		Writer = oldWriter
-	}()
+	SaveForTest(t)
 
 	var buf bytes.Buffer
 	Writer = &buf
@@ -254,13 +245,7 @@ func TestList_JSON(t *testing.T) {
 }
 
 func TestList_Table(t *testing.T) {
-	// Save and restore state
-	oldFormat := CurrentFormat
-	oldWriter := Writer
-	defer func() {
-		CurrentFormat = oldFormat
-		Writer = oldWriter
-	}()
+	SaveForTest(t)
 
 	var buf bytes.Buffer
 	Writer = &buf
@@ -291,13 +276,7 @@ func TestList_Table(t *testing.T) {
 }
 
 func TestList_Quiet(t *testing.T) {
-	// Save and restore state
-	oldFormat := CurrentFormat
-	oldWriter := Writer
-	defer func() {
-		CurrentFormat = oldFormat
-		Writer = oldWriter
-	}()
+	SaveForTest(t)
 
 	var buf bytes.Buffer
 	Writer = &buf
@@ -333,13 +312,7 @@ func TestList_Quiet(t *testing.T) {
 }
 
 func TestDebugEnabled(t *testing.T) {
-	// Save and restore state
-	oldLevel := Level
-	oldCategories := DebugCategories
-	defer func() {
-		Level = oldLevel
-		DebugCategories = oldCategories
-	}()
+	SaveForTest(t)
 
 	// Test: debug disabled at normal level
 	Level = VerbosityNormal
@@ -376,15 +349,7 @@ func TestDebugEnabled(t *testing.T) {
 }
 
 func TestSymbols(t *testing.T) {
-	// Save and restore state
-	oldLevel := Level
-	oldFormat := CurrentFormat
-	oldWriter := Writer
-	defer func() {
-		Level = oldLevel
-		CurrentFormat = oldFormat
-		Writer = oldWriter
-	}()
+	SaveForTest(t)
 
 	var buf bytes.Buffer
 	Writer = &buf
@@ -403,13 +368,7 @@ func TestSymbols(t *testing.T) {
 }
 
 func TestSymbols_QuietMode(t *testing.T) {
-	// Save and restore state
-	oldLevel := Level
-	oldWriter := Writer
-	defer func() {
-		Level = oldLevel
-		Writer = oldWriter
-	}()
+	SaveForTest(t)
 
 	var buf bytes.Buffer
 	Writer = &buf
@@ -424,15 +383,7 @@ func TestSymbols_QuietMode(t *testing.T) {
 }
 
 func TestSymbols_JSONMode(t *testing.T) {
-	// Save and restore state
-	oldLevel := Level
-	oldFormat := CurrentFormat
-	oldWriter := Writer
-	defer func() {
-		Level = oldLevel
-		CurrentFormat = oldFormat
-		Writer = oldWriter
-	}()
+	SaveForTest(t)
 
 	var buf bytes.Buffer
 	Writer = &buf
@@ -448,13 +399,7 @@ func TestSymbols_JSONMode(t *testing.T) {
 }
 
 func TestTraceEnabled(t *testing.T) {
-	// Save and restore state
-	oldLevel := Level
-	oldCategories := DebugCategories
-	defer func() {
-		Level = oldLevel
-		DebugCategories = oldCategories
-	}()
+	SaveForTest(t)
 
 	// Test: trace disabled at debug level
 	Level = VerbosityDebug
@@ -482,17 +427,7 @@ func TestTraceEnabled(t *testing.T) {
 }
 
 func TestDebugOutput(t *testing.T) {
-	// Save and restore state
-	oldLevel := Level
-	oldCategories := DebugCategories
-	oldErrWriter := ErrWriter
-	oldShowTimestamps := ShowTimestamps
-	defer func() {
-		Level = oldLevel
-		DebugCategories = oldCategories
-		ErrWriter = oldErrWriter
-		ShowTimestamps = oldShowTimestamps
-	}()
+	SaveForTest(t)
 
 	var buf bytes.Buffer
 	ErrWriter = &buf
@@ -515,17 +450,7 @@ func TestDebugOutput(t *testing.T) {
 }
 
 func TestDebugf(t *testing.T) {
-	// Save and restore state
-	oldLevel := Level
-	oldCategories := DebugCategories
-	oldErrWriter := ErrWriter
-	oldShowTimestamps := ShowTimestamps
-	defer func() {
-		Level = oldLevel
-		DebugCategories = oldCategories
-		ErrWriter = oldErrWriter
-		ShowTimestamps = oldShowTimestamps
-	}()
+	SaveForTest(t)
 
 	var buf bytes.Buffer
 	ErrWriter = &buf
@@ -542,17 +467,7 @@ func TestDebugf(t *testing.T) {
 }
 
 func TestTraceOutput(t *testing.T) {
-	// Save and restore state
-	oldLevel := Level
-	oldCategories := DebugCategories
-	oldErrWriter := ErrWriter
-	oldShowTimestamps := ShowTimestamps
-	defer func() {
-		Level = oldLevel
-		DebugCategories = oldCategories
-		ErrWriter = oldErrWriter
-		ShowTimestamps = oldShowTimestamps
-	}()
+	SaveForTest(t)
 
 	var buf bytes.Buffer
 	ErrWriter = &buf
@@ -572,17 +487,7 @@ func TestTraceOutput(t *testing.T) {
 }
 
 func TestTracef(t *testing.T) {
-	// Save and restore state
-	oldLevel := Level
-	oldCategories := DebugCategories
-	oldErrWriter := ErrWriter
-	oldShowTimestamps := ShowTimestamps
-	defer func() {
-		Level = oldLevel
-		DebugCategories = oldCategories
-		ErrWriter = oldErrWriter
-		ShowTimestamps = oldShowTimestamps
-	}()
+	SaveForTest(t)
 
 	var buf bytes.Buffer
 	ErrWriter = &buf
@@ -599,17 +504,7 @@ func TestTracef(t *testing.T) {
 }
 
 func TestDebugWithTimestamps(t *testing.T) {
-	// Save and restore state
-	oldLevel := Level
-	oldCategories := DebugCategories
-	oldErrWriter := ErrWriter
-	oldShowTimestamps := ShowTimestamps
-	defer func() {
-		Level = oldLevel
-		DebugCategories = oldCategories
-		ErrWriter = oldErrWriter
-		ShowTimestamps = oldShowTimestamps
-	}()
+	SaveForTest(t)
 
 	var buf bytes.Buffer
 	ErrWriter = &buf
@@ -627,13 +522,7 @@ func TestDebugWithTimestamps(t *testing.T) {
 }
 
 func TestDebugDisabled(t *testing.T) {
-	// Save and restore state
-	oldLevel := Level
-	oldErrWriter := ErrWriter
-	defer func() {
-		Level = oldLevel
-		ErrWriter = oldErrWriter
-	}()
+	SaveForTest(t)
 
 	var buf bytes.Buffer
 	ErrWriter = &buf
@@ -647,13 +536,7 @@ func TestDebugDisabled(t *testing.T) {
 }
 
 func TestItem(t *testing.T) {
-	// Save and restore state
-	oldFormat := CurrentFormat
-	oldWriter := Writer
-	defer func() {
-		CurrentFormat = oldFormat
-		Writer = oldWriter
-	}()
+	SaveForTest(t)
 
 	type TestItem struct {
 		Name   string `json:"name"`
@@ -663,7 +546,6 @@ func TestItem(t *testing.T) {
 
 	item := TestItem{Name: "test", Status: "active", Count: 42}
 
-	// Test table format
 	var buf bytes.Buffer
 	Writer = &buf
 	CurrentFormat = FormatTable
@@ -683,13 +565,7 @@ func TestItem(t *testing.T) {
 }
 
 func TestItem_JSON(t *testing.T) {
-	// Save and restore state
-	oldFormat := CurrentFormat
-	oldWriter := Writer
-	defer func() {
-		CurrentFormat = oldFormat
-		Writer = oldWriter
-	}()
+	SaveForTest(t)
 
 	type TestItem struct {
 		Name string `json:"name"`
@@ -711,13 +587,7 @@ func TestItem_JSON(t *testing.T) {
 }
 
 func TestItem_Plain(t *testing.T) {
-	// Save and restore state
-	oldFormat := CurrentFormat
-	oldWriter := Writer
-	defer func() {
-		CurrentFormat = oldFormat
-		Writer = oldWriter
-	}()
+	SaveForTest(t)
 
 	type TestItem struct {
 		Name   string `json:"name"`
@@ -743,13 +613,7 @@ func TestItem_Plain(t *testing.T) {
 }
 
 func TestItem_Quiet(t *testing.T) {
-	// Save and restore state
-	oldFormat := CurrentFormat
-	oldWriter := Writer
-	defer func() {
-		CurrentFormat = oldFormat
-		Writer = oldWriter
-	}()
+	SaveForTest(t)
 
 	type TestItem struct {
 		Name   string `json:"name"`
@@ -772,13 +636,7 @@ func TestItem_Quiet(t *testing.T) {
 }
 
 func TestItem_NonStruct(t *testing.T) {
-	// Save and restore state
-	oldFormat := CurrentFormat
-	oldWriter := Writer
-	defer func() {
-		CurrentFormat = oldFormat
-		Writer = oldWriter
-	}()
+	SaveForTest(t)
 
 	var buf bytes.Buffer
 	Writer = &buf
@@ -796,13 +654,7 @@ func TestItem_NonStruct(t *testing.T) {
 }
 
 func TestList_Plain(t *testing.T) {
-	// Save and restore state
-	oldFormat := CurrentFormat
-	oldWriter := Writer
-	defer func() {
-		CurrentFormat = oldFormat
-		Writer = oldWriter
-	}()
+	SaveForTest(t)
 
 	type Item struct {
 		Name   string `json:"name"`
@@ -833,13 +685,7 @@ func TestList_Plain(t *testing.T) {
 }
 
 func TestList_Empty(t *testing.T) {
-	// Save and restore state
-	oldFormat := CurrentFormat
-	oldWriter := Writer
-	defer func() {
-		CurrentFormat = oldFormat
-		Writer = oldWriter
-	}()
+	SaveForTest(t)
 
 	type Item struct {
 		Name string `json:"name"`
@@ -860,13 +706,7 @@ func TestList_Empty(t *testing.T) {
 }
 
 func TestList_InvalidType(t *testing.T) {
-	// Save and restore state
-	oldFormat := CurrentFormat
-	oldWriter := Writer
-	defer func() {
-		CurrentFormat = oldFormat
-		Writer = oldWriter
-	}()
+	SaveForTest(t)
 
 	var buf bytes.Buffer
 	Writer = &buf
@@ -879,13 +719,7 @@ func TestList_InvalidType(t *testing.T) {
 }
 
 func TestPrint(t *testing.T) {
-	// Save and restore state
-	oldLevel := Level
-	oldWriter := Writer
-	defer func() {
-		Level = oldLevel
-		Writer = oldWriter
-	}()
+	SaveForTest(t)
 
 	var buf bytes.Buffer
 	Writer = &buf
@@ -900,13 +734,7 @@ func TestPrint(t *testing.T) {
 }
 
 func TestPrint_Quiet(t *testing.T) {
-	// Save and restore state
-	oldLevel := Level
-	oldWriter := Writer
-	defer func() {
-		Level = oldLevel
-		Writer = oldWriter
-	}()
+	SaveForTest(t)
 
 	var buf bytes.Buffer
 	Writer = &buf
@@ -920,13 +748,7 @@ func TestPrint_Quiet(t *testing.T) {
 }
 
 func TestPrintf(t *testing.T) {
-	// Save and restore state
-	oldLevel := Level
-	oldWriter := Writer
-	defer func() {
-		Level = oldLevel
-		Writer = oldWriter
-	}()
+	SaveForTest(t)
 
 	var buf bytes.Buffer
 	Writer = &buf
@@ -941,13 +763,7 @@ func TestPrintf(t *testing.T) {
 }
 
 func TestVerbose(t *testing.T) {
-	// Save and restore state
-	oldLevel := Level
-	oldWriter := Writer
-	defer func() {
-		Level = oldLevel
-		Writer = oldWriter
-	}()
+	SaveForTest(t)
 
 	var buf bytes.Buffer
 	Writer = &buf
@@ -969,13 +785,7 @@ func TestVerbose(t *testing.T) {
 }
 
 func TestVerbosef(t *testing.T) {
-	// Save and restore state
-	oldLevel := Level
-	oldWriter := Writer
-	defer func() {
-		Level = oldLevel
-		Writer = oldWriter
-	}()
+	SaveForTest(t)
 
 	var buf bytes.Buffer
 	Writer = &buf
@@ -989,13 +799,7 @@ func TestVerbosef(t *testing.T) {
 }
 
 func TestEffectiveFormat(t *testing.T) {
-	// Save and restore state
-	oldFormat := CurrentFormat
-	oldWriter := Writer
-	defer func() {
-		CurrentFormat = oldFormat
-		Writer = oldWriter
-	}()
+	SaveForTest(t)
 
 	// Non-auto formats return themselves
 	CurrentFormat = FormatJSON
@@ -1019,15 +823,7 @@ func TestEffectiveFormat(t *testing.T) {
 }
 
 func TestWarning(t *testing.T) {
-	// Save and restore state
-	oldLevel := Level
-	oldFormat := CurrentFormat
-	oldErrWriter := ErrWriter
-	defer func() {
-		Level = oldLevel
-		CurrentFormat = oldFormat
-		ErrWriter = oldErrWriter
-	}()
+	SaveForTest(t)
 
 	var buf bytes.Buffer
 	ErrWriter = &buf
@@ -1046,15 +842,7 @@ func TestWarning(t *testing.T) {
 }
 
 func TestError(t *testing.T) {
-	// Save and restore state
-	oldLevel := Level
-	oldFormat := CurrentFormat
-	oldErrWriter := ErrWriter
-	defer func() {
-		Level = oldLevel
-		CurrentFormat = oldFormat
-		ErrWriter = oldErrWriter
-	}()
+	SaveForTest(t)
 
 	var buf bytes.Buffer
 	ErrWriter = &buf
@@ -1073,15 +861,7 @@ func TestError(t *testing.T) {
 }
 
 func TestInfo(t *testing.T) {
-	// Save and restore state
-	oldLevel := Level
-	oldFormat := CurrentFormat
-	oldWriter := Writer
-	defer func() {
-		Level = oldLevel
-		CurrentFormat = oldFormat
-		Writer = oldWriter
-	}()
+	SaveForTest(t)
 
 	var buf bytes.Buffer
 	Writer = &buf
@@ -1100,10 +880,6 @@ func TestInfo(t *testing.T) {
 }
 
 func TestRedactString(t *testing.T) {
-	// RedactString matches specific patterns:
-	// - Bearer tokens: bearer [token]
-	// - Basic auth: basic [base64]
-	// - API key patterns: 16+ char key : 16+ char secret
 	tests := []struct {
 		input    string
 		contains string
@@ -1165,14 +941,7 @@ func TestRedactString(t *testing.T) {
 }
 
 func TestSuccessf(t *testing.T) {
-	oldLevel := Level
-	oldFormat := CurrentFormat
-	oldWriter := Writer
-	defer func() {
-		Level = oldLevel
-		CurrentFormat = oldFormat
-		Writer = oldWriter
-	}()
+	SaveForTest(t)
 
 	var buf bytes.Buffer
 	Writer = &buf
@@ -1191,10 +960,7 @@ func TestSuccessf(t *testing.T) {
 }
 
 func TestErrorf(t *testing.T) {
-	oldErrWriter := ErrWriter
-	defer func() {
-		ErrWriter = oldErrWriter
-	}()
+	SaveForTest(t)
 
 	var buf bytes.Buffer
 	ErrWriter = &buf
@@ -1211,12 +977,7 @@ func TestErrorf(t *testing.T) {
 }
 
 func TestWarningf(t *testing.T) {
-	oldLevel := Level
-	oldErrWriter := ErrWriter
-	defer func() {
-		Level = oldLevel
-		ErrWriter = oldErrWriter
-	}()
+	SaveForTest(t)
 
 	var buf bytes.Buffer
 	ErrWriter = &buf
@@ -1234,14 +995,7 @@ func TestWarningf(t *testing.T) {
 }
 
 func TestInfof(t *testing.T) {
-	oldLevel := Level
-	oldFormat := CurrentFormat
-	oldWriter := Writer
-	defer func() {
-		Level = oldLevel
-		CurrentFormat = oldFormat
-		Writer = oldWriter
-	}()
+	SaveForTest(t)
 
 	var buf bytes.Buffer
 	Writer = &buf
@@ -1260,14 +1014,7 @@ func TestInfof(t *testing.T) {
 }
 
 func TestStatusf(t *testing.T) {
-	oldLevel := Level
-	oldFormat := CurrentFormat
-	oldWriter := Writer
-	defer func() {
-		Level = oldLevel
-		CurrentFormat = oldFormat
-		Writer = oldWriter
-	}()
+	SaveForTest(t)
 
 	var buf bytes.Buffer
 	Writer = &buf
@@ -1286,14 +1033,7 @@ func TestStatusf(t *testing.T) {
 }
 
 func TestStep(t *testing.T) {
-	oldLevel := Level
-	oldFormat := CurrentFormat
-	oldWriter := Writer
-	defer func() {
-		Level = oldLevel
-		CurrentFormat = oldFormat
-		Writer = oldWriter
-	}()
+	SaveForTest(t)
 
 	var buf bytes.Buffer
 	Writer = &buf
@@ -1312,14 +1052,7 @@ func TestStep(t *testing.T) {
 }
 
 func TestStepf(t *testing.T) {
-	oldLevel := Level
-	oldFormat := CurrentFormat
-	oldWriter := Writer
-	defer func() {
-		Level = oldLevel
-		CurrentFormat = oldFormat
-		Writer = oldWriter
-	}()
+	SaveForTest(t)
 
 	var buf bytes.Buffer
 	Writer = &buf
@@ -1369,10 +1102,7 @@ func TestRedactHeaders(t *testing.T) {
 }
 
 func TestJSONCompact(t *testing.T) {
-	oldWriter := Writer
-	defer func() {
-		Writer = oldWriter
-	}()
+	SaveForTest(t)
 
 	var buf bytes.Buffer
 	Writer = &buf
@@ -1402,12 +1132,7 @@ func TestJSONCompactTo(t *testing.T) {
 }
 
 func TestWithTiming(t *testing.T) {
-	oldLevel := Level
-	oldWriter := Writer
-	defer func() {
-		Level = oldLevel
-		Writer = oldWriter
-	}()
+	SaveForTest(t)
 
 	var buf bytes.Buffer
 	Writer = &buf
@@ -1415,17 +1140,10 @@ func TestWithTiming(t *testing.T) {
 
 	done := WithTiming(DebugNet, "test operation")
 	done()
-
-	// WithTiming uses Debug internally, just verify it doesn't panic
 }
 
 func TestStatus_QuietMode(t *testing.T) {
-	oldLevel := Level
-	oldWriter := Writer
-	defer func() {
-		Level = oldLevel
-		Writer = oldWriter
-	}()
+	SaveForTest(t)
 
 	var buf bytes.Buffer
 	Writer = &buf
@@ -1433,21 +1151,13 @@ func TestStatus_QuietMode(t *testing.T) {
 
 	Status(SymbolSuccess, "test message")
 
-	// Should be empty in quiet mode
 	if buf.String() != "" {
 		t.Errorf("expected no output in quiet mode, got %q", buf.String())
 	}
 }
 
 func TestStatus_JSONMode(t *testing.T) {
-	oldLevel := Level
-	oldFormat := CurrentFormat
-	oldWriter := Writer
-	defer func() {
-		Level = oldLevel
-		CurrentFormat = oldFormat
-		Writer = oldWriter
-	}()
+	SaveForTest(t)
 
 	var buf bytes.Buffer
 	Writer = &buf
@@ -1456,7 +1166,6 @@ func TestStatus_JSONMode(t *testing.T) {
 
 	Status(SymbolSuccess, "test message")
 
-	// Should be empty in JSON mode (status doesn't go to JSON output)
 	if buf.String() != "" {
 		t.Errorf("expected no output in JSON mode, got %q", buf.String())
 	}

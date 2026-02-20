@@ -282,9 +282,7 @@ func TestIsRetryable(t *testing.T) {
 }
 
 func TestPrint(t *testing.T) {
-	// Save and restore state
-	oldWriter := output.ErrWriter
-	defer func() { output.ErrWriter = oldWriter }()
+	output.SaveForTest(t)
 
 	var buf bytes.Buffer
 	output.ErrWriter = &buf
@@ -304,9 +302,7 @@ func TestPrint(t *testing.T) {
 }
 
 func TestPrintWithHint(t *testing.T) {
-	// Save and restore state
-	oldWriter := output.ErrWriter
-	defer func() { output.ErrWriter = oldWriter }()
+	output.SaveForTest(t)
 
 	var buf bytes.Buffer
 	output.ErrWriter = &buf
@@ -323,9 +319,7 @@ func TestPrintWithHint(t *testing.T) {
 }
 
 func TestExit(t *testing.T) {
-	// Save and restore state
-	oldWriter := output.ErrWriter
-	defer func() { output.ErrWriter = oldWriter }()
+	output.SaveForTest(t)
 
 	var buf bytes.Buffer
 	output.ErrWriter = &buf
