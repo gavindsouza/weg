@@ -32,10 +32,10 @@ type AppDependency struct {
 type DependencySource int
 
 const (
-	SourceNone       DependencySource = iota
-	SourcePyproject                   // pyproject.toml [tool.weg.dependencies.apps]
-	SourceHooks                       // hooks.py required_apps
-	SourceRemote                      // Fetched from GitHub raw content
+	SourceNone      DependencySource = iota
+	SourcePyproject                  // pyproject.toml [tool.weg.dependencies.apps]
+	SourceHooks                      // hooks.py required_apps
+	SourceRemote                     // Fetched from GitHub raw content
 )
 
 func (s DependencySource) String() string {
@@ -353,10 +353,10 @@ func ReadInstalledAppDirs(appsDir string) ([]string, error) {
 
 // FrappeCloudAppInfo represents app info from the Frappe marketplace API
 type FrappeCloudAppInfo struct {
-	Name   string `json:"name"`
-	Repo   string `json:"repo"`
+	Name      string `json:"name"`
+	Repo      string `json:"repo"`
 	RepoOwner string `json:"repo_owner"`
-	Branch string `json:"branch"`
+	Branch    string `json:"branch"`
 }
 
 // LookupAppOnMarketplace attempts to find an app by name on Frappe Cloud marketplace.

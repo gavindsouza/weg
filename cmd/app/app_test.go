@@ -89,4 +89,3 @@ func TestExcludeCommand_Setup(t *testing.T) {
 		t.Error("expected RunE to be set")
 	}
 }
-
