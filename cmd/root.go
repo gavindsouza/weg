@@ -142,8 +142,6 @@ func Execute() {
 }
 
 func init() {
-	cobra.OnInitialize(initConfig)
-
 	// Global persistent flags
 	rootCmd.PersistentFlags().StringVarP(&chdir, "chdir", "C", "", "Run as if weg was started in <path>")
 	rootCmd.PersistentFlags().CountVarP(&verboseCount, "verbose", "v", "Increase verbosity (-v, -vv, -vvv)")
@@ -179,12 +177,6 @@ func init() {
 	wegmcp.Version = Version
 	rootCmd.AddCommand(wegmcp.McpCmd)
 	rootCmd.AddCommand(workspace.WorkspaceCmd)
-}
-
-// initConfig reads in config file and ENV variables if set
-func initConfig() {
-	// Config initialization happens here
-	// Will be expanded as needed
 }
 
 // configureOutput sets up the output package based on flags and environment.

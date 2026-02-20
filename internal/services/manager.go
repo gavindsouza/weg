@@ -2,6 +2,7 @@ package services
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -40,22 +41,25 @@ func (m *Manager) Start() error {
 	return m.startWithProcessCompose()
 }
 
+// ensureDevboxServices starts mariadb and redis via devbox services
+func (m *Manager) ensureDevboxServices() error {
+	for _, svc := range []string{"mariadb", "redis"} {
+		cmd := exec.Command("devbox", "services", "start", svc, "-c", m.BenchPath)
+		cmd.Dir = m.BenchPath
+		if output, err := cmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("failed to start %s: %w\n%s", svc, err, string(output))
+		}
+	}
+	return nil
+}
+
 // startWithDevbox starts services using devbox services + process-compose
 func (m *Manager) startWithDevbox() error {
-	// First, ensure mariadb and redis are running via devbox services
-	startMariadb := exec.Command("devbox", "services", "start", "mariadb", "-c", m.BenchPath)
-	startMariadb.Dir = m.BenchPath
-	if output, err := startMariadb.CombinedOutput(); err != nil {
-		return fmt.Errorf("failed to start mariadb: %w\n%s", err, string(output))
+	if err := m.ensureDevboxServices(); err != nil {
+		return err
 	}
 
-	startRedis := exec.Command("devbox", "services", "start", "redis", "-c", m.BenchPath)
-	startRedis.Dir = m.BenchPath
-	if output, err := startRedis.CombinedOutput(); err != nil {
-		return fmt.Errorf("failed to start redis: %w\n%s", err, string(output))
-	}
-
-	// Then run process-compose via devbox for the Frappe services
+	// Run process-compose via devbox for the Frappe services
 	composePath := filepath.Join(m.BenchPath, "process-compose.yaml")
 	if _, err := os.Stat(composePath); os.IsNotExist(err) {
 		return fmt.Errorf("process-compose.yaml not found. Run 'weg sync' first")
@@ -106,17 +110,8 @@ func (m *Manager) startWithProcessCompose() error {
 // StartDetached starts services in the background
 func (m *Manager) StartDetached() error {
 	if m.isDevboxProject() {
-		// Start mariadb and redis via devbox services
-		startMariadb := exec.Command("devbox", "services", "start", "mariadb", "-c", m.BenchPath)
-		startMariadb.Dir = m.BenchPath
-		if output, err := startMariadb.CombinedOutput(); err != nil {
-			return fmt.Errorf("failed to start mariadb: %w\n%s", err, string(output))
-		}
-
-		startRedis := exec.Command("devbox", "services", "start", "redis", "-c", m.BenchPath)
-		startRedis.Dir = m.BenchPath
-		if output, err := startRedis.CombinedOutput(); err != nil {
-			return fmt.Errorf("failed to start redis: %w\n%s", err, string(output))
+		if err := m.ensureDevboxServices(); err != nil {
+			return err
 		}
 
 		// Start Frappe services via process-compose in background
@@ -400,11 +395,14 @@ func (m *Manager) IsRunning() bool {
 	cmd := exec.Command("process-compose", "ps", "-f", composePath, "-o", "json")
 	cmd.Dir = m.BenchPath
 
-	output, err := cmd.Output()
+	out, err := cmd.Output()
 	if err != nil {
 		return false
 	}
 
-	// If we get valid JSON output with processes, they're running
-	return len(output) > 2 // More than just "[]"
+	var processes []json.RawMessage
+	if json.Unmarshal(out, &processes) != nil {
+		return false
+	}
+	return len(processes) > 0
 }

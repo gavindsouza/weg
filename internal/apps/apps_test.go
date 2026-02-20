@@ -5,6 +5,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"testing"
+
+	"github.com/gavindsouza/weg/internal/fsutil"
 )
 
 func TestIsGitRepo(t *testing.T) {
@@ -42,17 +44,17 @@ func TestFileExists(t *testing.T) {
 	}
 
 	// Test existing file
-	if !fileExists(filePath) {
+	if !fsutil.FileExists(filePath) {
 		t.Error("expected file to exist")
 	}
 
 	// Test non-existent file
-	if fileExists(filepath.Join(tmpDir, "nonexistent.txt")) {
+	if fsutil.FileExists(filepath.Join(tmpDir, "nonexistent.txt")) {
 		t.Error("expected nonexistent file to not exist")
 	}
 
 	// Test directory (should return false)
-	if fileExists(tmpDir) {
+	if fsutil.FileExists(tmpDir) {
 		t.Error("expected directory to return false for fileExists")
 	}
 }

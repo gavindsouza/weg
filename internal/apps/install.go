@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
+	"github.com/gavindsouza/weg/internal/fsutil"
 	"github.com/gavindsouza/weg/tools"
 )
 
@@ -51,8 +52,8 @@ func InstallApp(name, url, branch string, opts InstallOptions) error {
 // InstallPythonDeps installs Python dependencies using uv
 func InstallPythonDeps(appPath string, opts InstallOptions) error {
 	// Check if pyproject.toml or setup.py exists
-	hasPyproject := fileExists(filepath.Join(appPath, "pyproject.toml"))
-	hasSetupPy := fileExists(filepath.Join(appPath, "setup.py"))
+	hasPyproject := fsutil.FileExists(filepath.Join(appPath, "pyproject.toml"))
+	hasSetupPy := fsutil.FileExists(filepath.Join(appPath, "setup.py"))
 
 	if !hasPyproject && !hasSetupPy {
 		// No Python package to install
@@ -223,11 +224,6 @@ func LinkLocalApp(name, sourcePath string, opts InstallOptions) error {
 	}
 
 	return nil
-}
-
-func fileExists(path string) bool {
-	info, err := os.Stat(path)
-	return err == nil && !info.IsDir()
 }
 
 // InstallAppOnSite installs an app on a Frappe site

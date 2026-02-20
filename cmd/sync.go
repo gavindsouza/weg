@@ -2,11 +2,11 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/gavindsouza/weg/internal/config"
 	"github.com/gavindsouza/weg/internal/errors"
+	"github.com/gavindsouza/weg/internal/fsutil"
 	"github.com/gavindsouza/weg/internal/state"
 	"github.com/spf13/cobra"
 )
@@ -78,7 +78,7 @@ func syncApp(path string, result *config.DetectionResult) error {
 	wegTomlPath := filepath.Join(wegDir, "weg.toml")
 
 	// For app-centric projects, try .weg/weg.toml first for sync
-	if fileExists(wegTomlPath) {
+	if fsutil.FileExists(wegTomlPath) {
 		return syncAppWithWegToml(path, wegDir, wegTomlPath)
 	}
 
@@ -275,10 +275,4 @@ func syncBench(path string, result *config.DetectionResult) error {
 
 	PrintInfo("\nSync complete!")
 	return nil
-}
-
-// fileExists checks if a file exists
-func fileExists(path string) bool {
-	_, err := os.Stat(path)
-	return err == nil
 }

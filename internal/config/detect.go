@@ -231,12 +231,6 @@ func dirExists(path string) bool {
 	return err == nil && info.IsDir()
 }
 
-// fileExists checks if a file exists
-func fileExists(path string) bool {
-	info, err := os.Stat(path)
-	return err == nil && !info.IsDir()
-}
-
 // IsWegManaged returns true if this is a weg-managed project (app or bench)
 func (r *DetectionResult) IsWegManaged() bool {
 	return r.Context == ContextWegApp || r.Context == ContextWegBench

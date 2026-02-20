@@ -58,6 +58,18 @@ func SafeWrite(path string, data []byte, perm os.FileMode) error {
 	return nil
 }
 
+// FileExists checks if a regular file (not a directory) exists at path.
+func FileExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir()
+}
+
+// DirExists checks if a directory exists at path.
+func DirExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && info.IsDir()
+}
+
 // copyFile copies a file from src to dst
 func copyFile(src, dst string) error {
 	data, err := os.ReadFile(src)
