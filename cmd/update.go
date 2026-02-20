@@ -11,6 +11,7 @@ import (
 
 	"github.com/gavindsouza/weg/internal/apps"
 	"github.com/gavindsouza/weg/internal/config"
+	"github.com/gavindsouza/weg/internal/errors"
 	"github.com/gavindsouza/weg/internal/runtime"
 	"github.com/gavindsouza/weg/internal/services"
 	"github.com/gavindsouza/weg/internal/state"
@@ -68,7 +69,7 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 		benchPath = absPath
 		appsDir = filepath.Join(benchPath, "apps")
 	default:
-		return fmt.Errorf("not a weg-managed project. Run 'weg init' first")
+		return errors.NotInProject(absPath)
 	}
 
 	// Load state to get installed apps

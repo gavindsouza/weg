@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/gavindsouza/weg/internal/config"
+	wegerrors "github.com/gavindsouza/weg/internal/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -38,7 +39,7 @@ func runGet(cmd *cobra.Command, args []string) error {
 	}
 
 	if result.Context != config.ContextWegBench && result.Context != config.ContextWegApp {
-		return fmt.Errorf("not a weg-managed project")
+		return wegerrors.NotInProject(cwd)
 	}
 
 	value, err := getConfigValue(result, key)

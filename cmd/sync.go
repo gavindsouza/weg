@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/gavindsouza/weg/internal/config"
+	"github.com/gavindsouza/weg/internal/errors"
 	"github.com/gavindsouza/weg/internal/state"
 	"github.com/spf13/cobra"
 )
@@ -63,7 +64,7 @@ func runSync(cmd *cobra.Command, args []string) error {
 	case config.ContextWegBench:
 		return syncBench(absPath, result)
 	case config.ContextFresh, config.ContextApp, config.ContextBench:
-		return fmt.Errorf("not a weg-managed project. Run 'weg init' first")
+		return errors.NotInProject(absPath)
 	default:
 		return fmt.Errorf("unknown context")
 	}

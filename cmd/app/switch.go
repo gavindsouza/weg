@@ -7,6 +7,7 @@ import (
 	"github.com/gavindsouza/weg/internal/apps"
 	"github.com/gavindsouza/weg/internal/completion"
 	"github.com/gavindsouza/weg/internal/config"
+	wegerrors "github.com/gavindsouza/weg/internal/errors"
 	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/state"
 	"github.com/spf13/cobra"
@@ -51,7 +52,7 @@ func runSwitch(cmd *cobra.Command, args []string) error {
 		benchPath = filepath.Join(absPath, ".weg")
 		appsDir = filepath.Join(benchPath, "apps")
 	default:
-		return fmt.Errorf("not a weg-managed project")
+		return wegerrors.NotInProject(absPath)
 	}
 
 	appPath := filepath.Join(appsDir, appName)

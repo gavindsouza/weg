@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/gavindsouza/weg/internal/config"
+	wegerrors "github.com/gavindsouza/weg/internal/errors"
 	"github.com/gavindsouza/weg/internal/output"
 	"github.com/spf13/cobra"
 )
@@ -43,7 +44,7 @@ func runListApps(cmd *cobra.Command, args []string) error {
 	case config.ContextWegApp:
 		return listAppDeps(result)
 	default:
-		return fmt.Errorf("not a weg-managed project")
+		return wegerrors.NotInProject(cwd)
 	}
 }
 

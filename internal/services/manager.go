@@ -1,10 +1,13 @@
 package services
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
+	"syscall"
 )
 
 // Manager handles service lifecycle
@@ -210,8 +213,30 @@ func (m *Manager) killOrphanedProcesses() {
 		m.killByRunID()
 	}
 
-	// Also kill by path patterns (catches orphaned child processes like esbuild)
-	// These may have been reparented to init and lost their WEG_RUNNER env
+	// Kill orphaned child processes (e.g. esbuild, yarn) that may have been
+	// reparented to init and lost their WEG_RUNNER env var.
+	// Uses /proc cmdline scanning instead of pkill -f to avoid matching
+	// unrelated processes with similar path substrings.
+	m.killByPathPatterns()
+}
+
+// killByRunID kills all processes with WEG_RUNNER=<runID> in their environment
+func (m *Manager) killByRunID() {
+	pattern := fmt.Sprintf("WEG_RUNNER=%s", m.RunID)
+
+	m.forEachProc(func(pid string) {
+		envData, err := os.ReadFile(fmt.Sprintf("/proc/%s/environ", pid))
+		if err != nil {
+			return
+		}
+		if containsNullDelimited(envData, pattern) {
+			syscall.Kill(atoiUnsafe(pid), syscall.SIGTERM)
+		}
+	})
+}
+
+// killByPathPatterns kills processes whose cmdline contains bench-specific paths
+func (m *Manager) killByPathPatterns() {
 	patterns := []string{
 		filepath.Join(m.BenchPath, "sites"),                    // gunicorn, bench commands
 		filepath.Join(m.BenchPath, "apps/frappe/socketio.js"),  // socketio
@@ -220,71 +245,57 @@ func (m *Manager) killOrphanedProcesses() {
 		filepath.Join(m.BenchPath, "env"),                      // workers, scheduler, watch
 	}
 
-	for _, pattern := range patterns {
-		exec.Command("pkill", "-f", pattern).Run()
-	}
+	m.forEachProc(func(pid string) {
+		cmdline, err := os.ReadFile(fmt.Sprintf("/proc/%s/cmdline", pid))
+		if err != nil {
+			return
+		}
+		// cmdline is null-delimited; join to match against full command
+		cmd := string(bytes.ReplaceAll(cmdline, []byte{0}, []byte(" ")))
+		for _, pattern := range patterns {
+			if strings.Contains(cmd, pattern) {
+				syscall.Kill(atoiUnsafe(pid), syscall.SIGTERM)
+				return
+			}
+		}
+	})
 }
 
-// killByRunID kills all processes with WEG_RUNNER=<runID> in their environment
-func (m *Manager) killByRunID() {
-	pattern := fmt.Sprintf("WEG_RUNNER=%s", m.RunID)
-
-	// Find all process PIDs and check their environment
+// forEachProc iterates over numeric /proc entries (PIDs)
+func (m *Manager) forEachProc(fn func(pid string)) {
 	entries, err := os.ReadDir("/proc")
 	if err != nil {
 		return
 	}
-
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
 		}
-		// Check if directory name is a PID (all digits)
 		pid := entry.Name()
 		if len(pid) == 0 || pid[0] < '0' || pid[0] > '9' {
 			continue
 		}
-
-		// Read process environment
-		envPath := fmt.Sprintf("/proc/%s/environ", pid)
-		envData, err := os.ReadFile(envPath)
-		if err != nil {
-			continue
-		}
-
-		// Check if WEG_RUNNER matches
-		if containsEnvVar(envData, pattern) {
-			exec.Command("kill", pid).Run()
-		}
+		fn(pid)
 	}
 }
 
-// containsEnvVar checks if envData (null-separated) contains the pattern
-func containsEnvVar(envData []byte, pattern string) bool {
-	patternBytes := []byte(pattern)
-	// Environment variables are null-separated
-	start := 0
-	for i := 0; i <= len(envData); i++ {
-		if i == len(envData) || envData[i] == 0 {
-			if i > start {
-				entry := envData[start:i]
-				if len(entry) >= len(patternBytes) {
-					match := true
-					for j := 0; j < len(patternBytes); j++ {
-						if entry[j] != patternBytes[j] {
-							match = false
-							break
-						}
-					}
-					if match {
-						return true
-					}
-				}
-			}
-			start = i + 1
+// containsNullDelimited checks if null-delimited data contains a matching entry
+func containsNullDelimited(data []byte, pattern string) bool {
+	for _, entry := range bytes.Split(data, []byte{0}) {
+		if bytes.HasPrefix(entry, []byte(pattern)) {
+			return true
 		}
 	}
 	return false
+}
+
+// atoiUnsafe converts a string of digits to int (assumes valid PID)
+func atoiUnsafe(s string) int {
+	n := 0
+	for _, c := range s {
+		n = n*10 + int(c-'0')
+	}
+	return n
 }
 
 // Status shows the status of running services

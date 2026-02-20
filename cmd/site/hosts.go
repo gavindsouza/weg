@@ -9,6 +9,7 @@ import (
 
 	"github.com/gavindsouza/weg/internal/completion"
 	"github.com/gavindsouza/weg/internal/config"
+	wegerrors "github.com/gavindsouza/weg/internal/errors"
 	"github.com/gavindsouza/weg/internal/state"
 	"github.com/spf13/cobra"
 )
@@ -280,7 +281,7 @@ func getSitesToManage(args []string) ([]string, error) {
 	case config.ContextWegApp:
 		benchPath = filepath.Join(absPath, ".weg")
 	default:
-		return nil, fmt.Errorf("not a weg-managed project")
+		return nil, wegerrors.NotInProject(absPath)
 	}
 
 	st, err := state.Load(absPath)

@@ -10,6 +10,7 @@ import (
 	"github.com/BurntSushi/toml"
 	"github.com/gavindsouza/weg/internal/apps"
 	"github.com/gavindsouza/weg/internal/config"
+	wegerrors "github.com/gavindsouza/weg/internal/errors"
 	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/state"
 	"github.com/spf13/cobra"
@@ -52,7 +53,7 @@ func runGet(cmd *cobra.Command, args []string) error {
 	appURL, appName := parseAppSpec(appSpec)
 
 	if !result.IsWegManaged() {
-		return fmt.Errorf("not a weg-managed project")
+		return wegerrors.NotInProject(absPath)
 	}
 	benchPath := result.BenchPath
 	appsDir := filepath.Join(benchPath, "apps")

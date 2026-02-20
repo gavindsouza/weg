@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/gavindsouza/weg/internal/config"
+	"github.com/gavindsouza/weg/internal/errors"
 	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/prompt"
 	"github.com/gavindsouza/weg/tools"
@@ -99,7 +100,7 @@ func runUpgrade(cmd *cobra.Command, args []string) error {
 		benchPath = cwd
 		configPath = filepath.Join(cwd, "weg.toml")
 	default:
-		return fmt.Errorf("not a weg-managed project. Run 'weg init' first")
+		return errors.NotInProject(cwd)
 	}
 
 	// Load current config

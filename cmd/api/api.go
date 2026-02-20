@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/gavindsouza/weg/internal/config"
+	wegerrors "github.com/gavindsouza/weg/internal/errors"
 	"github.com/gavindsouza/weg/internal/remote"
 	"github.com/gavindsouza/weg/internal/state"
 	"github.com/spf13/cobra"
@@ -88,7 +89,7 @@ func detectBenchAndSite() (benchPath, site string, err error) {
 	case config.ContextWegBench:
 		benchPath = absPath
 	default:
-		return "", "", fmt.Errorf("not a weg-managed project. Run 'weg init' first")
+		return "", "", wegerrors.NotInProject(absPath)
 	}
 
 	// Get site from flag or auto-detect

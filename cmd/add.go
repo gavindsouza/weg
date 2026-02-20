@@ -9,6 +9,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/gavindsouza/weg/internal/config"
+	"github.com/gavindsouza/weg/internal/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -63,7 +64,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	case config.ContextWegBench:
 		return addToBenchConfig(absPath, appName, appURL, branch, isLocal)
 	default:
-		return fmt.Errorf("not a weg-managed project. Run 'weg init' first")
+		return errors.NotInProject(absPath)
 	}
 }
 

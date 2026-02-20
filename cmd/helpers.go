@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/gavindsouza/weg/internal/config"
+	"github.com/gavindsouza/weg/internal/errors"
 	"github.com/gavindsouza/weg/internal/state"
 )
 
@@ -38,7 +39,7 @@ func ResolveBenchPathFrom(path string) (*BenchContext, error) {
 	}
 
 	if !result.IsWegManaged() {
-		return nil, fmt.Errorf("not a weg-managed project")
+		return nil, errors.NotInProject(absPath)
 	}
 
 	return &BenchContext{

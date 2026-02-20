@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/gavindsouza/weg/internal/config"
+	"github.com/gavindsouza/weg/internal/errors"
 )
 
 // getDefaultSite returns the default site from config
@@ -82,7 +83,7 @@ func RunBench(args []string) error {
 	case config.ContextWegApp:
 		benchPath = filepath.Join(cwd, ".weg")
 	default:
-		return fmt.Errorf("not a weg-managed project")
+		return errors.NotInProject(cwd)
 	}
 
 	// Check for devbox

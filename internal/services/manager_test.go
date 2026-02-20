@@ -49,70 +49,70 @@ func TestIsDevboxProject(t *testing.T) {
 	})
 }
 
-func TestContainsEnvVar(t *testing.T) {
+func TestContainsNullDelimited(t *testing.T) {
 	tests := []struct {
 		name    string
-		envData []byte
+		data    []byte
 		pattern string
 		want    bool
 	}{
 		{
 			name:    "single matching var",
-			envData: []byte("WEG_RUNNER=abc123\x00"),
+			data:    []byte("WEG_RUNNER=abc123\x00"),
 			pattern: "WEG_RUNNER=abc123",
 			want:    true,
 		},
 		{
 			name:    "matching var among multiple",
-			envData: []byte("PATH=/usr/bin\x00WEG_RUNNER=abc123\x00HOME=/home/test\x00"),
+			data:    []byte("PATH=/usr/bin\x00WEG_RUNNER=abc123\x00HOME=/home/test\x00"),
 			pattern: "WEG_RUNNER=abc123",
 			want:    true,
 		},
 		{
 			name:    "no match",
-			envData: []byte("PATH=/usr/bin\x00HOME=/home/test\x00"),
+			data:    []byte("PATH=/usr/bin\x00HOME=/home/test\x00"),
 			pattern: "WEG_RUNNER=abc123",
 			want:    false,
 		},
 		{
 			name:    "partial match is not match",
-			envData: []byte("WEG_RUNNER=abc\x00"),
+			data:    []byte("WEG_RUNNER=abc\x00"),
 			pattern: "WEG_RUNNER=abc123",
 			want:    false,
 		},
 		{
-			name:    "empty env data",
-			envData: []byte{},
+			name:    "empty data",
+			data:    []byte{},
 			pattern: "WEG_RUNNER=abc123",
 			want:    false,
 		},
 		{
 			name:    "matching at start",
-			envData: []byte("WEG_RUNNER=test\x00OTHER=value\x00"),
+			data:    []byte("WEG_RUNNER=test\x00OTHER=value\x00"),
 			pattern: "WEG_RUNNER=test",
 			want:    true,
 		},
 		{
 			name:    "matching at end",
-			envData: []byte("OTHER=value\x00WEG_RUNNER=test\x00"),
+			data:    []byte("OTHER=value\x00WEG_RUNNER=test\x00"),
 			pattern: "WEG_RUNNER=test",
 			want:    true,
 		},
 		{
 			name:    "matching at end without trailing null",
-			envData: []byte("OTHER=value\x00WEG_RUNNER=test"),
+			data:    []byte("OTHER=value\x00WEG_RUNNER=test"),
 			pattern: "WEG_RUNNER=test",
 			want:    true,
 		},
 		{
 			name:    "different run ID",
-			envData: []byte("WEG_RUNNER=xyz789\x00"),
+			data:    []byte("WEG_RUNNER=xyz789\x00"),
 			pattern: "WEG_RUNNER=abc123",
 			want:    false,
 		},
 		{
 			name:    "prefix match in longer value",
-			envData: []byte("WEG_RUNNER=abc123extra\x00"),
+			data:    []byte("WEG_RUNNER=abc123extra\x00"),
 			pattern: "WEG_RUNNER=abc123",
 			want:    true, // Prefix match is valid
 		},
@@ -120,9 +120,9 @@ func TestContainsEnvVar(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := containsEnvVar(tt.envData, tt.pattern)
+			got := containsNullDelimited(tt.data, tt.pattern)
 			if got != tt.want {
-				t.Errorf("containsEnvVar(%q, %q) = %v, want %v", tt.envData, tt.pattern, got, tt.want)
+				t.Errorf("containsNullDelimited(%q, %q) = %v, want %v", tt.data, tt.pattern, got, tt.want)
 			}
 		})
 	}

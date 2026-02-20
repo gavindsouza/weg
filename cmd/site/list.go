@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/gavindsouza/weg/internal/config"
+	wegerrors "github.com/gavindsouza/weg/internal/errors"
 	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/state"
 	"github.com/spf13/cobra"
@@ -57,7 +58,7 @@ func runList(cmd *cobra.Command, args []string) error {
 		configuredSites = []config.SiteConfig{}
 
 	default:
-		return fmt.Errorf("not a weg-managed project")
+		return wegerrors.NotInProject(absPath)
 	}
 
 	// Load state

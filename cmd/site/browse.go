@@ -9,6 +9,7 @@ import (
 
 	"github.com/gavindsouza/weg/internal/completion"
 	"github.com/gavindsouza/weg/internal/config"
+	wegerrors "github.com/gavindsouza/weg/internal/errors"
 	"github.com/gavindsouza/weg/internal/runtime"
 	"github.com/spf13/cobra"
 )
@@ -52,7 +53,7 @@ func runBrowse(cmd *cobra.Command, args []string) error {
 	case config.ContextWegApp:
 		benchPath = filepath.Join(cwd, ".weg")
 	default:
-		return fmt.Errorf("not a weg-managed project")
+		return wegerrors.NotInProject(cwd)
 	}
 
 	// Get site

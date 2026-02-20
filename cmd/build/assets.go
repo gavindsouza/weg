@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/gavindsouza/weg/internal/config"
+	wegerrors "github.com/gavindsouza/weg/internal/errors"
 	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/state"
 	"github.com/spf13/cobra"
@@ -117,7 +118,7 @@ func resolveContext(siteName string) (string, string, error) {
 	case config.ContextWegApp:
 		benchPath = filepath.Join(absPath, ".weg")
 	default:
-		return "", "", fmt.Errorf("not a weg-managed project")
+		return "", "", wegerrors.NotInProject(absPath)
 	}
 
 	site := siteName

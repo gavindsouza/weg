@@ -9,6 +9,7 @@ import (
 	"syscall"
 
 	"github.com/gavindsouza/weg/internal/config"
+	"github.com/gavindsouza/weg/internal/errors"
 	"github.com/gavindsouza/weg/internal/runtime"
 	"github.com/gavindsouza/weg/internal/services"
 	"github.com/gavindsouza/weg/internal/state"
@@ -73,7 +74,7 @@ func runStart(cmd *cobra.Command, args []string) error {
 	case config.ContextWegBench:
 		benchPath = absPath
 	default:
-		return fmt.Errorf("not a weg-managed project. Run 'weg init' first")
+		return errors.NotInProject(absPath)
 	}
 
 	// Check if services are already running for this project

@@ -7,6 +7,7 @@ import (
 	"github.com/gavindsouza/weg/internal/apps"
 	"github.com/gavindsouza/weg/internal/completion"
 	"github.com/gavindsouza/weg/internal/config"
+	wegerrors "github.com/gavindsouza/weg/internal/errors"
 	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/prompt"
 	"github.com/gavindsouza/weg/internal/state"
@@ -69,7 +70,7 @@ func runRemove(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("cannot remove the main app")
 		}
 	default:
-		return fmt.Errorf("not a weg-managed project")
+		return wegerrors.NotInProject(absPath)
 	}
 
 	// Load state
