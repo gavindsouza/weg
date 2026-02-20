@@ -39,7 +39,7 @@ type Entity struct {
 	Type     EntityType
 	Name     string
 	Module   string
-	Data     map[string]interface{}
+	Data     map[string]any
 	FilePath string // Relative path where this should be saved
 }
 
@@ -76,7 +76,7 @@ func WriteEntity(baseDir string, entity Entity) error {
 }
 
 // getString extracts a string value from a map
-func getString(m map[string]interface{}, key string) string {
+func getString(m map[string]any, key string) string {
 	if v, ok := m[key]; ok {
 		if s, ok := v.(string); ok {
 			return s

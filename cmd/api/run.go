@@ -54,7 +54,7 @@ func runRunCmd(cmd *cobra.Command, args []string) error {
 	method := args[1]
 
 	// Parse kwargs
-	kwargs := make(map[string]interface{})
+	kwargs := make(map[string]any)
 
 	if runArgs != "" {
 		if err := json.Unmarshal([]byte(runArgs), &kwargs); err != nil {
@@ -72,7 +72,7 @@ func runRunCmd(cmd *cobra.Command, args []string) error {
 		value := kv[1]
 
 		// Try to parse as JSON for complex values
-		var jsonValue interface{}
+		var jsonValue any
 		if err := json.Unmarshal([]byte(value), &jsonValue); err == nil {
 			kwargs[key] = jsonValue
 		} else {
@@ -88,7 +88,7 @@ func runRunCmd(cmd *cobra.Command, args []string) error {
 	return printResult(result)
 }
 
-func runDocMethod(benchPath, site, user, doctype, name, method string, kwargs map[string]interface{}) (*internalapi.Result, error) {
+func runDocMethod(benchPath, site, user, doctype, name, method string, kwargs map[string]any) (*internalapi.Result, error) {
 	kwargsJSON, _ := json.Marshal(kwargs)
 	escapedKwargs := strings.ReplaceAll(string(kwargsJSON), `\`, `\\`)
 	escapedKwargs = strings.ReplaceAll(escapedKwargs, `'`, `\'`)

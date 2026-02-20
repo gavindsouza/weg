@@ -34,7 +34,7 @@ func runInstall(cmd *cobra.Command, args []string) error {
 	mcpPath := filepath.Join(".", ".mcp.json")
 
 	// Load existing config or start fresh
-	config := make(map[string]interface{})
+	config := make(map[string]any)
 	if data, err := os.ReadFile(mcpPath); err == nil {
 		if err := json.Unmarshal(data, &config); err != nil {
 			return fmt.Errorf("failed to parse existing .mcp.json: %w", err)
@@ -42,9 +42,9 @@ func runInstall(cmd *cobra.Command, args []string) error {
 	}
 
 	// Ensure mcpServers key exists
-	servers, ok := config["mcpServers"].(map[string]interface{})
+	servers, ok := config["mcpServers"].(map[string]any)
 	if !ok {
-		servers = make(map[string]interface{})
+		servers = make(map[string]any)
 	}
 
 	// Check if weg entry already exists
@@ -54,7 +54,7 @@ func runInstall(cmd *cobra.Command, args []string) error {
 	}
 
 	// Add weg entry
-	servers["weg"] = map[string]interface{}{
+	servers["weg"] = map[string]any{
 		"command": "weg",
 		"args":    []string{"mcp", "serve"},
 	}

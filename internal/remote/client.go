@@ -50,18 +50,18 @@ func NewClientFromConfig(config *SiteConfig, creds *Credentials) *Client {
 
 // APIResponse represents a standard Frappe API response
 type APIResponse struct {
-	Message interface{} `json:"message"`
-	Exc     string      `json:"exc,omitempty"`
-	ExcType string      `json:"exc_type,omitempty"`
+	Message any    `json:"message"`
+	Exc     string `json:"exc,omitempty"`
+	ExcType string `json:"exc_type,omitempty"`
 }
 
 // DocListResponse represents a response from get_list
 type DocListResponse struct {
-	Data []map[string]interface{} `json:"data"`
+	Data []map[string]any `json:"data"`
 }
 
 // request makes an authenticated request to the Frappe API
-func (c *Client) request(method, endpoint string, body interface{}) ([]byte, error) {
+func (c *Client) request(method, endpoint string, body any) ([]byte, error) {
 	var reqBody io.Reader
 	if body != nil {
 		jsonBody, err := json.Marshal(body)
@@ -115,7 +115,7 @@ func (c *Client) Ping() error {
 }
 
 // GetDoc retrieves a single document
-func (c *Client) GetDoc(doctype, name string) (map[string]interface{}, error) {
+func (c *Client) GetDoc(doctype, name string) (map[string]any, error) {
 	endpoint := fmt.Sprintf("/api/resource/%s/%s", url.PathEscape(doctype), url.PathEscape(name))
 
 	respBody, err := c.request("GET", endpoint, nil)
@@ -124,7 +124,7 @@ func (c *Client) GetDoc(doctype, name string) (map[string]interface{}, error) {
 	}
 
 	var result struct {
-		Data map[string]interface{} `json:"data"`
+		Data map[string]any `json:"data"`
 	}
 	if err := json.Unmarshal(respBody, &result); err != nil {
 		return nil, fmt.Errorf("failed to parse response: %w", err)
@@ -134,7 +134,7 @@ func (c *Client) GetDoc(doctype, name string) (map[string]interface{}, error) {
 }
 
 // GetList retrieves a list of documents
-func (c *Client) GetList(doctype string, filters map[string]interface{}, fields []string, limit int) ([]map[string]interface{}, error) {
+func (c *Client) GetList(doctype string, filters map[string]any, fields []string, limit int) ([]map[string]any, error) {
 	endpoint := fmt.Sprintf("/api/resource/%s", url.PathEscape(doctype))
 
 	// Build query parameters
@@ -161,7 +161,7 @@ func (c *Client) GetList(doctype string, filters map[string]interface{}, fields 
 	}
 
 	var result struct {
-		Data []map[string]interface{} `json:"data"`
+		Data []map[string]any `json:"data"`
 	}
 	if err := json.Unmarshal(respBody, &result); err != nil {
 		return nil, fmt.Errorf("failed to parse response: %w", err)
@@ -171,8 +171,8 @@ func (c *Client) GetList(doctype string, filters map[string]interface{}, fields 
 }
 
 // GetAll retrieves all documents of a type (handles pagination)
-func (c *Client) GetAll(doctype string, filters map[string]interface{}, fields []string) ([]map[string]interface{}, error) {
-	var allDocs []map[string]interface{}
+func (c *Client) GetAll(doctype string, filters map[string]any, fields []string) ([]map[string]any, error) {
+	var allDocs []map[string]any
 	pageSize := 100
 	offset := 0
 
@@ -199,7 +199,7 @@ func (c *Client) GetAll(doctype string, filters map[string]interface{}, fields [
 		}
 
 		var result struct {
-			Data []map[string]interface{} `json:"data"`
+			Data []map[string]any `json:"data"`
 		}
 		if err := json.Unmarshal(respBody, &result); err != nil {
 			return nil, fmt.Errorf("failed to parse response: %w", err)
@@ -217,13 +217,13 @@ func (c *Client) GetAll(doctype string, filters map[string]interface{}, fields [
 }
 
 // CallMethod calls a whitelisted Frappe method
-func (c *Client) CallMethod(method string, args map[string]interface{}) (interface{}, error) {
+func (c *Client) CallMethod(method string, args map[string]any) (any, error) {
 	endpoint := fmt.Sprintf("/api/method/%s", method)
 
 	// Frappe requires a body for POST requests; use empty object if no args
 	body := args
 	if body == nil {
-		body = map[string]interface{}{}
+		body = map[string]any{}
 	}
 
 	respBody, err := c.request("POST", endpoint, body)
@@ -240,7 +240,7 @@ func (c *Client) CallMethod(method string, args map[string]interface{}) (interfa
 }
 
 // InsertDoc creates a new document
-func (c *Client) InsertDoc(doctype string, doc map[string]interface{}) (map[string]interface{}, error) {
+func (c *Client) InsertDoc(doctype string, doc map[string]any) (map[string]any, error) {
 	endpoint := fmt.Sprintf("/api/resource/%s", url.PathEscape(doctype))
 
 	respBody, err := c.request("POST", endpoint, doc)
@@ -249,7 +249,7 @@ func (c *Client) InsertDoc(doctype string, doc map[string]interface{}) (map[stri
 	}
 
 	var result struct {
-		Data map[string]interface{} `json:"data"`
+		Data map[string]any `json:"data"`
 	}
 	if err := json.Unmarshal(respBody, &result); err != nil {
 		return nil, fmt.Errorf("failed to parse response: %w", err)
@@ -259,7 +259,7 @@ func (c *Client) InsertDoc(doctype string, doc map[string]interface{}) (map[stri
 }
 
 // UpdateDoc updates an existing document
-func (c *Client) UpdateDoc(doctype, name string, doc map[string]interface{}) (map[string]interface{}, error) {
+func (c *Client) UpdateDoc(doctype, name string, doc map[string]any) (map[string]any, error) {
 	endpoint := fmt.Sprintf("/api/resource/%s/%s", url.PathEscape(doctype), url.PathEscape(name))
 
 	respBody, err := c.request("PUT", endpoint, doc)
@@ -268,7 +268,7 @@ func (c *Client) UpdateDoc(doctype, name string, doc map[string]interface{}) (ma
 	}
 
 	var result struct {
-		Data map[string]interface{} `json:"data"`
+		Data map[string]any `json:"data"`
 	}
 	if err := json.Unmarshal(respBody, &result); err != nil {
 		return nil, fmt.Errorf("failed to parse response: %w", err)
@@ -285,8 +285,8 @@ func (c *Client) DeleteDoc(doctype, name string) error {
 }
 
 // GetVersions retrieves Version records for a document
-func (c *Client) GetVersions(doctype, name string) ([]map[string]interface{}, error) {
-	filters := map[string]interface{}{
+func (c *Client) GetVersions(doctype, name string) ([]map[string]any, error) {
+	filters := map[string]any{
 		"ref_doctype": doctype,
 		"docname":     name,
 	}
@@ -296,8 +296,8 @@ func (c *Client) GetVersions(doctype, name string) ([]map[string]interface{}, er
 }
 
 // GetInstalledApps retrieves the list of installed apps
-func (c *Client) GetInstalledApps() ([]map[string]interface{}, error) {
-	result, err := c.CallMethod("frappe.client.get_list", map[string]interface{}{
+func (c *Client) GetInstalledApps() ([]map[string]any, error) {
+	result, err := c.CallMethod("frappe.client.get_list", map[string]any{
 		"doctype": "Installed Application",
 		"fields":  []string{"app_name", "app_version", "git_branch"},
 	})
@@ -306,10 +306,10 @@ func (c *Client) GetInstalledApps() ([]map[string]interface{}, error) {
 		return c.GetAll("Module Def", nil, []string{"name", "app_name", "module_name"})
 	}
 
-	if apps, ok := result.([]interface{}); ok {
-		var appList []map[string]interface{}
+	if apps, ok := result.([]any); ok {
+		var appList []map[string]any
 		for _, app := range apps {
-			if appMap, ok := app.(map[string]interface{}); ok {
+			if appMap, ok := app.(map[string]any); ok {
 				appList = append(appList, appMap)
 			}
 		}
@@ -320,7 +320,7 @@ func (c *Client) GetInstalledApps() ([]map[string]interface{}, error) {
 }
 
 // GetModules retrieves all Module Def records
-func (c *Client) GetModules() ([]map[string]interface{}, error) {
+func (c *Client) GetModules() ([]map[string]any, error) {
 	return c.GetAll("Module Def", nil, []string{"name", "app_name", "module_name"})
 }
 
@@ -331,8 +331,8 @@ func (c *Client) GetFrappeVersion() (string, error) {
 		return "", err
 	}
 
-	if versions, ok := result.(map[string]interface{}); ok {
-		if frappe, ok := versions["frappe"].(map[string]interface{}); ok {
+	if versions, ok := result.(map[string]any); ok {
+		if frappe, ok := versions["frappe"].(map[string]any); ok {
 			if version, ok := frappe["version"].(string); ok {
 				return version, nil
 			}
@@ -355,8 +355,8 @@ type VersionRecord struct {
 // GetAllVersions retrieves all Version records for given doctypes
 func (c *Client) GetAllVersions(doctypes []string) ([]VersionRecord, error) {
 	// Build filter for multiple doctypes
-	filters := map[string]interface{}{
-		"ref_doctype": []interface{}{"in", doctypes},
+	filters := map[string]any{
+		"ref_doctype": []any{"in", doctypes},
 	}
 
 	docs, err := c.GetAll("Version", filters, []string{"name", "ref_doctype", "docname", "owner", "creation", "data"})
@@ -405,8 +405,8 @@ func (c *Client) GetUsers(emails []string) (map[string]UserInfo, error) {
 	}
 
 	// Fetch users
-	filters := map[string]interface{}{
-		"name": []interface{}{"in", uniqueEmails},
+	filters := map[string]any{
+		"name": []any{"in", uniqueEmails},
 	}
 	docs, err := c.GetAll("User", filters, []string{"name", "full_name", "email"})
 	if err != nil {
@@ -462,8 +462,8 @@ func (c *Client) GetDocTypeModules(doctypes []string) (map[string]string, error)
 	}
 
 	// Fetch DocTypes with their modules
-	filters := map[string]interface{}{
-		"name": []interface{}{"in", uniqueDocTypes},
+	filters := map[string]any{
+		"name": []any{"in", uniqueDocTypes},
 	}
 	docs, err := c.GetAll("DocType", filters, []string{"name", "module"})
 	if err != nil {

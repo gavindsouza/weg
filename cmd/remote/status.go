@@ -186,7 +186,7 @@ func detectRemoteChanges(client *remote.Client, config *remote.SiteConfig, baseD
 		}
 
 		// Normalize JSON for comparison (parse and re-marshal)
-		var doc map[string]interface{}
+		var doc map[string]any
 		if err := json.Unmarshal(data, &doc); err != nil {
 			return nil
 		}
@@ -209,7 +209,7 @@ func detectRemoteChanges(client *remote.Client, config *remote.SiteConfig, baseD
 	// Compare remote entities with local
 	for _, entity := range result.Entities {
 		// Normalize remote entity
-		dataCopy := make(map[string]interface{})
+		dataCopy := make(map[string]any)
 		for k, v := range entity.Data {
 			dataCopy[k] = v
 		}

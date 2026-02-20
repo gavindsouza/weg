@@ -115,7 +115,7 @@ finally:
 		return fmt.Errorf("failed to list doctypes: %s", result.Error)
 	}
 
-	doctypes, ok := result.Data.([]interface{})
+	doctypes, ok := result.Data.([]any)
 	if !ok || len(doctypes) == 0 {
 		fmt.Println("No DocTypes found")
 		return nil
@@ -124,7 +124,7 @@ finally:
 	fmt.Printf("%-40s %s\n", "DOCTYPE", "MODULE")
 	fmt.Println(strings.Repeat("-", 60))
 	for _, dt := range doctypes {
-		d := dt.(map[string]interface{})
+		d := dt.(map[string]any)
 		name := d["name"].(string)
 		module := ""
 		if m, ok := d["module"].(string); ok {

@@ -140,7 +140,7 @@ finally:
 		return fmt.Errorf("failed to trim tables: %s", apiResult.Error)
 	}
 
-	results, ok := apiResult.Data.(map[string]interface{})
+	results, ok := apiResult.Data.(map[string]any)
 	if ok && len(results) > 0 {
 		fmt.Println("Deleted records:")
 		for table, count := range results {

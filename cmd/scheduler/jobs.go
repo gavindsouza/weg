@@ -72,7 +72,7 @@ finally:
 		return fmt.Errorf("failed to list jobs: %s", result.Error)
 	}
 
-	jobs, ok := result.Data.([]interface{})
+	jobs, ok := result.Data.([]any)
 	if !ok {
 		fmt.Println("No pending jobs")
 		return nil
@@ -88,7 +88,7 @@ finally:
 	fmt.Println("--------------------------------------------------------------------------------")
 
 	for _, job := range jobs {
-		j, ok := job.(map[string]interface{})
+		j, ok := job.(map[string]any)
 		if !ok {
 			continue
 		}

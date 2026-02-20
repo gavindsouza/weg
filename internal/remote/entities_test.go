@@ -35,25 +35,25 @@ func TestFetcherFetchAll(t *testing.T) {
 
 		switch r.URL.Path {
 		case "/api/method/frappe.utils.change_log.get_versions":
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"message": map[string]interface{}{
-					"frappe": map[string]interface{}{"version": "15.0.0"},
+			json.NewEncoder(w).Encode(map[string]any{
+				"message": map[string]any{
+					"frappe": map[string]any{"version": "15.0.0"},
 				},
 			})
 		case "/api/resource/Module Def":
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"data": []map[string]interface{}{
+			json.NewEncoder(w).Encode(map[string]any{
+				"data": []map[string]any{
 					{"name": "Core", "app_name": "frappe"},
 					{"name": "Custom", "app_name": "frappe"},
 				},
 			})
 		case "/api/resource/DocType":
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"data": []map[string]interface{}{},
+			json.NewEncoder(w).Encode(map[string]any{
+				"data": []map[string]any{},
 			})
 		case "/api/resource/Custom Field":
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"data": []map[string]interface{}{
+			json.NewEncoder(w).Encode(map[string]any{
+				"data": []map[string]any{
 					{
 						"name":                "User-test_field",
 						"dt":                  "User",
@@ -65,13 +65,13 @@ func TestFetcherFetchAll(t *testing.T) {
 				},
 			})
 		case "/api/resource/Property Setter":
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"data": []map[string]interface{}{},
+			json.NewEncoder(w).Encode(map[string]any{
+				"data": []map[string]any{},
 			})
 		case "/api/resource/Client Script":
 			// List endpoint
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"data": []map[string]interface{}{
+			json.NewEncoder(w).Encode(map[string]any{
+				"data": []map[string]any{
 					{
 						"name":   "Test Script",
 						"dt":     "User",
@@ -82,8 +82,8 @@ func TestFetcherFetchAll(t *testing.T) {
 			})
 		case "/api/resource/Client Script/Test Script":
 			// GetDoc endpoint for full document
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"data": map[string]interface{}{
+			json.NewEncoder(w).Encode(map[string]any{
+				"data": map[string]any{
 					"name":   "Test Script",
 					"dt":     "User",
 					"script": "console.log('test');",
@@ -91,31 +91,31 @@ func TestFetcherFetchAll(t *testing.T) {
 				},
 			})
 		case "/api/resource/Server Script":
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"data": []map[string]interface{}{},
+			json.NewEncoder(w).Encode(map[string]any{
+				"data": []map[string]any{},
 			})
 		case "/api/resource/Report":
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"data": []map[string]interface{}{},
+			json.NewEncoder(w).Encode(map[string]any{
+				"data": []map[string]any{},
 			})
 		case "/api/resource/Print Format":
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"data": []map[string]interface{}{},
+			json.NewEncoder(w).Encode(map[string]any{
+				"data": []map[string]any{},
 			})
 		case "/api/resource/Workflow":
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"data": []map[string]interface{}{},
+			json.NewEncoder(w).Encode(map[string]any{
+				"data": []map[string]any{},
 			})
 		case "/api/resource/Notification":
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"data": []map[string]interface{}{},
+			json.NewEncoder(w).Encode(map[string]any{
+				"data": []map[string]any{},
 			})
 		case "/api/resource/Letter Head":
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"data": []map[string]interface{}{},
+			json.NewEncoder(w).Encode(map[string]any{
+				"data": []map[string]any{},
 			})
 		default:
-			json.NewEncoder(w).Encode(map[string]interface{}{"data": []map[string]interface{}{}})
+			json.NewEncoder(w).Encode(map[string]any{"data": []map[string]any{}})
 		}
 	}))
 	defer server.Close()
@@ -169,7 +169,7 @@ func TestWriteEntity(t *testing.T) {
 		Type:   EntityClientScript,
 		Name:   "Test Script",
 		Module: "Custom",
-		Data: map[string]interface{}{
+		Data: map[string]any{
 			"name":   "Test Script",
 			"dt":     "User",
 			"script": "console.log('test');",
@@ -193,7 +193,7 @@ func TestWriteEntity(t *testing.T) {
 		t.Fatalf("failed to read entity file: %v", err)
 	}
 
-	var data map[string]interface{}
+	var data map[string]any
 	if err := json.Unmarshal(content, &data); err != nil {
 		t.Fatalf("failed to parse entity JSON: %v", err)
 	}
@@ -214,7 +214,7 @@ func TestWriteEntityCreatesDirectories(t *testing.T) {
 		Type:     EntityReport,
 		Name:     "My Report",
 		Module:   "Custom",
-		Data:     map[string]interface{}{"name": "My Report"},
+		Data:     map[string]any{"name": "My Report"},
 		FilePath: "custom/report/my_report/my_report.json",
 	}
 
@@ -252,7 +252,7 @@ func TestToSnakeCase(t *testing.T) {
 }
 
 func TestGetString(t *testing.T) {
-	m := map[string]interface{}{
+	m := map[string]any{
 		"string_field": "hello",
 		"int_field":    42,
 		"nil_field":    nil,
@@ -328,15 +328,15 @@ func TestFetchCustomFieldsGroupsByDocType(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		// httptest server receives decoded path
 		if r.URL.Path == "/api/resource/Custom Field" {
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"data": []map[string]interface{}{
+			json.NewEncoder(w).Encode(map[string]any{
+				"data": []map[string]any{
 					{"name": "User-field1", "dt": "User", "fieldname": "field1"},
 					{"name": "User-field2", "dt": "User", "fieldname": "field2"},
 					{"name": "Customer-field1", "dt": "Customer", "fieldname": "field1"},
 				},
 			})
 		} else {
-			json.NewEncoder(w).Encode(map[string]interface{}{"data": []map[string]interface{}{}})
+			json.NewEncoder(w).Encode(map[string]any{"data": []map[string]any{}})
 		}
 	}))
 	defer server.Close()
@@ -358,7 +358,7 @@ func TestFetchCustomFieldsGroupsByDocType(t *testing.T) {
 	// Find User entity and verify it has 2 fields
 	for _, e := range entities {
 		if e.Name == "User" {
-			fields, ok := e.Data["custom_fields"].([]map[string]interface{})
+			fields, ok := e.Data["custom_fields"].([]map[string]any)
 			if !ok {
 				t.Fatal("expected custom_fields to be a slice")
 			}
@@ -374,14 +374,14 @@ func TestFetchPropertySettersGroupsByDocType(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		// httptest server receives decoded path
 		if r.URL.Path == "/api/resource/Property Setter" {
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"data": []map[string]interface{}{
+			json.NewEncoder(w).Encode(map[string]any{
+				"data": []map[string]any{
 					{"name": "User-email-label", "doc_type": "User", "property": "label"},
 					{"name": "User-email-hidden", "doc_type": "User", "property": "hidden"},
 				},
 			})
 		} else {
-			json.NewEncoder(w).Encode(map[string]interface{}{"data": []map[string]interface{}{}})
+			json.NewEncoder(w).Encode(map[string]any{"data": []map[string]any{}})
 		}
 	}))
 	defer server.Close()
@@ -412,8 +412,8 @@ func TestFetchClientScripts(t *testing.T) {
 		switch r.URL.Path {
 		case "/api/resource/Client Script":
 			// List endpoint
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"data": []map[string]interface{}{
+			json.NewEncoder(w).Encode(map[string]any{
+				"data": []map[string]any{
 					{
 						"name":    "Test Script",
 						"dt":      "User",
@@ -425,8 +425,8 @@ func TestFetchClientScripts(t *testing.T) {
 			})
 		case "/api/resource/Client Script/Test Script":
 			// GetDoc endpoint
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"data": map[string]interface{}{
+			json.NewEncoder(w).Encode(map[string]any{
+				"data": map[string]any{
 					"name":    "Test Script",
 					"dt":      "User",
 					"script":  "console.log('test');",
@@ -436,8 +436,8 @@ func TestFetchClientScripts(t *testing.T) {
 			})
 		case "/api/resource/DocType":
 			// DocType module lookup for prefetchDocTypeModules
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"data": []map[string]interface{}{
+			json.NewEncoder(w).Encode(map[string]any{
+				"data": []map[string]any{
 					{
 						"name":   "User",
 						"module": "Custom",
@@ -445,7 +445,7 @@ func TestFetchClientScripts(t *testing.T) {
 				},
 			})
 		default:
-			json.NewEncoder(w).Encode(map[string]interface{}{"data": []map[string]interface{}{}})
+			json.NewEncoder(w).Encode(map[string]any{"data": []map[string]any{}})
 		}
 	}))
 	defer server.Close()
@@ -481,8 +481,8 @@ func TestFetchServerScripts(t *testing.T) {
 		switch r.URL.Path {
 		case "/api/resource/Server Script":
 			// List endpoint
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"data": []map[string]interface{}{
+			json.NewEncoder(w).Encode(map[string]any{
+				"data": []map[string]any{
 					{
 						"name":        "API Test",
 						"script_type": "API",
@@ -494,8 +494,8 @@ func TestFetchServerScripts(t *testing.T) {
 			})
 		case "/api/resource/Server Script/API Test":
 			// GetDoc endpoint
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"data": map[string]interface{}{
+			json.NewEncoder(w).Encode(map[string]any{
+				"data": map[string]any{
 					"name":        "API Test",
 					"script_type": "API",
 					"api_method":  "test_method",
@@ -504,7 +504,7 @@ func TestFetchServerScripts(t *testing.T) {
 				},
 			})
 		default:
-			json.NewEncoder(w).Encode(map[string]interface{}{"data": []map[string]interface{}{}})
+			json.NewEncoder(w).Encode(map[string]any{"data": []map[string]any{}})
 		}
 	}))
 	defer server.Close()
@@ -539,8 +539,8 @@ func TestFetchReportsWithChildTable(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		// httptest server receives decoded paths
 		if r.URL.Path == "/api/resource/Report" {
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"data": []map[string]interface{}{
+			json.NewEncoder(w).Encode(map[string]any{
+				"data": []map[string]any{
 					{
 						"name":        "Test Report",
 						"report_type": "Script Report",
@@ -550,19 +550,19 @@ func TestFetchReportsWithChildTable(t *testing.T) {
 				},
 			})
 		} else if r.URL.Path == "/api/resource/Report/Test Report" {
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"data": map[string]interface{}{
+			json.NewEncoder(w).Encode(map[string]any{
+				"data": map[string]any{
 					"name":        "Test Report",
 					"report_type": "Script Report",
 					"is_standard": "No",
 					"module":      "Custom",
-					"roles": []map[string]interface{}{
+					"roles": []map[string]any{
 						{"role": "System Manager"},
 					},
 				},
 			})
 		} else {
-			json.NewEncoder(w).Encode(map[string]interface{}{"data": []map[string]interface{}{}})
+			json.NewEncoder(w).Encode(map[string]any{"data": []map[string]any{}})
 		}
 	}))
 	defer server.Close()
@@ -582,10 +582,10 @@ func TestFetchReportsWithChildTable(t *testing.T) {
 
 	if len(entities) > 0 {
 		// Verify full doc was fetched (with roles child table)
-		roles, ok := entities[0].Data["roles"].([]interface{})
+		roles, ok := entities[0].Data["roles"].([]any)
 		if !ok {
-			// Might be []map[string]interface{} depending on JSON unmarshaling
-			rolesMap, ok := entities[0].Data["roles"].([]map[string]interface{})
+			// Might be []map[string]any depending on JSON unmarshaling
+			rolesMap, ok := entities[0].Data["roles"].([]map[string]any)
 			if !ok {
 				t.Log("roles not found or wrong type - this is expected if GetDoc wasn't called")
 			} else if len(rolesMap) != 1 {

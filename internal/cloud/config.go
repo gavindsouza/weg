@@ -237,7 +237,7 @@ func GetCloudClient(cloudName string) (*Client, error) {
 }
 
 // tomlMarshal encodes a value to TOML bytes
-func tomlMarshal(v interface{}) ([]byte, error) {
+func tomlMarshal(v any) ([]byte, error) {
 	var buf bytes.Buffer
 	encoder := toml.NewEncoder(&buf)
 	if err := encoder.Encode(v); err != nil {

@@ -19,10 +19,10 @@ type Executor struct {
 
 // Result represents the result of an API call
 type Result struct {
-	Success   bool        `json:"success"`
-	Data      interface{} `json:"data,omitempty"`
-	Error     string      `json:"error,omitempty"`
-	Traceback string      `json:"traceback,omitempty"`
+	Success   bool   `json:"success"`
+	Data      any    `json:"data,omitempty"`
+	Error     string `json:"error,omitempty"`
+	Traceback string `json:"traceback,omitempty"`
 }
 
 // NewExecutor creates a new API executor
@@ -55,7 +55,7 @@ func ensureDir(path string) {
 }
 
 // Call executes a frappe.call() with the given method and kwargs
-func (e *Executor) Call(method string, kwargs map[string]interface{}) (*Result, error) {
+func (e *Executor) Call(method string, kwargs map[string]any) (*Result, error) {
 	kwargsJSON, err := json.Marshal(kwargs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to serialize kwargs: %w", err)
@@ -120,7 +120,7 @@ finally:
 }
 
 // GetList retrieves a list of documents
-func (e *Executor) GetList(doctype string, filters map[string]interface{}, fields []string, limit int, orderBy string) (*Result, error) {
+func (e *Executor) GetList(doctype string, filters map[string]any, fields []string, limit int, orderBy string) (*Result, error) {
 	filtersJSON, _ := json.Marshal(filters)
 	fieldsJSON, _ := json.Marshal(fields)
 	if len(fields) == 0 {
@@ -155,7 +155,7 @@ finally:
 }
 
 // Insert creates a new document
-func (e *Executor) Insert(doc map[string]interface{}) (*Result, error) {
+func (e *Executor) Insert(doc map[string]any) (*Result, error) {
 	docJSON, _ := json.Marshal(doc)
 	escapedDoc := strings.ReplaceAll(string(docJSON), `'`, `\'`)
 
@@ -187,7 +187,7 @@ finally:
 }
 
 // Save updates an existing document
-func (e *Executor) Save(doc map[string]interface{}) (*Result, error) {
+func (e *Executor) Save(doc map[string]any) (*Result, error) {
 	docJSON, _ := json.Marshal(doc)
 	escapedDoc := strings.ReplaceAll(string(docJSON), `'`, `\'`)
 
@@ -316,7 +316,7 @@ func (e *Executor) ExecuteRaw(script string) (*Result, error) {
 }
 
 // FormatJSON formats data as pretty JSON
-func FormatJSON(data interface{}) (string, error) {
+func FormatJSON(data any) (string, error) {
 	b, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
 		return "", err

@@ -11,7 +11,7 @@ import (
 )
 
 // DebugLog prints debug messages only when WEG_NO_PROGRESS is set
-func DebugLog(format string, args ...interface{}) {
+func DebugLog(format string, args ...any) {
 	if os.Getenv("WEG_NO_PROGRESS") != "" {
 		fmt.Printf("DEBUG: "+format+"\n", args...)
 	}

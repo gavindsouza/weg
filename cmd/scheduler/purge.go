@@ -85,7 +85,7 @@ finally:
 		return fmt.Errorf("failed to purge jobs: %s", result.Error)
 	}
 
-	data, ok := result.Data.(map[string]interface{})
+	data, ok := result.Data.(map[string]any)
 	if ok {
 		deleted, _ := data["deleted"].(float64)
 		output.Successf("Purged %d failed jobs", int(deleted))

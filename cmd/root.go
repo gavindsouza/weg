@@ -246,21 +246,21 @@ func GetConfigPath() string {
 }
 
 // PrintVerbose prints a message only in verbose mode
-func PrintVerbose(format string, args ...interface{}) {
+func PrintVerbose(format string, args ...any) {
 	if verbose {
 		fmt.Printf(format+"\n", args...)
 	}
 }
 
 // PrintInfo prints a message unless quiet mode is enabled
-func PrintInfo(format string, args ...interface{}) {
+func PrintInfo(format string, args ...any) {
 	if !quiet {
 		fmt.Printf(format+"\n", args...)
 	}
 }
 
 // PrintError prints an error message (always shown)
-func PrintError(format string, args ...interface{}) {
+func PrintError(format string, args ...any) {
 	fmt.Fprintf(os.Stderr, "Error: "+format+"\n", args...)
 }
 

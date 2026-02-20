@@ -148,7 +148,7 @@ finally:
 		fmt.Print(string(output))
 	} else {
 		// Pretty print JSON
-		var data interface{}
+		var data any
 		if err := json.Unmarshal(output, &data); err != nil {
 			// Not JSON, print as-is
 			fmt.Print(string(output))

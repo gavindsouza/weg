@@ -116,7 +116,7 @@ func TestResultParsing(t *testing.T) {
 func TestFormatJSON(t *testing.T) {
 	tests := []struct {
 		name    string
-		data    interface{}
+		data    any
 		wantErr bool
 	}{
 		{
@@ -126,7 +126,7 @@ func TestFormatJSON(t *testing.T) {
 		},
 		{
 			name:    "nested structure",
-			data:    map[string]interface{}{"user": map[string]string{"name": "test"}},
+			data:    map[string]any{"user": map[string]string{"name": "test"}},
 			wantErr: false,
 		},
 		{
@@ -167,7 +167,7 @@ func TestResultFields(t *testing.T) {
 	// Test that Result struct fields are correctly typed
 	result := Result{
 		Success: true,
-		Data:    map[string]interface{}{"count": 42},
+		Data:    map[string]any{"count": 42},
 		Error:   "",
 	}
 
@@ -175,7 +175,7 @@ func TestResultFields(t *testing.T) {
 		t.Error("expected Success to be true")
 	}
 
-	data, ok := result.Data.(map[string]interface{})
+	data, ok := result.Data.(map[string]any)
 	if !ok {
 		t.Error("expected Data to be a map")
 	}
@@ -247,7 +247,7 @@ func TestNewExecutorAppCentricMode(t *testing.T) {
 }
 
 func TestFormatJSONOutput(t *testing.T) {
-	data := map[string]interface{}{
+	data := map[string]any{
 		"name":  "Test",
 		"count": 42,
 	}
@@ -263,7 +263,7 @@ func TestFormatJSONOutput(t *testing.T) {
 	}
 
 	// Verify it's valid JSON
-	var parsed map[string]interface{}
+	var parsed map[string]any
 	if err := json.Unmarshal([]byte(result), &parsed); err != nil {
 		t.Errorf("output is not valid JSON: %v", err)
 	}
@@ -298,7 +298,7 @@ func TestResultArrayData(t *testing.T) {
 		t.Fatalf("failed to parse: %v", err)
 	}
 
-	data, ok := result.Data.([]interface{})
+	data, ok := result.Data.([]any)
 	if !ok {
 		t.Error("expected data to be an array")
 	}

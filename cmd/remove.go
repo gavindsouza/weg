@@ -67,37 +67,37 @@ func removeFromAppConfig(path, name string) error {
 	}
 
 	// Parse existing config
-	var pyproject map[string]interface{}
+	var pyproject map[string]any
 	if err := toml.Unmarshal(data, &pyproject); err != nil {
 		return fmt.Errorf("failed to parse pyproject.toml: %w", err)
 	}
 
 	// Navigate to tool.weg.dependencies.apps
-	tool, ok := pyproject["tool"].(map[string]interface{})
+	tool, ok := pyproject["tool"].(map[string]any)
 	if !ok {
 		return fmt.Errorf("app %s not found in configuration", name)
 	}
 
-	weg, ok := tool["weg"].(map[string]interface{})
+	weg, ok := tool["weg"].(map[string]any)
 	if !ok {
 		return fmt.Errorf("app %s not found in configuration", name)
 	}
 
-	deps, ok := weg["dependencies"].(map[string]interface{})
+	deps, ok := weg["dependencies"].(map[string]any)
 	if !ok {
 		return fmt.Errorf("app %s not found in configuration", name)
 	}
 
-	apps, ok := deps["apps"].([]interface{})
+	apps, ok := deps["apps"].([]any)
 	if !ok {
 		return fmt.Errorf("app %s not found in configuration", name)
 	}
 
 	// Find and remove the app
 	found := false
-	newApps := make([]interface{}, 0, len(apps))
+	newApps := make([]any, 0, len(apps))
 	for _, app := range apps {
-		appMap, ok := app.(map[string]interface{})
+		appMap, ok := app.(map[string]any)
 		if !ok {
 			newApps = append(newApps, app)
 			continue
@@ -152,13 +152,13 @@ func removeFromBenchConfig(path, name string) error {
 	}
 
 	// Parse existing config
-	var wegConfig map[string]interface{}
+	var wegConfig map[string]any
 	if err := toml.Unmarshal(data, &wegConfig); err != nil {
 		return fmt.Errorf("failed to parse weg.toml: %w", err)
 	}
 
 	// Get apps section
-	apps, ok := wegConfig["apps"].(map[string]interface{})
+	apps, ok := wegConfig["apps"].(map[string]any)
 	if !ok {
 		return fmt.Errorf("app %s not found in configuration", name)
 	}

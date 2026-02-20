@@ -128,14 +128,14 @@ func resolveSiteConfig() (string, string, error) {
 	return benchPath, site, nil
 }
 
-func loadSiteConfigJSON(benchPath, site string) (map[string]interface{}, string, error) {
+func loadSiteConfigJSON(benchPath, site string) (map[string]any, string, error) {
 	configPath := filepath.Join(benchPath, "sites", site, "site_config.json")
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		return nil, configPath, fmt.Errorf("failed to read config: %w", err)
 	}
 
-	var cfg map[string]interface{}
+	var cfg map[string]any
 	if err := json.Unmarshal(data, &cfg); err != nil {
 		return nil, configPath, fmt.Errorf("failed to parse config: %w", err)
 	}
@@ -143,7 +143,7 @@ func loadSiteConfigJSON(benchPath, site string) (map[string]interface{}, string,
 	return cfg, configPath, nil
 }
 
-func saveSiteConfigJSON(path string, cfg map[string]interface{}) error {
+func saveSiteConfigJSON(path string, cfg map[string]any) error {
 	data, err := json.MarshalIndent(cfg, "", " ")
 	if err != nil {
 		return fmt.Errorf("failed to serialize config: %w", err)
@@ -210,7 +210,7 @@ func runConfigSet(cmd *cobra.Command, args []string) error {
 	key := args[0]
 	valueStr := args[1]
 
-	var value interface{}
+	var value any
 	if configJSON {
 		// Parse as JSON
 		if err := json.Unmarshal([]byte(valueStr), &value); err != nil {

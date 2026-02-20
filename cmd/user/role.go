@@ -194,7 +194,7 @@ finally:
 		return fmt.Errorf("failed to list roles: %s", result.Error)
 	}
 
-	roles, ok := result.Data.([]interface{})
+	roles, ok := result.Data.([]any)
 	if !ok || len(roles) == 0 {
 		fmt.Printf("No roles assigned to %s\n", email)
 		return nil
@@ -278,7 +278,7 @@ finally:
 		return fmt.Errorf("failed to get user: %s", result.Error)
 	}
 
-	data, ok := result.Data.(map[string]interface{})
+	data, ok := result.Data.(map[string]any)
 	if !ok {
 		return fmt.Errorf("unexpected response format")
 	}
@@ -293,7 +293,7 @@ finally:
 	fmt.Printf("Last Login: %s\n", getString(data, "last_login"))
 	fmt.Printf("Last Active:%s\n", getString(data, "last_active"))
 
-	if roles, ok := data["roles"].([]interface{}); ok && len(roles) > 0 {
+	if roles, ok := data["roles"].([]any); ok && len(roles) > 0 {
 		fmt.Printf("\nRoles:\n")
 		for _, r := range roles {
 			fmt.Printf("  - %s\n", r.(string))
@@ -303,14 +303,14 @@ finally:
 	return nil
 }
 
-func getString(m map[string]interface{}, key string) string {
+func getString(m map[string]any, key string) string {
 	if v, ok := m[key].(string); ok {
 		return v
 	}
 	return ""
 }
 
-func getBool(m map[string]interface{}, key string) bool {
+func getBool(m map[string]any, key string) bool {
 	if v, ok := m[key].(float64); ok {
 		return v == 1
 	}

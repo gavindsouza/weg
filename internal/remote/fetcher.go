@@ -198,7 +198,7 @@ func (f *Fetcher) FetchAll() (*FetchResult, error) {
 
 // fetchCustomDocTypes fetches custom DocTypes (custom=1)
 func (f *Fetcher) fetchCustomDocTypes() ([]Entity, error) {
-	docs, err := f.Client.GetAll("DocType", map[string]interface{}{
+	docs, err := f.Client.GetAll("DocType", map[string]any{
 		"custom": 1,
 	}, []string{"name", "module"})
 	if err != nil {
@@ -237,7 +237,7 @@ func (f *Fetcher) fetchCustomDocTypes() ([]Entity, error) {
 
 // fetchCustomFields fetches Custom Fields (is_system_generated=0)
 func (f *Fetcher) fetchCustomFields() ([]Entity, error) {
-	docs, err := f.Client.GetAll("Custom Field", map[string]interface{}{
+	docs, err := f.Client.GetAll("Custom Field", map[string]any{
 		"is_system_generated": 0,
 	}, []string{"*"})
 	if err != nil {
@@ -254,7 +254,7 @@ func (f *Fetcher) fetchCustomFields() ([]Entity, error) {
 	f.prefetchDocTypeModules(targetDocTypes)
 
 	// Group by target doctype
-	byDocType := make(map[string][]map[string]interface{})
+	byDocType := make(map[string][]map[string]any)
 
 	for _, doc := range docs {
 		dt := getString(doc, "dt")
@@ -270,7 +270,7 @@ func (f *Fetcher) fetchCustomFields() ([]Entity, error) {
 		module := f.getDocTypeModule(dt)
 
 		// Create combined document
-		combined := map[string]interface{}{
+		combined := map[string]any{
 			"doctype":       dt,
 			"custom_fields": fields,
 		}
@@ -304,7 +304,7 @@ func (f *Fetcher) fetchPropertySetters() ([]Entity, error) {
 	f.prefetchDocTypeModules(targetDocTypes)
 
 	// Group by target doctype
-	byDocType := make(map[string][]map[string]interface{})
+	byDocType := make(map[string][]map[string]any)
 
 	for _, doc := range docs {
 		dt := getString(doc, "doc_type")
@@ -319,7 +319,7 @@ func (f *Fetcher) fetchPropertySetters() ([]Entity, error) {
 		// Use the target DocType's module
 		module := f.getDocTypeModule(dt)
 
-		combined := map[string]interface{}{
+		combined := map[string]any{
 			"doctype":          dt,
 			"property_setters": setters,
 		}
@@ -442,7 +442,7 @@ func (f *Fetcher) fetchServerScripts() ([]Entity, error) {
 
 // fetchReports fetches custom Reports (is_standard="No")
 func (f *Fetcher) fetchReports() ([]Entity, error) {
-	docs, err := f.Client.GetAll("Report", map[string]interface{}{
+	docs, err := f.Client.GetAll("Report", map[string]any{
 		"is_standard": "No",
 	}, []string{"name", "module", "ref_doctype"})
 	if err != nil {
@@ -488,7 +488,7 @@ func (f *Fetcher) fetchReports() ([]Entity, error) {
 
 // fetchPrintFormats fetches custom Print Formats (standard="No")
 func (f *Fetcher) fetchPrintFormats() ([]Entity, error) {
-	docs, err := f.Client.GetAll("Print Format", map[string]interface{}{
+	docs, err := f.Client.GetAll("Print Format", map[string]any{
 		"standard": "No",
 	}, []string{"name", "module", "doc_type"})
 	if err != nil {

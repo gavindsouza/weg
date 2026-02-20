@@ -222,7 +222,7 @@ func handleWegStatus(ctx context.Context, _ mcplib.CallToolRequest) (*mcplib.Cal
 		return toolError(fmt.Errorf("failed to detect context: %w", err))
 	}
 
-	status := map[string]interface{}{
+	status := map[string]any{
 		"context":     result.Context.String(),
 		"path":        result.Path,
 		"description": result.ContextDescription(),

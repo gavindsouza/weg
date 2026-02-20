@@ -118,37 +118,37 @@ func addToAppConfig(path, name, url, branch string, isLocal bool) error {
 	}
 
 	// Parse existing config
-	var pyproject map[string]interface{}
+	var pyproject map[string]any
 	if err := toml.Unmarshal(data, &pyproject); err != nil {
 		return fmt.Errorf("failed to parse pyproject.toml: %w", err)
 	}
 
 	// Navigate to or create tool.weg.dependencies.apps
-	tool, ok := pyproject["tool"].(map[string]interface{})
+	tool, ok := pyproject["tool"].(map[string]any)
 	if !ok {
-		tool = make(map[string]interface{})
+		tool = make(map[string]any)
 		pyproject["tool"] = tool
 	}
 
-	weg, ok := tool["weg"].(map[string]interface{})
+	weg, ok := tool["weg"].(map[string]any)
 	if !ok {
-		weg = make(map[string]interface{})
+		weg = make(map[string]any)
 		tool["weg"] = weg
 	}
 
-	deps, ok := weg["dependencies"].(map[string]interface{})
+	deps, ok := weg["dependencies"].(map[string]any)
 	if !ok {
-		deps = make(map[string]interface{})
+		deps = make(map[string]any)
 		weg["dependencies"] = deps
 	}
 
-	apps, ok := deps["apps"].([]interface{})
+	apps, ok := deps["apps"].([]any)
 	if !ok {
-		apps = []interface{}{}
+		apps = []any{}
 	}
 
 	// Add new app
-	newApp := map[string]interface{}{
+	newApp := map[string]any{
 		"name": name,
 	}
 	if url != "" {
@@ -190,20 +190,20 @@ func addToBenchConfig(path, name, url, branch string, isLocal bool) error {
 	}
 
 	// Parse existing config
-	var wegConfig map[string]interface{}
+	var wegConfig map[string]any
 	if err := toml.Unmarshal(data, &wegConfig); err != nil {
 		return fmt.Errorf("failed to parse weg.toml: %w", err)
 	}
 
 	// Get or create apps section
-	apps, ok := wegConfig["apps"].(map[string]interface{})
+	apps, ok := wegConfig["apps"].(map[string]any)
 	if !ok {
-		apps = make(map[string]interface{})
+		apps = make(map[string]any)
 		wegConfig["apps"] = apps
 	}
 
 	// Add new app
-	appConfig := make(map[string]interface{})
+	appConfig := make(map[string]any)
 	if isLocal {
 		appConfig["path"] = url
 	} else {

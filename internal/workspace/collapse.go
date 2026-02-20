@@ -43,7 +43,7 @@ func Collapse(opts CollapseOptions) (*CollapseResult, error) {
 	}
 
 	// Track which source files we've updated (to handle multiple fields per file)
-	updatedSources := make(map[string]map[string]interface{})
+	updatedSources := make(map[string]map[string]any)
 
 	// Process each tracked workspace file
 	for workspacePath, fileState := range state.Files {
@@ -76,7 +76,7 @@ func Collapse(opts CollapseOptions) (*CollapseResult, error) {
 
 		// Load source JSON (from cache or disk)
 		sourcePath := filepath.Join(opts.BaseDir, fileState.Source)
-		var doc map[string]interface{}
+		var doc map[string]any
 
 		if cached, exists := updatedSources[fileState.Source]; exists {
 			doc = cached

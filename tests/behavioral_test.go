@@ -49,7 +49,7 @@ func TestSiteList_EmptyBench(t *testing.T) {
 	}
 	// If there's output, it should mention "No sites found" or be valid JSON
 	if out[0] == '[' {
-		var sites []map[string]interface{}
+		var sites []map[string]any
 		if err := json.Unmarshal([]byte(out), &sites); err != nil {
 			t.Fatalf("invalid JSON output: %v\noutput: %s", err, out)
 		}
@@ -87,7 +87,7 @@ func TestSiteList_WithSites(t *testing.T) {
 		t.Fatal("expected output for bench with sites")
 	}
 
-	var sites []map[string]interface{}
+	var sites []map[string]any
 	if err := json.Unmarshal([]byte(out), &sites); err != nil {
 		t.Fatalf("invalid JSON output: %v\noutput: %s", err, out)
 	}
@@ -150,7 +150,7 @@ branch = "version-15"
 		t.Fatal("expected output for bench with apps")
 	}
 
-	var apps []map[string]interface{}
+	var apps []map[string]any
 	if err := json.Unmarshal([]byte(out), &apps); err != nil {
 		t.Fatalf("invalid JSON output: %v\noutput: %s", err, out)
 	}

@@ -22,10 +22,10 @@ func remoteGetDoc(client *remote.Client, doctype, name string) (*RemoteResult, e
 
 // remoteGetList fetches a list of documents via HTTP
 func remoteGetList(client *remote.Client, doctype string, filters map[string]any, fields []string, limit int, orderBy string) (*RemoteResult, error) {
-	// Convert filters to map[string]interface{}
-	var filtersIface map[string]interface{}
+	// Convert filters to map[string]any
+	var filtersIface map[string]any
 	if filters != nil {
-		filtersIface = make(map[string]interface{})
+		filtersIface = make(map[string]any)
 		for k, v := range filters {
 			filtersIface[k] = v
 		}
@@ -40,8 +40,8 @@ func remoteGetList(client *remote.Client, doctype string, filters map[string]any
 
 // remoteCreate creates a new document via HTTP
 func remoteCreate(client *remote.Client, doctype string, doc map[string]any) (*RemoteResult, error) {
-	// Convert to map[string]interface{}
-	docIface := make(map[string]interface{})
+	// Convert to map[string]any
+	docIface := make(map[string]any)
 	for k, v := range doc {
 		docIface[k] = v
 	}
@@ -55,8 +55,8 @@ func remoteCreate(client *remote.Client, doctype string, doc map[string]any) (*R
 
 // remoteUpdate updates an existing document via HTTP
 func remoteUpdate(client *remote.Client, doctype, name string, doc map[string]any) (*RemoteResult, error) {
-	// Convert to map[string]interface{}
-	docIface := make(map[string]interface{})
+	// Convert to map[string]any
+	docIface := make(map[string]any)
 	for k, v := range doc {
 		docIface[k] = v
 	}
@@ -79,8 +79,8 @@ func remoteDelete(client *remote.Client, doctype, name string) (*RemoteResult, e
 
 // remoteCall invokes a whitelisted method via HTTP
 func remoteCall(client *remote.Client, method string, args map[string]any) (*RemoteResult, error) {
-	// Convert to map[string]interface{}
-	argsIface := make(map[string]interface{})
+	// Convert to map[string]any
+	argsIface := make(map[string]any)
 	for k, v := range args {
 		argsIface[k] = v
 	}

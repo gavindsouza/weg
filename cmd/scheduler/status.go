@@ -64,7 +64,7 @@ finally:
 		return fmt.Errorf("failed to check scheduler status: %s", result.Error)
 	}
 
-	data, ok := result.Data.(map[string]interface{})
+	data, ok := result.Data.(map[string]any)
 	if !ok {
 		return fmt.Errorf("unexpected response format")
 	}

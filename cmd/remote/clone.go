@@ -597,7 +597,7 @@ repos:
 }
 
 // writeFileContent writes JSON content to a file path
-func writeFileContent(baseDir, filePath string, content map[string]interface{}) error {
+func writeFileContent(baseDir, filePath string, content map[string]any) error {
 	fullPath := filepath.Join(baseDir, filePath)
 
 	// Create directory

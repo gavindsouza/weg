@@ -108,7 +108,7 @@ finally:
 	}
 
 	// Format output as table
-	docs, ok := result.Data.([]interface{})
+	docs, ok := result.Data.([]any)
 	if !ok || len(docs) == 0 {
 		fmt.Println("No documents found")
 		return nil

@@ -23,7 +23,7 @@ type HistoryEntry struct {
 	EntityType  EntityType
 	Module      string
 	FilePath    string
-	EntityData  map[string]interface{} // Current entity data for metadata extraction
+	EntityData  map[string]any // Current entity data for metadata extraction
 }
 
 // DoctypeToEntityType maps Frappe doctype names to our entity types
@@ -72,7 +72,7 @@ func (f *Fetcher) FetchHistory() ([]HistoryEntry, error) {
 		}
 
 		// Parse the version data to get the document state
-		var versionData map[string]interface{}
+		var versionData map[string]any
 		if v.Data != "" {
 			if err := json.Unmarshal([]byte(v.Data), &versionData); err != nil {
 				continue // Skip malformed version data
@@ -142,7 +142,7 @@ func (f *Fetcher) FetchHistoryWithDocs(entities []Entity) ([]HistoryEntry, map[s
 		// Get module and entity data from entity map if available
 		module := "_"
 		filePath := ""
-		var entityData map[string]interface{}
+		var entityData map[string]any
 		if e, exists := entityMap[key]; exists {
 			module = e.Module
 			filePath = e.FilePath
@@ -203,14 +203,14 @@ func determineAction(data string) string {
 		return "create"
 	}
 
-	var versionData map[string]interface{}
+	var versionData map[string]any
 	if err := json.Unmarshal([]byte(data), &versionData); err != nil {
 		return "update"
 	}
 
 	// Check for creation indicators
-	if changed, ok := versionData["changed"].([]interface{}); ok && len(changed) == 0 {
-		if added, ok := versionData["added"].([]interface{}); ok && len(added) > 0 {
+	if changed, ok := versionData["changed"].([]any); ok && len(changed) == 0 {
+		if added, ok := versionData["added"].([]any); ok && len(added) > 0 {
 			return "create"
 		}
 	}

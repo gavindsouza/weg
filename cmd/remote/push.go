@@ -194,7 +194,7 @@ type localEntity struct {
 	entityType string
 	doctype    string
 	name       string
-	data       map[string]interface{}
+	data       map[string]any
 }
 
 // findChangedEntities finds only entities that have been modified since last push
@@ -235,7 +235,7 @@ func findChangedEntities(baseDir string, includeUncommitted bool) ([]localEntity
 			continue
 		}
 
-		var doc map[string]interface{}
+		var doc map[string]any
 		if err := json.Unmarshal(data, &doc); err != nil {
 			continue
 		}
@@ -490,7 +490,7 @@ func findLocalEntities(baseDir string) ([]localEntity, error) {
 					return nil
 				}
 
-				var doc map[string]interface{}
+				var doc map[string]any
 				if err := json.Unmarshal(data, &doc); err != nil {
 					return nil
 				}
@@ -561,7 +561,7 @@ func pushEntity(client *remote.Client, e localEntity) error {
 	}
 }
 
-func pushDocument(client *remote.Client, doctype, name string, data map[string]interface{}) error {
+func pushDocument(client *remote.Client, doctype, name string, data map[string]any) error {
 	// Check if document exists and get current modified timestamp
 	existing, err := client.GetDoc(doctype, name)
 	if err != nil {
@@ -582,13 +582,13 @@ func pushDocument(client *remote.Client, doctype, name string, data map[string]i
 
 func pushCustomFields(client *remote.Client, e localEntity) error {
 	// Custom fields are grouped by target doctype
-	fields, ok := e.data["custom_fields"].([]interface{})
+	fields, ok := e.data["custom_fields"].([]any)
 	if !ok {
 		return fmt.Errorf("invalid custom fields format")
 	}
 
 	for _, f := range fields {
-		field, ok := f.(map[string]interface{})
+		field, ok := f.(map[string]any)
 		if !ok {
 			continue
 		}
@@ -629,13 +629,13 @@ func pushCustomFields(client *remote.Client, e localEntity) error {
 }
 
 func pushPropertySetters(client *remote.Client, e localEntity) error {
-	setters, ok := e.data["property_setters"].([]interface{})
+	setters, ok := e.data["property_setters"].([]any)
 	if !ok {
 		return fmt.Errorf("invalid property setters format")
 	}
 
 	for _, s := range setters {
-		setter, ok := s.(map[string]interface{})
+		setter, ok := s.(map[string]any)
 		if !ok {
 			continue
 		}
@@ -657,7 +657,7 @@ func pushPropertySetters(client *remote.Client, e localEntity) error {
 	return nil
 }
 
-func getString(m map[string]interface{}, key string) string {
+func getString(m map[string]any, key string) string {
 	if v, ok := m[key]; ok {
 		if s, ok := v.(string); ok {
 			return s

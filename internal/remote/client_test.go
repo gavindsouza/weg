@@ -100,8 +100,8 @@ func TestClientGetDoc(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"data": map[string]interface{}{
+		json.NewEncoder(w).Encode(map[string]any{
+			"data": map[string]any{
 				"name":      "User-test_field",
 				"dt":        "User",
 				"fieldname": "test_field",
@@ -140,8 +140,8 @@ func TestClientGetList(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"data": []map[string]interface{}{
+		json.NewEncoder(w).Encode(map[string]any{
+			"data": []map[string]any{
 				{"name": "Script 1", "dt": "User"},
 				{"name": "Script 2", "dt": "Customer"},
 			},
@@ -150,7 +150,7 @@ func TestClientGetList(t *testing.T) {
 	defer server.Close()
 
 	client := NewClient(server.URL, "key", "secret")
-	docs, err := client.GetList("Client Script", map[string]interface{}{
+	docs, err := client.GetList("Client Script", map[string]any{
 		"enabled": 1,
 	}, []string{"name", "dt"}, 10)
 	if err != nil {
@@ -172,18 +172,18 @@ func TestClientGetAll(t *testing.T) {
 		// Simulate pagination
 		if callCount == 1 {
 			// First page - return full page
-			docs := make([]map[string]interface{}, 100)
+			docs := make([]map[string]any, 100)
 			for i := 0; i < 100; i++ {
-				docs[i] = map[string]interface{}{"name": i}
+				docs[i] = map[string]any{"name": i}
 			}
-			json.NewEncoder(w).Encode(map[string]interface{}{"data": docs})
+			json.NewEncoder(w).Encode(map[string]any{"data": docs})
 		} else {
 			// Second page - return partial (end of data)
-			docs := make([]map[string]interface{}, 50)
+			docs := make([]map[string]any, 50)
 			for i := 0; i < 50; i++ {
-				docs[i] = map[string]interface{}{"name": 100 + i}
+				docs[i] = map[string]any{"name": 100 + i}
 			}
-			json.NewEncoder(w).Encode(map[string]interface{}{"data": docs})
+			json.NewEncoder(w).Encode(map[string]any{"data": docs})
 		}
 	}))
 	defer server.Close()
@@ -214,9 +214,9 @@ func TestClientCallMethod(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"message": map[string]interface{}{
-				"frappe": map[string]interface{}{
+		json.NewEncoder(w).Encode(map[string]any{
+			"message": map[string]any{
+				"frappe": map[string]any{
 					"version": "15.0.0",
 				},
 			},
@@ -230,12 +230,12 @@ func TestClientCallMethod(t *testing.T) {
 		t.Fatalf("CallMethod failed: %v", err)
 	}
 
-	msg, ok := result.(map[string]interface{})
+	msg, ok := result.(map[string]any)
 	if !ok {
 		t.Fatalf("expected map result, got %T", result)
 	}
 
-	frappe, ok := msg["frappe"].(map[string]interface{})
+	frappe, ok := msg["frappe"].(map[string]any)
 	if !ok {
 		t.Fatal("expected frappe in result")
 	}
@@ -252,7 +252,7 @@ func TestClientInsertDoc(t *testing.T) {
 		}
 
 		// Verify body
-		var body map[string]interface{}
+		var body map[string]any
 		json.NewDecoder(r.Body).Decode(&body)
 
 		if body["fieldname"] != "new_field" {
@@ -260,8 +260,8 @@ func TestClientInsertDoc(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"data": map[string]interface{}{
+		json.NewEncoder(w).Encode(map[string]any{
+			"data": map[string]any{
 				"name":      "User-new_field",
 				"fieldname": "new_field",
 			},
@@ -270,7 +270,7 @@ func TestClientInsertDoc(t *testing.T) {
 	defer server.Close()
 
 	client := NewClient(server.URL, "key", "secret")
-	doc, err := client.InsertDoc("Custom Field", map[string]interface{}{
+	doc, err := client.InsertDoc("Custom Field", map[string]any{
 		"dt":        "User",
 		"fieldname": "new_field",
 		"fieldtype": "Data",
@@ -296,8 +296,8 @@ func TestClientUpdateDoc(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"data": map[string]interface{}{
+		json.NewEncoder(w).Encode(map[string]any{
+			"data": map[string]any{
 				"name":  "User-test_field",
 				"label": "Updated Label",
 			},
@@ -306,7 +306,7 @@ func TestClientUpdateDoc(t *testing.T) {
 	defer server.Close()
 
 	client := NewClient(server.URL, "key", "secret")
-	doc, err := client.UpdateDoc("Custom Field", "User-test_field", map[string]interface{}{
+	doc, err := client.UpdateDoc("Custom Field", "User-test_field", map[string]any{
 		"label": "Updated Label",
 	})
 	if err != nil {
@@ -344,9 +344,9 @@ func TestClientDeleteDoc(t *testing.T) {
 func TestClientGetFrappeVersion(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"message": map[string]interface{}{
-				"frappe": map[string]interface{}{
+		json.NewEncoder(w).Encode(map[string]any{
+			"message": map[string]any{
+				"frappe": map[string]any{
 					"version": "15.42.0",
 					"title":   "Frappe Framework",
 				},
@@ -369,8 +369,8 @@ func TestClientGetFrappeVersion(t *testing.T) {
 func TestClientGetInstalledApps(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"message": []map[string]interface{}{
+		json.NewEncoder(w).Encode(map[string]any{
+			"message": []map[string]any{
 				{"app_name": "frappe", "app_version": "15.0.0", "git_branch": "version-15"},
 				{"app_name": "erpnext", "app_version": "14.0.0", "git_branch": "version-14"},
 			},
@@ -396,8 +396,8 @@ func TestClientGetInstalledApps(t *testing.T) {
 func TestClientGetModules(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"data": []map[string]interface{}{
+		json.NewEncoder(w).Encode(map[string]any{
+			"data": []map[string]any{
 				{"name": "Core", "app_name": "frappe"},
 				{"name": "Custom", "app_name": "frappe"},
 			},
@@ -419,7 +419,7 @@ func TestClientGetModules(t *testing.T) {
 func TestClientAPIError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		json.NewEncoder(w).Encode(map[string]any{
 			"exc": "Internal Server Error",
 		})
 	}))

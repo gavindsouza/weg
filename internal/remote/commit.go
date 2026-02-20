@@ -14,7 +14,7 @@ import (
 // HistoricalState represents an entity's state at a point in history
 type HistoricalState struct {
 	FilePath    string
-	Data        map[string]interface{}
+	Data        map[string]any
 	Timestamp   string
 	Author      string
 	Message     string
@@ -23,23 +23,23 @@ type HistoricalState struct {
 
 // CommitInfo contains information needed to create a git commit
 type CommitInfo struct {
-	Timestamp    string                            // RFC3339 formatted timestamp
-	Author       string                            // Author name and email formatted for git
-	Message      string                            // Commit message
-	Files        []string                          // Files to include in this commit
-	FileContents map[string]map[string]interface{} // File path -> content to write
+	Timestamp    string                    // RFC3339 formatted timestamp
+	Author       string                    // Author name and email formatted for git
+	Message      string                    // Commit message
+	Files        []string                  // Files to include in this commit
+	FileContents map[string]map[string]any // File path -> content to write
 }
 
 // versionChange represents a single field change with old and new values
 type versionChange struct {
 	field    string
-	oldValue interface{}
-	newValue interface{}
+	oldValue any
+	newValue any
 }
 
 // ReconstructFileHistory reconstructs the historical states of a file from versions
 // Returns states in chronological order (oldest first)
-func ReconstructFileHistory(currentData map[string]interface{}, versions []HistoryEntry) []HistoricalState {
+func ReconstructFileHistory(currentData map[string]any, versions []HistoryEntry) []HistoricalState {
 	if len(versions) == 0 {
 		return nil
 	}
@@ -77,12 +77,12 @@ func ReconstructFileHistory(currentData map[string]interface{}, versions []Histo
 
 // applyVersionReverse applies version changes in reverse to get previous state
 // Takes current data and version data, returns what the data looked like BEFORE this version
-func applyVersionReverse(currentData map[string]interface{}, versionDataJSON string) map[string]interface{} {
+func applyVersionReverse(currentData map[string]any, versionDataJSON string) map[string]any {
 	if versionDataJSON == "" {
 		return currentData
 	}
 
-	var versionData map[string]interface{}
+	var versionData map[string]any
 	if err := json.Unmarshal([]byte(versionDataJSON), &versionData); err != nil {
 		return currentData
 	}
@@ -91,9 +91,9 @@ func applyVersionReverse(currentData map[string]interface{}, versionDataJSON str
 	result := deepCopyMap(currentData)
 
 	// Reverse field changes: replace new values with old values
-	if changed, ok := versionData["changed"].([]interface{}); ok {
+	if changed, ok := versionData["changed"].([]any); ok {
 		for _, c := range changed {
-			if arr, ok := c.([]interface{}); ok && len(arr) >= 3 {
+			if arr, ok := c.([]any); ok && len(arr) >= 3 {
 				fieldName, ok := arr[0].(string)
 				if !ok {
 					continue
@@ -106,19 +106,19 @@ func applyVersionReverse(currentData map[string]interface{}, versionDataJSON str
 	}
 
 	// Handle child table additions (reverse = remove these rows)
-	if added, ok := versionData["added"].([]interface{}); ok {
+	if added, ok := versionData["added"].([]any); ok {
 		for _, item := range added {
-			if arr, ok := item.([]interface{}); ok && len(arr) >= 2 {
+			if arr, ok := item.([]any); ok && len(arr) >= 2 {
 				tableName, ok := arr[0].(string)
 				if !ok {
 					continue
 				}
-				rowData, ok := arr[1].(map[string]interface{})
+				rowData, ok := arr[1].(map[string]any)
 				if !ok {
 					continue
 				}
 				// Remove this row from the child table
-				if table, exists := result[tableName].([]interface{}); exists {
+				if table, exists := result[tableName].([]any); exists {
 					result[tableName] = removeRowFromTable(table, rowData)
 				}
 			}
@@ -126,22 +126,22 @@ func applyVersionReverse(currentData map[string]interface{}, versionDataJSON str
 	}
 
 	// Handle child table removals (reverse = add these rows back)
-	if removed, ok := versionData["removed"].([]interface{}); ok {
+	if removed, ok := versionData["removed"].([]any); ok {
 		for _, item := range removed {
-			if arr, ok := item.([]interface{}); ok && len(arr) >= 2 {
+			if arr, ok := item.([]any); ok && len(arr) >= 2 {
 				tableName, ok := arr[0].(string)
 				if !ok {
 					continue
 				}
-				rowData, ok := arr[1].(map[string]interface{})
+				rowData, ok := arr[1].(map[string]any)
 				if !ok {
 					continue
 				}
 				// Add this row back to the child table
-				if table, exists := result[tableName].([]interface{}); exists {
+				if table, exists := result[tableName].([]any); exists {
 					result[tableName] = append(table, rowData)
 				} else {
-					result[tableName] = []interface{}{rowData}
+					result[tableName] = []any{rowData}
 				}
 			}
 		}
@@ -151,15 +151,15 @@ func applyVersionReverse(currentData map[string]interface{}, versionDataJSON str
 }
 
 // removeRowFromTable removes a row from a child table by matching the "name" field
-func removeRowFromTable(table []interface{}, rowToRemove map[string]interface{}) []interface{} {
+func removeRowFromTable(table []any, rowToRemove map[string]any) []any {
 	rowName, _ := rowToRemove["name"].(string)
 	if rowName == "" {
 		return table
 	}
 
-	var newTable []interface{}
+	var newTable []any
 	for _, row := range table {
-		if rowMap, ok := row.(map[string]interface{}); ok {
+		if rowMap, ok := row.(map[string]any); ok {
 			if name, _ := rowMap["name"].(string); name != rowName {
 				newTable = append(newTable, row)
 			}
@@ -171,13 +171,13 @@ func removeRowFromTable(table []interface{}, rowToRemove map[string]interface{})
 }
 
 // deepCopyMap creates a deep copy of a map
-func deepCopyMap(m map[string]interface{}) map[string]interface{} {
+func deepCopyMap(m map[string]any) map[string]any {
 	// Use JSON marshal/unmarshal for deep copy
 	data, err := json.Marshal(m)
 	if err != nil {
 		return m
 	}
-	var result map[string]interface{}
+	var result map[string]any
 	if err := json.Unmarshal(data, &result); err != nil {
 		return m
 	}
@@ -203,15 +203,15 @@ func parseVersionData(data string, entityType EntityType) (action string, change
 		return "create", nil, 0, 0
 	}
 
-	var versionData map[string]interface{}
+	var versionData map[string]any
 	if err := json.Unmarshal([]byte(data), &versionData); err != nil {
 		return "update", nil, 0, 0
 	}
 
 	// Extract changed fields with values
-	if changed, ok := versionData["changed"].([]interface{}); ok {
+	if changed, ok := versionData["changed"].([]any); ok {
 		for _, c := range changed {
-			if arr, ok := c.([]interface{}); ok && len(arr) >= 1 {
+			if arr, ok := c.([]any); ok && len(arr) >= 1 {
 				if fieldName, ok := arr[0].(string); ok {
 					vc := versionChange{field: fieldName}
 					if len(arr) >= 2 {
@@ -227,12 +227,12 @@ func parseVersionData(data string, entityType EntityType) (action string, change
 	}
 
 	// Check for row additions (child tables)
-	if added, ok := versionData["added"].([]interface{}); ok {
+	if added, ok := versionData["added"].([]any); ok {
 		addedRows = len(added)
 	}
 
 	// Check for row removals
-	if removed, ok := versionData["removed"].([]interface{}); ok {
+	if removed, ok := versionData["removed"].([]any); ok {
 		removedRows = len(removed)
 	}
 
@@ -357,7 +357,7 @@ func describeRowType(entityType EntityType, count int) string {
 }
 
 // isTruthy checks if a value represents a truthy state
-func isTruthy(v interface{}) bool {
+func isTruthy(v any) bool {
 	if v == nil {
 		return false
 	}
@@ -492,7 +492,7 @@ func buildSmartCommitParts(entry HistoryEntry, action string, changes []versionC
 }
 
 // buildServerScriptCommit creates commit parts for server scripts
-func buildServerScriptCommit(entry HistoryEntry, data map[string]interface{}, changes []versionChange, addedRows, removedRows int) (scope, description, prefix string) {
+func buildServerScriptCommit(entry HistoryEntry, data map[string]any, changes []versionChange, addedRows, removedRows int) (scope, description, prefix string) {
 	prefix = "fix" // script changes are typically fixes/improvements
 
 	if data == nil {
@@ -568,7 +568,7 @@ func buildServerScriptCommit(entry HistoryEntry, data map[string]interface{}, ch
 }
 
 // buildClientScriptCommit creates commit parts for client scripts
-func buildClientScriptCommit(entry HistoryEntry, data map[string]interface{}, changes []versionChange) (scope, description, prefix string) {
+func buildClientScriptCommit(entry HistoryEntry, data map[string]any, changes []versionChange) (scope, description, prefix string) {
 	prefix = "fix" // script changes are typically fixes/improvements
 
 	if data == nil {
@@ -586,7 +586,7 @@ func buildClientScriptCommit(entry HistoryEntry, data map[string]interface{}, ch
 	// Check what changed
 	scriptChanged := false
 	enabledChanged := false
-	var enabledValue interface{}
+	var enabledValue any
 
 	for _, c := range changes {
 		switch c.field {
@@ -815,7 +815,7 @@ func BuildCommitPlan(history []HistoryEntry, entities []Entity, entitiesWithoutH
 		var msgParts []string
 		var versionRefs []string
 		var files []string
-		fileContents := make(map[string]map[string]interface{})
+		fileContents := make(map[string]map[string]any)
 		var author string
 
 		for filePath, state := range states {
@@ -851,7 +851,7 @@ func BuildCommitPlan(history []HistoryEntry, entities []Entity, entitiesWithoutH
 	// Add final commit for entities without version history
 	if len(entitiesWithoutHistory) > 0 {
 		var files []string
-		fileContents := make(map[string]map[string]interface{})
+		fileContents := make(map[string]map[string]any)
 		for _, e := range entitiesWithoutHistory {
 			files = append(files, e.FilePath)
 			fileContents[e.FilePath] = e.Data

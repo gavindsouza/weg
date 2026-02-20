@@ -100,7 +100,7 @@ finally:
 		return nil
 	}
 
-	data, ok := result.Data.(map[string]interface{})
+	data, ok := result.Data.(map[string]any)
 	if !ok {
 		return fmt.Errorf("unexpected response format")
 	}
@@ -120,9 +120,9 @@ finally:
 	fmt.Printf("%-25s %-15s %-6s %s\n", "FIELD", "TYPE", "REQD", "OPTIONS")
 	fmt.Println(strings.Repeat("-", 70))
 
-	fields, _ := data["fields"].([]interface{})
+	fields, _ := data["fields"].([]any)
 	for _, f := range fields {
-		field := f.(map[string]interface{})
+		field := f.(map[string]any)
 		fieldname := ""
 		if fn, ok := field["fieldname"].(string); ok {
 			fieldname = fn

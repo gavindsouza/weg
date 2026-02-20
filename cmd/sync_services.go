@@ -70,9 +70,9 @@ func syncAppServices(benchPath string) error {
 
 // devboxConfig represents devbox.json structure
 type devboxConfig struct {
-	Schema   string                 `json:"$schema,omitempty"`
-	Packages []string               `json:"packages"`
-	Shell    map[string]interface{} `json:"shell,omitempty"`
+	Schema   string         `json:"$schema,omitempty"`
+	Packages []string       `json:"packages"`
+	Shell    map[string]any `json:"shell,omitempty"`
 }
 
 // addDevboxPackages adds packages to devbox.json if not already present

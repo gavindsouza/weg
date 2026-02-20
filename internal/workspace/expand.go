@@ -79,7 +79,7 @@ func Expand(opts ExpandOptions) (*ExpandResult, error) {
 			continue
 		}
 
-		var doc map[string]interface{}
+		var doc map[string]any
 		if err := json.Unmarshal(data, &doc); err != nil {
 			result.Errors = append(result.Errors, fmt.Sprintf("%s: invalid JSON: %v", entityFile, err))
 			continue
@@ -202,7 +202,7 @@ func detectEntityType(path string) string {
 }
 
 // getEntityName extracts the entity name from the document or path
-func getEntityName(doc map[string]interface{}, path string) string {
+func getEntityName(doc map[string]any, path string) string {
 	// Try to get name from document
 	if name, ok := doc["name"].(string); ok && name != "" {
 		return name

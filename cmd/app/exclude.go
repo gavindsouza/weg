@@ -75,19 +75,19 @@ func setAppExcluded(appName string, excluded bool) error {
 		return fmt.Errorf("failed to read weg.toml: %w", err)
 	}
 
-	var wegConfig map[string]interface{}
+	var wegConfig map[string]any
 	if err := toml.Unmarshal(data, &wegConfig); err != nil {
 		return fmt.Errorf("failed to parse weg.toml: %w", err)
 	}
 
 	// Get apps section
-	apps, ok := wegConfig["apps"].(map[string]interface{})
+	apps, ok := wegConfig["apps"].(map[string]any)
 	if !ok {
 		return fmt.Errorf("no apps section in weg.toml")
 	}
 
 	// Get the app
-	appConfig, ok := apps[appName].(map[string]interface{})
+	appConfig, ok := apps[appName].(map[string]any)
 	if !ok {
 		return fmt.Errorf("app %s not found in weg.toml", appName)
 	}

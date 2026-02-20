@@ -90,7 +90,7 @@ finally:
 		return fmt.Errorf("failed to list users: %s", result.Error)
 	}
 
-	users, ok := result.Data.([]interface{})
+	users, ok := result.Data.([]any)
 	if !ok || len(users) == 0 {
 		fmt.Println("No users found")
 		return nil
@@ -99,7 +99,7 @@ finally:
 	fmt.Printf("%-35s %-25s %-8s %s\n", "EMAIL", "NAME", "ENABLED", "LAST LOGIN")
 	fmt.Println(strings.Repeat("-", 90))
 	for _, u := range users {
-		user := u.(map[string]interface{})
+		user := u.(map[string]any)
 		email := user["name"].(string)
 		fullName := ""
 		if fn, ok := user["full_name"].(string); ok {

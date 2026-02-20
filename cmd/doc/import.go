@@ -45,7 +45,7 @@ func runImport(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to read file: %w", err)
 	}
 
-	var doc map[string]interface{}
+	var doc map[string]any
 	if err := json.Unmarshal(data, &doc); err != nil {
 		return fmt.Errorf("invalid JSON: %w", err)
 	}
@@ -123,7 +123,7 @@ finally:
 		return fmt.Errorf("failed to import: %s", result.Error)
 	}
 
-	resultData, ok := result.Data.(map[string]interface{})
+	resultData, ok := result.Data.(map[string]any)
 	if ok {
 		action := resultData["action"]
 		name := resultData["name"]
