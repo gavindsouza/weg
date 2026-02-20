@@ -41,7 +41,7 @@ func runSet(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to get current directory: %w", err)
 	}
 
-	result, err := config.DetectContext(cwd)
+	result, err := config.DetectProjectContext(cwd)
 	if err != nil {
 		return fmt.Errorf("failed to detect context: %w", err)
 	}

@@ -55,7 +55,7 @@ func runBuild(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to get current directory: %w", err)
 	}
 
-	result, err := config.DetectContext(cwd)
+	result, err := config.DetectProjectContext(cwd)
 	if err != nil {
 		return fmt.Errorf("failed to detect context: %w", err)
 	}
@@ -65,7 +65,7 @@ func runBuild(cmd *cobra.Command, args []string) error {
 
 	switch result.Context {
 	case config.ContextWegBench:
-		benchPath = cwd
+		benchPath = result.BenchPath
 		appName = filepath.Base(cwd)
 	case config.ContextWegApp:
 		benchPath = filepath.Join(cwd, ".weg")

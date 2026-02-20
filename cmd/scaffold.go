@@ -53,7 +53,7 @@ func runScaffold(cmd *cobra.Command, args []string) error {
 	}
 
 	// Detect context - should be a weg-managed app
-	result, err := config.DetectContext(absPath)
+	result, err := config.DetectProjectContext(absPath)
 	if err != nil {
 		return fmt.Errorf("failed to detect context: %w", err)
 	}

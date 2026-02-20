@@ -30,7 +30,7 @@ func runCurrent(cmd *cobra.Command, args []string) error {
 	}
 
 	// Try to detect context
-	result, err := config.DetectContext(cwd)
+	result, err := config.DetectProjectContext(cwd)
 	if err != nil {
 		return fmt.Errorf("not in a weg-managed directory: %w", err)
 	}
@@ -40,7 +40,7 @@ func runCurrent(cmd *cobra.Command, args []string) error {
 
 	switch result.Context {
 	case config.ContextWegBench:
-		benchPath = cwd
+		benchPath = result.BenchPath
 		configPath = filepath.Join(cwd, "weg.toml")
 	case config.ContextWegApp:
 		benchPath = filepath.Join(cwd, ".weg")
@@ -51,7 +51,7 @@ func runCurrent(cmd *cobra.Command, args []string) error {
 			configPath = filepath.Join(cwd, "pyproject.toml")
 		}
 	case config.ContextBench:
-		benchPath = cwd
+		benchPath = result.BenchPath
 		fmt.Println("Traditional bench (not weg-managed)")
 		fmt.Printf("Path: %s\n", benchPath)
 		return nil

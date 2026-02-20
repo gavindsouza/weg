@@ -48,7 +48,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	}
 
 	// Detect context
-	result, err := config.DetectContext(absPath)
+	result, err := config.DetectProjectContext(absPath)
 	if err != nil {
 		fmt.Println("[ ] Weg project")
 		fmt.Println("    Not a weg-managed project. Run 'weg init' first.")
@@ -58,9 +58,9 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	var benchPath string
 	switch result.Context {
 	case config.ContextWegApp:
-		benchPath = filepath.Join(absPath, ".weg")
+		benchPath = result.BenchPath
 	case config.ContextWegBench:
-		benchPath = absPath
+		benchPath = result.BenchPath
 	default:
 		fmt.Println("[ ] Weg project")
 		fmt.Println("    Not a weg-managed project. Run 'weg init' first.")

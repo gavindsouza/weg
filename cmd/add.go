@@ -44,7 +44,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	}
 
 	// Detect context
-	result, err := config.DetectContext(absPath)
+	result, err := config.DetectProjectContext(absPath)
 	if err != nil {
 		return fmt.Errorf("failed to detect context: %w", err)
 	}

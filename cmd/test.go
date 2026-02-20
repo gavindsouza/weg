@@ -65,7 +65,7 @@ func runTest(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid path: %w", err)
 	}
 
-	result, err := config.DetectContext(absPath)
+	result, err := config.DetectProjectContext(absPath)
 	if err != nil {
 		return fmt.Errorf("failed to detect context: %w", err)
 	}
@@ -75,17 +75,17 @@ func runTest(cmd *cobra.Command, args []string) error {
 
 	switch result.Context {
 	case config.ContextWegBench:
-		benchPath = absPath
+		benchPath = result.BenchPath
 		if testApp == "" {
 			return fmt.Errorf("please specify --app when running from a bench")
 		}
 		appName = testApp
 	case config.ContextWegApp:
-		benchPath = filepath.Join(absPath, ".weg")
+		benchPath = result.BenchPath
 		appName = filepath.Base(absPath)
 	case config.ContextApp:
 		// App without weg setup
-		benchPath = filepath.Join(absPath, ".weg")
+		benchPath = result.BenchPath
 		appName = filepath.Base(absPath)
 		if _, err := os.Stat(benchPath); os.IsNotExist(err) {
 			return fmt.Errorf("no .weg environment found. Run 'weg init' first")
@@ -100,7 +100,7 @@ func runTest(cmd *cobra.Command, args []string) error {
 
 	// Get compatible versions from pyproject.toml
 	var compatibleVersions []string
-	pyprojectPath := filepath.Join(absPath, "pyproject.toml")
+	pyprojectPath := filepath.Join(result.Path, "pyproject.toml")
 	if appConfig, err := config.ParsePyproject(pyprojectPath); err == nil && appConfig != nil {
 		compatibleVersions = appConfig.Compatibility.Frappe
 	}

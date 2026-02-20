@@ -53,16 +53,16 @@ func runSync(cmd *cobra.Command, args []string) error {
 	}
 
 	// Detect context
-	result, err := config.DetectContext(absPath)
+	result, err := config.DetectProjectContext(absPath)
 	if err != nil {
 		return fmt.Errorf("failed to detect context: %w", err)
 	}
 
 	switch result.Context {
 	case config.ContextWegApp:
-		return syncApp(absPath, result)
+		return syncApp(result.Path, result)
 	case config.ContextWegBench:
-		return syncBench(absPath, result)
+		return syncBench(result.Path, result)
 	case config.ContextFresh, config.ContextApp, config.ContextBench:
 		return errors.NotInProject(absPath)
 	default:

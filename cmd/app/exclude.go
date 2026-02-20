@@ -53,7 +53,7 @@ func setAppExcluded(appName string, excluded bool) error {
 		return fmt.Errorf("invalid path: %w", err)
 	}
 
-	result, err := config.DetectContext(absPath)
+	result, err := config.DetectProjectContext(absPath)
 	if err != nil {
 		return fmt.Errorf("failed to detect context: %w", err)
 	}
@@ -67,7 +67,7 @@ func setAppExcluded(appName string, excluded bool) error {
 		return fmt.Errorf("cannot exclude frappe - it is required")
 	}
 
-	wegPath := filepath.Join(absPath, "weg.toml")
+	wegPath := filepath.Join(result.Path, "weg.toml")
 
 	// Read existing config
 	data, err := os.ReadFile(wegPath)

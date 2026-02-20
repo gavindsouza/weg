@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	internalconfig "github.com/gavindsouza/weg/internal/config"
 	"github.com/spf13/cobra"
 )
 
@@ -31,7 +32,12 @@ func init() {
 }
 
 func runInstall(cmd *cobra.Command, args []string) error {
-	mcpPath := filepath.Join(".", ".mcp.json")
+	// Place .mcp.json in the project root if inside a project, else CWD
+	base, _ := filepath.Abs(".")
+	if root, found := internalconfig.FindBenchRoot(base); found {
+		base = root
+	}
+	mcpPath := filepath.Join(base, ".mcp.json")
 
 	// Load existing config or start fresh
 	config := make(map[string]any)

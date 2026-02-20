@@ -37,7 +37,7 @@ func runList(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid path: %w", err)
 	}
 
-	result, err := config.DetectContext(absPath)
+	result, err := config.DetectProjectContext(absPath)
 	if err != nil {
 		return fmt.Errorf("failed to detect context: %w", err)
 	}
@@ -45,9 +45,9 @@ func runList(cmd *cobra.Command, args []string) error {
 	var benchPath string
 	switch result.Context {
 	case config.ContextWegBench:
-		benchPath = absPath
+		benchPath = result.BenchPath
 	case config.ContextWegApp:
-		benchPath = filepath.Join(absPath, ".weg")
+		benchPath = result.BenchPath
 	default:
 		return wegerrors.NotInProject(absPath)
 	}

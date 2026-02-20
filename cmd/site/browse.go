@@ -41,7 +41,7 @@ func runBrowse(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	result, err := config.DetectContext(cwd)
+	result, err := config.DetectProjectContext(cwd)
 	if err != nil {
 		return fmt.Errorf("failed to detect context: %w", err)
 	}
@@ -49,7 +49,7 @@ func runBrowse(cmd *cobra.Command, args []string) error {
 	var benchPath string
 	switch result.Context {
 	case config.ContextWegBench:
-		benchPath = cwd
+		benchPath = result.BenchPath
 	case config.ContextWegApp:
 		benchPath = filepath.Join(cwd, ".weg")
 	default:

@@ -34,7 +34,7 @@ func runList(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid path: %w", err)
 	}
 
-	result, err := config.DetectContext(absPath)
+	result, err := config.DetectProjectContext(absPath)
 	if err != nil {
 		return fmt.Errorf("failed to detect context: %w", err)
 	}
@@ -44,7 +44,7 @@ func runList(cmd *cobra.Command, args []string) error {
 
 	switch result.Context {
 	case config.ContextWegBench:
-		benchPath = absPath
+		benchPath = result.BenchPath
 		appsDir = filepath.Join(benchPath, "apps")
 		benchConfig, err := config.ParseWegToml(absPath)
 		if err != nil {
@@ -53,7 +53,7 @@ func runList(cmd *cobra.Command, args []string) error {
 		configuredApps = benchConfig.Apps
 
 	case config.ContextWegApp:
-		benchPath = filepath.Join(absPath, ".weg")
+		benchPath = result.BenchPath
 		appsDir = filepath.Join(benchPath, "apps")
 		// For app-centric, show the main app and dependencies
 		appConfig, err := config.ParsePyproject(absPath)

@@ -19,16 +19,14 @@ func GetBenchPath() string {
 		return ""
 	}
 
-	result, err := config.DetectContext(absPath)
+	result, err := config.DetectProjectContext(absPath)
 	if err != nil {
 		return ""
 	}
 
 	switch result.Context {
-	case config.ContextWegBench:
-		return absPath
-	case config.ContextWegApp:
-		return filepath.Join(absPath, ".weg")
+	case config.ContextWegBench, config.ContextWegApp:
+		return result.BenchPath
 	default:
 		return ""
 	}

@@ -84,7 +84,7 @@ func runUpgrade(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	result, err := config.DetectContext(cwd)
+	result, err := config.DetectProjectContext(cwd)
 	if err != nil {
 		return fmt.Errorf("failed to detect context: %w", err)
 	}
@@ -97,7 +97,7 @@ func runUpgrade(cmd *cobra.Command, args []string) error {
 		benchPath = filepath.Join(cwd, ".weg")
 		configPath = filepath.Join(benchPath, "weg.toml")
 	case config.ContextWegBench:
-		benchPath = cwd
+		benchPath = result.BenchPath
 		configPath = filepath.Join(cwd, "weg.toml")
 	default:
 		return errors.NotInProject(cwd)

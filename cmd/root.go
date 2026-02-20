@@ -93,40 +93,10 @@ Learn more at https://github.com/gavindsouza/weg`,
 			}
 		}
 
-		// Commands that should work without being in a project
-		skipAutoChdir := map[string]bool{
-			"new":        true,
-			"create":     true,
-			"init":       true,
-			"help":       true,
-			"version":    true,
-			"completion": true,
-			"self":       true,
-			"run":        true, // weg run clones fresh
-			"clone":      true, // weg remote clone works outside projects
-			"remote":     true, // weg remote subcommands
-			"workspace":  true, // weg workspace works in remote clones
-		}
-
-		// Skip auto-detection for root command (no subcommand) or skipped commands
-		cmdName := cmd.Name()
-		if cmdName == "weg" || skipAutoChdir[cmdName] {
-			return nil
-		}
-
-		// Find project root by walking up the directory tree
+		// Find project root by walking up (without changing process CWD)
 		cwd, _ := os.Getwd()
 		if root, found := internalconfig.FindBenchRoot(cwd); found {
 			projectRoot = root
-			// Only chdir if we're not already at the root
-			if cwd != root {
-				if err := os.Chdir(root); err != nil {
-					return fmt.Errorf("failed to change to project root %s: %w", root, err)
-				}
-				if verbose {
-					fmt.Printf("Changed to project root: %s\n", root)
-				}
-			}
 		}
 
 		return nil

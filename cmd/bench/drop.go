@@ -47,7 +47,7 @@ func runDrop(cmd *cobra.Command, args []string) error {
 	}
 
 	// Verify it's a bench
-	result, err := config.DetectContext(benchPath)
+	result, err := config.DetectProjectContext(benchPath)
 	if err != nil {
 		return fmt.Errorf("failed to detect context: %w", err)
 	}

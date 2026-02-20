@@ -33,7 +33,7 @@ func ResolveBenchPathFrom(path string) (*BenchContext, error) {
 		return nil, fmt.Errorf("invalid path: %w", err)
 	}
 
-	result, err := config.DetectContext(absPath)
+	result, err := config.DetectProjectContext(absPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to detect context: %w", err)
 	}

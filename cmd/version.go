@@ -57,7 +57,7 @@ func runVersionCmd(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	result, err := config.DetectContext(absPath)
+	result, err := config.DetectProjectContext(absPath)
 	if err != nil {
 		return nil
 	}
@@ -65,9 +65,9 @@ func runVersionCmd(cmd *cobra.Command, args []string) error {
 	var benchPath string
 	switch result.Context {
 	case config.ContextWegBench:
-		benchPath = absPath
+		benchPath = result.BenchPath
 	case config.ContextWegApp:
-		benchPath = filepath.Join(absPath, ".weg")
+		benchPath = result.BenchPath
 	default:
 		return nil
 	}

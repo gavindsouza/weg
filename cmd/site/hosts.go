@@ -269,7 +269,7 @@ func getSitesToManage(args []string) ([]string, error) {
 		return nil, err
 	}
 
-	result, err := config.DetectContext(absPath)
+	result, err := config.DetectProjectContext(absPath)
 	if err != nil {
 		return nil, err
 	}
@@ -277,9 +277,9 @@ func getSitesToManage(args []string) ([]string, error) {
 	var benchPath string
 	switch result.Context {
 	case config.ContextWegBench:
-		benchPath = absPath
+		benchPath = result.BenchPath
 	case config.ContextWegApp:
-		benchPath = filepath.Join(absPath, ".weg")
+		benchPath = result.BenchPath
 	default:
 		return nil, wegerrors.NotInProject(absPath)
 	}

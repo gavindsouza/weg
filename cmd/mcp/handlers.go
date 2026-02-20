@@ -217,7 +217,7 @@ func handleWegStatus(ctx context.Context, _ mcplib.CallToolRequest) (*mcplib.Cal
 		return toolError(fmt.Errorf("failed to get working directory: %w", err))
 	}
 
-	result, err := config.DetectContext(absPath)
+	result, err := config.DetectProjectContext(absPath)
 	if err != nil {
 		return toolError(fmt.Errorf("failed to detect context: %w", err))
 	}
@@ -283,7 +283,7 @@ func handleWegSiteList(ctx context.Context, _ mcplib.CallToolRequest) (*mcplib.C
 		return toolError(fmt.Errorf("failed to get working directory: %w", err))
 	}
 
-	result, err := config.DetectContext(absPath)
+	result, err := config.DetectProjectContext(absPath)
 	if err != nil {
 		return toolError(fmt.Errorf("failed to detect context: %w", err))
 	}
@@ -338,7 +338,7 @@ func handleWegAppList(ctx context.Context, _ mcplib.CallToolRequest) (*mcplib.Ca
 		return toolError(fmt.Errorf("failed to get working directory: %w", err))
 	}
 
-	result, err := config.DetectContext(absPath)
+	result, err := config.DetectProjectContext(absPath)
 	if err != nil {
 		return toolError(fmt.Errorf("failed to detect context: %w", err))
 	}

@@ -61,7 +61,7 @@ func runStart(cmd *cobra.Command, args []string) error {
 	}
 
 	// Detect context
-	result, err := config.DetectContext(absPath)
+	result, err := config.DetectProjectContext(absPath)
 	if err != nil {
 		return fmt.Errorf("failed to detect context: %w", err)
 	}
@@ -70,9 +70,9 @@ func runStart(cmd *cobra.Command, args []string) error {
 	var benchPath string
 	switch result.Context {
 	case config.ContextWegApp:
-		benchPath = filepath.Join(absPath, ".weg")
+		benchPath = result.BenchPath
 	case config.ContextWegBench:
-		benchPath = absPath
+		benchPath = result.BenchPath
 	default:
 		return errors.NotInProject(absPath)
 	}
@@ -88,14 +88,14 @@ func runStart(cmd *cobra.Command, args []string) error {
 
 	// Check if sync is needed (unless --no-sync)
 	if !noSync {
-		st, err := state.Load(absPath)
+		st, err := state.Load(result.Path)
 		if err == nil && !st.IsEmpty() {
 			configPath := result.ConfigPath
 			if configPath == "" {
-				if config.HasWegToml(absPath) {
-					configPath = filepath.Join(absPath, "weg.toml")
+				if config.HasWegToml(result.Path) {
+					configPath = filepath.Join(result.Path, "weg.toml")
 				} else {
-					configPath = filepath.Join(absPath, "pyproject.toml")
+					configPath = filepath.Join(result.Path, "pyproject.toml")
 				}
 			}
 

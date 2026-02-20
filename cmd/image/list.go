@@ -44,7 +44,7 @@ func runList(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("failed to get current directory: %w", err)
 		}
 
-		result, _ := config.DetectContext(cwd)
+		result, _ := config.DetectProjectContext(cwd)
 		if result.Context == config.ContextWegBench || result.Context == config.ContextWegApp {
 			appName := filepath.Base(cwd)
 			filter = appName

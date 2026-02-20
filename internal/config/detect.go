@@ -121,6 +121,31 @@ func DetectContext(path string) (*DetectionResult, error) {
 	return result, nil
 }
 
+// DetectProjectContext is like DetectContext but walks up the directory tree
+// to find the project root first. Use this when the caller may be in a
+// subdirectory of a project.
+func DetectProjectContext(path string) (*DetectionResult, error) {
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return nil, err
+	}
+
+	// Try the given path first
+	result, err := DetectContext(absPath)
+	if err != nil {
+		return nil, err
+	}
+
+	// If nothing detected, walk up to find a project root
+	if result.Context == ContextFresh {
+		if root, found := FindBenchRoot(absPath); found {
+			return DetectContext(root)
+		}
+	}
+
+	return result, nil
+}
+
 // FindBenchRoot walks up the directory tree to find a bench root
 func FindBenchRoot(startPath string) (string, bool) {
 	absPath, err := filepath.Abs(startPath)
