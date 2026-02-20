@@ -35,7 +35,7 @@ func runClear(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	fmt.Println("Clearing build cache and assets...")
+	output.Print("Clearing build cache and assets...")
 
 	// Clear assets directory bundles
 	assetsDir := filepath.Join(benchPath, "sites", "assets")
@@ -68,7 +68,7 @@ func runClear(cmd *cobra.Command, args []string) error {
 				// Clear node_modules in app source
 				nodeDir := filepath.Join(appsDir, e.Name(), "node_modules")
 				if _, err := os.Stat(nodeDir); err == nil {
-					output.Infof("Removing %s/node_modules...\n", e.Name())
+					output.Infof("Removing %s/node_modules...", e.Name())
 					os.RemoveAll(nodeDir)
 					cleared++
 				}
@@ -111,11 +111,11 @@ finally:
 	result, err := executor.ExecuteRaw(script)
 	if err == nil && result.Success {
 		if count, ok := result.Data.(float64); ok {
-			fmt.Printf("Cleared %d Python cache files/directories\n", int(count))
+			output.Printf("Cleared %d Python cache files/directories", int(count))
 		}
 	}
 
-	fmt.Printf("Cleared %d asset directories\n", cleared)
-	fmt.Println("Build cache cleared. Run 'weg build assets' to rebuild.")
+	output.Printf("Cleared %d asset directories", cleared)
+	output.Print("Build cache cleared. Run 'weg build assets' to rebuild.")
 	return nil
 }

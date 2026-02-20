@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/gavindsouza/weg/internal/config"
+	wegoutput "github.com/gavindsouza/weg/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -64,8 +65,8 @@ func runList(cmd *cobra.Command, args []string) error {
 	if err := execCmd.Run(); err != nil {
 		// If no images found, show friendly message
 		if filter != "" {
-			fmt.Printf("No images found for '%s'\n", filter)
-			fmt.Println("\nBuild an image with: weg image build")
+			wegoutput.Printf("No images found for '%s'", filter)
+			wegoutput.Print("\nBuild an image with: weg image build")
 			return nil
 		}
 		return err

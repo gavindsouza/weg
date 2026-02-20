@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	wegerrors "github.com/gavindsouza/weg/internal/errors"
 	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/prompt"
 	"github.com/gavindsouza/weg/internal/remote"
@@ -51,18 +52,18 @@ func init() {
 func runPush(cobraCmd *cobra.Command, args []string) error {
 	// Check if we're in a remote site directory
 	if !remote.IsRemoteSite(".") {
-		return fmt.Errorf("not a remote site clone (no .weg/site.toml found)")
+		return wegerrors.NotFound("remote clone", ".weg/site.toml")
 	}
 
 	// Load config and credentials
 	config, err := remote.LoadSiteConfig(".")
 	if err != nil {
-		return fmt.Errorf("failed to load config: %w", err)
+		return wegerrors.Config("site.toml", "read", err)
 	}
 
 	creds, err := remote.LoadCredentials(".")
 	if err != nil {
-		return fmt.Errorf("failed to load credentials: %w", err)
+		return wegerrors.Config("credentials", "read", err)
 	}
 
 	// Find modified files using git diff
@@ -85,8 +86,8 @@ func runPush(cobraCmd *cobra.Command, args []string) error {
 	}
 
 	if len(entities) == 0 {
-		fmt.Println("No changes to push")
-		fmt.Println("(use --all to push all entities)")
+		output.Print("No changes to push")
+		output.Print("(use --all to push all entities)")
 		return nil
 	}
 
@@ -95,17 +96,17 @@ func runPush(cobraCmd *cobra.Command, args []string) error {
 
 	if pushDryRun {
 		if pushAll {
-			fmt.Printf("Dry run - would push ALL %d entities:\n", len(entities))
+			output.Printf("Dry run - would push ALL %d entities:", len(entities))
 		} else {
-			fmt.Printf("Dry run - would push %d changed entities:\n", len(entities))
+			output.Printf("Dry run - would push %d changed entities:", len(entities))
 		}
 		for _, e := range entities {
-			fmt.Printf("  + %s: %s\n", e.entityType, e.name)
+			output.Printf("  + %s: %s", e.entityType, e.name)
 		}
 		if len(deletedEntities) > 0 {
-			fmt.Printf("\nWould delete %d entities:\n", len(deletedEntities))
+			output.Printf("\nWould delete %d entities:", len(deletedEntities))
 			for _, e := range deletedEntities {
-				fmt.Printf("  - %s: %s\n", e.entityType, e.name)
+				output.Printf("  - %s: %s", e.entityType, e.name)
 			}
 		}
 		return nil
@@ -117,12 +118,12 @@ func runPush(cobraCmd *cobra.Command, args []string) error {
 	if err := client.Ping(); err != nil {
 		return fmt.Errorf("failed to connect: %w", err)
 	}
-	fmt.Println("Connected")
+	output.Print("Connected")
 
 	// Push each entity
 	totalChanges := len(entities) + len(deletedEntities)
 	if totalChanges == 0 {
-		fmt.Println("No changes to push")
+		output.Print("No changes to push")
 		return nil
 	}
 
@@ -133,7 +134,7 @@ func runPush(cobraCmd *cobra.Command, args []string) error {
 
 	for _, e := range entities {
 		if err := pushEntity(client, e); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: Failed to push %s: %v\n", e.name, err)
+			output.Errorf("Failed to push %s: %v", e.name, err)
 			failed++
 		} else {
 			pushed++
@@ -142,29 +143,29 @@ func runPush(cobraCmd *cobra.Command, args []string) error {
 
 	// Delete removed entities (with confirmation)
 	if len(deletedEntities) > 0 && !pushForce {
-		fmt.Printf("\nThe following %d entities will be deleted from the remote:\n", len(deletedEntities))
+		output.Printf("\nThe following %d entities will be deleted from the remote:", len(deletedEntities))
 		for _, e := range deletedEntities {
-			fmt.Printf("  - %s: %s\n", e.entityType, e.name)
+			output.Printf("  - %s: %s", e.entityType, e.name)
 		}
 		if !prompt.ConfirmDanger("Delete these entities from remote?") {
-			fmt.Println("Skipping deletions")
+			output.Print("Skipping deletions")
 			deletedEntities = nil
 		}
 	}
 
 	for _, e := range deletedEntities {
 		if err := deleteEntity(client, e); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: Failed to delete %s: %v\n", e.name, err)
+			output.Errorf("Failed to delete %s: %v", e.name, err)
 			failed++
 		} else {
 			deleted++
 		}
 	}
 
-	fmt.Printf("Pushed: %d, Deleted: %d, Failed: %d\n", pushed, deleted, failed)
+	output.Printf("Pushed: %d, Deleted: %d, Failed: %d", pushed, deleted, failed)
 
 	if failed > 0 {
-		return fmt.Errorf("%d entities failed to push", failed)
+		return wegerrors.Operation("push", fmt.Sprintf("%d entities failed", failed), nil)
 	}
 
 	// Save current commit as last push point
@@ -430,7 +431,7 @@ func deleteEntity(client *remote.Client, e localEntity) error {
 	case "custom_field", "property_setter":
 		// These are grouped files - can't delete individual items this way
 		// Would need special handling
-		return fmt.Errorf("deletion of grouped entities not yet supported")
+		return wegerrors.Validation("entity", "deletion of grouped entities not yet supported")
 	default:
 		return client.DeleteDoc(e.doctype, e.name)
 	}
@@ -584,7 +585,7 @@ func pushCustomFields(client *remote.Client, e localEntity) error {
 	// Custom fields are grouped by target doctype
 	fields, ok := e.data["custom_fields"].([]any)
 	if !ok {
-		return fmt.Errorf("invalid custom fields format")
+		return wegerrors.Validation("custom_fields", "invalid format")
 	}
 
 	for _, f := range fields {
@@ -631,7 +632,7 @@ func pushCustomFields(client *remote.Client, e localEntity) error {
 func pushPropertySetters(client *remote.Client, e localEntity) error {
 	setters, ok := e.data["property_setters"].([]any)
 	if !ok {
-		return fmt.Errorf("invalid property setters format")
+		return wegerrors.Validation("property_setters", "invalid format")
 	}
 
 	for _, s := range setters {

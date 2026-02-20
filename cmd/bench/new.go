@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/gavindsouza/weg/internal/config"
+	wegerrors "github.com/gavindsouza/weg/internal/errors"
 	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/tools"
 	"github.com/spf13/cobra"
@@ -55,7 +56,7 @@ func runNew(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("failed to read directory: %w", err)
 		}
 		if len(entries) > 0 {
-			return fmt.Errorf("directory %s is not empty", benchPath)
+			return wegerrors.Validation("path", fmt.Sprintf("directory %s is not empty", benchPath))
 		}
 	}
 
@@ -70,7 +71,7 @@ func runNew(cmd *cobra.Command, args []string) error {
 
 	// Validate version
 	if version != "14" && version != "15" && version != "16" {
-		return fmt.Errorf("invalid version: %s (must be 14, 15, or 16)", version)
+		return wegerrors.Validation("version", fmt.Sprintf("must be 14, 15, or 16, got %s", version))
 	}
 
 	// Get database
@@ -84,13 +85,13 @@ func runNew(cmd *cobra.Command, args []string) error {
 
 	// Validate database
 	if !tools.IsDatabaseSupported(version, database) {
-		return fmt.Errorf("database %s is not supported for Frappe %s", database, version)
+		return wegerrors.Validation("database", fmt.Sprintf("%s is not supported for Frappe %s", database, version))
 	}
 
-	output.Infof("Creating bench at %s...\n", benchPath)
-	fmt.Printf("  Frappe version: %s\n", version)
-	fmt.Printf("  Database: %s\n", database)
-	fmt.Println()
+	output.Infof("Creating bench at %s...", benchPath)
+	output.Printf("  Frappe version: %s", version)
+	output.Printf("  Database: %s", database)
+	output.Print("")
 
 	// Create directory structure
 	if err := os.MkdirAll(benchPath, 0755); err != nil {
@@ -137,7 +138,7 @@ default = true
 
 	wegTomlPath := filepath.Join(benchPath, "weg.toml")
 	if err := os.WriteFile(wegTomlPath, []byte(wegToml), 0644); err != nil {
-		return fmt.Errorf("failed to write weg.toml: %w", err)
+		return wegerrors.Config("weg.toml", "write", err)
 	}
 
 	// Create common_site_config.json
@@ -171,15 +172,15 @@ node_modules/
 `
 	gitignorePath := filepath.Join(benchPath, ".gitignore")
 	if err := os.WriteFile(gitignorePath, []byte(gitignore), 0644); err != nil {
-		fmt.Printf("Warning: failed to write .gitignore: %v\n", err)
+		output.Warningf("failed to write .gitignore: %v", err)
 	}
 
-	fmt.Println("Bench created successfully!")
-	fmt.Println()
-	fmt.Println("Next steps:")
-	fmt.Printf("  cd %s\n", benchPath)
-	fmt.Println("  weg sync        # Install Frappe and create site")
-	fmt.Println("  weg start       # Start development server")
+	output.Print("Bench created successfully!")
+	output.Print("")
+	output.Print("Next steps:")
+	output.Printf("  cd %s", benchPath)
+	output.Print("  weg sync        # Install Frappe and create site")
+	output.Print("  weg start       # Start development server")
 
 	return nil
 }

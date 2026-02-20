@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 
+	wegerrors "github.com/gavindsouza/weg/internal/errors"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/workspace"
 	"github.com/spf13/cobra"
 )
@@ -33,7 +35,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 
 	// Check if we're in a weg clone
 	if _, err := os.Stat(".weg"); os.IsNotExist(err) {
-		return fmt.Errorf("not a weg remote clone (no .weg directory)")
+		return wegerrors.NotFound("remote clone", ".weg")
 	}
 
 	// Create workspace directory
@@ -41,31 +43,31 @@ func runInit(cmd *cobra.Command, args []string) error {
 	if err := os.MkdirAll(workspaceDir, 0755); err != nil {
 		return fmt.Errorf("failed to create workspace directory: %w", err)
 	}
-	fmt.Printf("Created %s/\n", workspace.WorkspaceDir)
+	output.Printf("Created %s/", workspace.WorkspaceDir)
 
 	// Update .gitignore
 	if err := updateGitignore(cwd); err != nil {
-		fmt.Printf("Warning: failed to update .gitignore: %v\n", err)
+		output.Warningf("failed to update .gitignore: %v", err)
 	} else {
-		fmt.Println("Updated .gitignore")
+		output.Print("Updated .gitignore")
 	}
 
 	// Create pre-commit config if it doesn't exist
 	precommitPath := filepath.Join(cwd, ".pre-commit-config.yaml")
 	if _, err := os.Stat(precommitPath); os.IsNotExist(err) {
 		if err := createPrecommitConfig(precommitPath); err != nil {
-			fmt.Printf("Warning: failed to create pre-commit config: %v\n", err)
+			output.Warningf("failed to create pre-commit config: %v", err)
 		} else {
-			fmt.Println("Created .pre-commit-config.yaml")
+			output.Print("Created .pre-commit-config.yaml")
 		}
 	} else {
-		fmt.Println("Skipped .pre-commit-config.yaml (already exists)")
+		output.Print("Skipped .pre-commit-config.yaml (already exists)")
 	}
 
-	fmt.Println()
-	fmt.Println("Workspace initialized! Next steps:")
-	fmt.Println("  weg workspace expand    # Extract code files")
-	fmt.Println("  pre-commit install      # Enable git hooks (optional)")
+	output.Print("")
+	output.Print("Workspace initialized! Next steps:")
+	output.Print("  weg workspace expand    # Extract code files")
+	output.Print("  pre-commit install      # Enable git hooks (optional)")
 
 	return nil
 }

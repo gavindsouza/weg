@@ -76,10 +76,10 @@ func runTrim(cmd *cobra.Command, args []string) error {
 	}
 
 	if site == "" {
-		return fmt.Errorf("no site specified and no default site found")
+		return wegerrors.Usage("no site specified and no default site found")
 	}
 
-	output.Infof("Trimming log tables for %s (keeping last %d days)...\n", site, trimDays)
+	output.Infof("Trimming log tables for %s (keeping last %d days)...", site, trimDays)
 
 	executor := api.NewExecutor(benchPath, site, "Administrator")
 
@@ -135,19 +135,19 @@ finally:
 
 	if !apiResult.Success {
 		if apiResult.Traceback != "" {
-			fmt.Fprintf(os.Stderr, "%s\n", apiResult.Traceback)
+			output.Errorf("%s", apiResult.Traceback)
 		}
 		return fmt.Errorf("failed to trim tables: %s", apiResult.Error)
 	}
 
 	results, ok := apiResult.Data.(map[string]any)
 	if ok && len(results) > 0 {
-		fmt.Println("Deleted records:")
+		output.Print("Deleted records:")
 		for table, count := range results {
-			fmt.Printf("  %s: %.0f\n", table, count)
+			output.Printf("  %s: %.0f", table, count)
 		}
 	} else {
-		fmt.Println("No old records found to delete")
+		output.Print("No old records found to delete")
 	}
 
 	return nil

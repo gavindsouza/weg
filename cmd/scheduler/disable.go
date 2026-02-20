@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/gavindsouza/weg/internal/api"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -64,6 +65,6 @@ finally:
 		return fmt.Errorf("failed to disable scheduler: %s", result.Error)
 	}
 
-	fmt.Printf("Scheduler disabled for %s\n", site)
+	output.Printf("Scheduler disabled for %s", site)
 	return nil
 }

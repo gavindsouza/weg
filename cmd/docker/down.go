@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -36,7 +37,7 @@ func runDown(cmd *cobra.Command, args []string) error {
 		cmdArgs = append(cmdArgs, "-v")
 	}
 
-	fmt.Println("Stopping containers...")
+	output.Print("Stopping containers...")
 
 	execCmd := exec.Command("docker", cmdArgs...)
 	execCmd.Dir = cwd
@@ -47,6 +48,6 @@ func runDown(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to stop containers: %w", err)
 	}
 
-	fmt.Println("Containers stopped")
+	output.Print("Containers stopped")
 	return nil
 }

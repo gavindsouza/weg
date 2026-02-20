@@ -71,7 +71,7 @@ func runNew(cmd *cobra.Command, args []string) error {
 
 	// Check if site already exists
 	if _, err := os.Stat(sitePath); err == nil {
-		return fmt.Errorf("site %s already exists", siteName)
+		return wegerrors.Validation("site", fmt.Sprintf("%s already exists", siteName))
 	}
 
 	// Get admin password if not provided
@@ -114,7 +114,7 @@ func runNew(cmd *cobra.Command, args []string) error {
 		installCmd.Stderr = os.Stderr
 
 		if err := installCmd.Run(); err != nil {
-			fmt.Printf("Warning: failed to install %s: %v\n", appName, err)
+			output.Warningf("failed to install %s: %v", appName, err)
 		}
 	}
 
@@ -141,7 +141,7 @@ func runNew(cmd *cobra.Command, args []string) error {
 	output.Successf("Successfully created site %s", siteName)
 
 	if setDefault {
-		fmt.Printf("Set %s as default site\n", siteName)
+		output.Printf("Set %s as default site", siteName)
 	}
 
 	return nil

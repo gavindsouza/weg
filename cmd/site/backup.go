@@ -106,7 +106,7 @@ func runBackup(cmd *cobra.Command, args []string) error {
 			site = strings.TrimSpace(string(data))
 		}
 		if site == "" {
-			return fmt.Errorf("no site specified and no default site found")
+			return wegerrors.Usage("no site specified and no default site found")
 		}
 		sites = []string{site}
 	}
@@ -135,7 +135,7 @@ func runBackup(cmd *cobra.Command, args []string) error {
 
 		siteConfig, err := loadSiteConfig(benchPath, site)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to load site config for %s: %v\n", site, err)
+			output.Errorf("Failed to load site config for %s: %v", site, err)
 			continue
 		}
 
@@ -147,23 +147,23 @@ func runBackup(cmd *cobra.Command, args []string) error {
 		if err := backupDatabase(benchPath, site, siteConfig, dbFile, useDevbox); err != nil {
 			return fmt.Errorf("failed to backup database for %s: %w", site, err)
 		}
-		fmt.Printf("  Database: %s\n", dbFile)
+		output.Printf("  Database: %s", dbFile)
 
 		// Backup files if requested
 		if backupWithFiles {
 			filesBackup := filepath.Join(backupDir, baseFilename+"_files.tar.gz")
 			if err := backupFiles(benchPath, site, filesBackup); err != nil {
-				fmt.Printf("Warning: failed to backup files for %s: %v\n", site, err)
+				output.Warningf("failed to backup files for %s: %v", site, err)
 			} else {
-				fmt.Printf("  Files: %s\n", filesBackup)
+				output.Printf("  Files: %s", filesBackup)
 			}
 		}
 	}
 
 	if len(sites) == 1 {
-		fmt.Printf("Backup completed for %s\n", sites[0])
+		output.Printf("Backup completed for %s", sites[0])
 	} else {
-		fmt.Printf("Backup completed for %d sites\n", len(sites))
+		output.Printf("Backup completed for %d sites", len(sites))
 	}
 
 	return nil

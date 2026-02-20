@@ -9,6 +9,7 @@ import (
 	"github.com/gavindsouza/weg/internal/api"
 	"github.com/gavindsouza/weg/internal/config"
 	wegerrors "github.com/gavindsouza/weg/internal/errors"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/state"
 	"github.com/spf13/cobra"
 )
@@ -57,23 +58,23 @@ finally:
 
 	result, err := executor.ExecuteRaw(script)
 	if err != nil {
-		return fmt.Errorf("failed to check scheduler status: %w", err)
+		return wegerrors.Operation("check scheduler status", "", err)
 	}
 
 	if !result.Success {
-		return fmt.Errorf("failed to check scheduler status: %s", result.Error)
+		return wegerrors.Operation("check scheduler status", result.Error, nil)
 	}
 
 	data, ok := result.Data.(map[string]any)
 	if !ok {
-		return fmt.Errorf("unexpected response format")
+		return wegerrors.Operation("check scheduler status", "unexpected response format", nil)
 	}
 
 	enabled, _ := data["enabled"].(bool)
 	if enabled {
-		fmt.Printf("Scheduler is enabled for %s\n", site)
+		output.Printf("Scheduler is enabled for %s", site)
 	} else {
-		fmt.Printf("Scheduler is disabled for %s\n", site)
+		output.Printf("Scheduler is disabled for %s", site)
 	}
 
 	return nil
@@ -116,7 +117,7 @@ func resolveSite(siteName string) (string, string, error) {
 	}
 
 	if site == "" {
-		return "", "", fmt.Errorf("no site specified and no default site found")
+		return "", "", wegerrors.Usage("no site specified and no default site found")
 	}
 
 	return benchPath, site, nil

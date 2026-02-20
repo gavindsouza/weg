@@ -73,7 +73,7 @@ func runReinstall(cmd *cobra.Command, args []string) error {
 	// Verify app exists
 	appPath := filepath.Join(benchPath, "apps", appName)
 	if _, err := os.Stat(appPath); os.IsNotExist(err) {
-		return fmt.Errorf("app %s not found in apps/", appName)
+		return wegerrors.NotFound("app", appName)
 	}
 
 	// Determine site
@@ -91,7 +91,7 @@ func runReinstall(cmd *cobra.Command, args []string) error {
 	}
 
 	if site == "" {
-		return fmt.Errorf("no site specified and no default site found")
+		return wegerrors.Usage("no site specified and no default site found")
 	}
 
 	// Confirm

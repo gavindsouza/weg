@@ -1,13 +1,13 @@
 package build
 
 import (
-	"fmt"
 	"os"
 	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"syscall"
 
+	wegerrors "github.com/gavindsouza/weg/internal/errors"
 	"github.com/gavindsouza/weg/internal/output"
 	"github.com/spf13/cobra"
 )
@@ -50,8 +50,8 @@ func runWatch(cmd *cobra.Command, args []string) error {
 		watchArgs = append(watchArgs, "--apps", appName)
 	}
 
-	output.Infof("Starting asset watcher for site %s...\n", site)
-	fmt.Println("Press Ctrl+C to stop")
+	output.Infof("Starting asset watcher for site %s...", site)
+	output.Print("Press Ctrl+C to stop")
 
 	// Run frappe watch via bench_helper
 	sitesDir := filepath.Join(benchPath, "sites")
@@ -70,7 +70,7 @@ func runWatch(cmd *cobra.Command, args []string) error {
 
 	go func() {
 		<-sigChan
-		fmt.Println("\nStopping watcher...")
+		output.Print("\nStopping watcher...")
 		if watchCmd.Process != nil {
 			watchCmd.Process.Signal(syscall.SIGTERM)
 		}
@@ -83,7 +83,7 @@ func runWatch(cmd *cobra.Command, args []string) error {
 				return nil
 			}
 		}
-		return fmt.Errorf("watch failed: %w", err)
+		return wegerrors.Operation("watch", "", err)
 	}
 
 	return nil

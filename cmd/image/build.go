@@ -7,6 +7,8 @@ import (
 
 	"github.com/gavindsouza/weg/internal/config"
 	"github.com/gavindsouza/weg/internal/container"
+	wegerrors "github.com/gavindsouza/weg/internal/errors"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -71,7 +73,7 @@ func runBuild(cmd *cobra.Command, args []string) error {
 		benchPath = filepath.Join(cwd, ".weg")
 		appName = filepath.Base(cwd)
 	default:
-		return fmt.Errorf("not in a weg-managed project")
+		return wegerrors.Usage("not in a weg-managed project")
 	}
 
 	// Get list of apps
@@ -89,7 +91,7 @@ func runBuild(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(apps) == 0 {
-		return fmt.Errorf("no apps found in %s", appsDir)
+		return wegerrors.NotFound("apps", appsDir)
 	}
 
 	// Build options
@@ -107,14 +109,14 @@ func runBuild(cmd *cobra.Command, args []string) error {
 		Verbose:    true,
 	}
 
-	fmt.Println("Building container image...")
-	fmt.Printf("  Apps: %v\n", apps)
-	fmt.Printf("  Target: %s\n", buildTarget)
-	fmt.Printf("  Platform: %s\n", buildPlatform)
-	fmt.Println()
+	output.Print("Building container image...")
+	output.Printf("  Apps: %v", apps)
+	output.Printf("  Target: %s", buildTarget)
+	output.Printf("  Platform: %s", buildPlatform)
+	output.Print("")
 
 	if err := container.BuildImage(opts); err != nil {
-		return fmt.Errorf("build failed: %w", err)
+		return wegerrors.Operation("build", "", err)
 	}
 
 	tag := buildTag
@@ -125,11 +127,11 @@ func runBuild(cmd *cobra.Command, args []string) error {
 		tag = fmt.Sprintf("%s/%s", buildRegistry, tag)
 	}
 
-	fmt.Println()
-	fmt.Printf("Image built: %s\n", tag)
+	output.Print("")
+	output.Printf("Image built: %s", tag)
 
 	if buildPush {
-		fmt.Println("Image pushed to registry")
+		output.Print("Image pushed to registry")
 	}
 
 	return nil

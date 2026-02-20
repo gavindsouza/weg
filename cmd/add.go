@@ -114,13 +114,13 @@ func addToAppConfig(path, name, url, branch string, isLocal bool) error {
 	// Read existing file
 	data, err := os.ReadFile(pyprojectPath)
 	if err != nil {
-		return fmt.Errorf("failed to read pyproject.toml: %w", err)
+		return errors.Config("pyproject.toml", "read", err)
 	}
 
 	// Parse existing config
 	var pyproject map[string]any
 	if err := toml.Unmarshal(data, &pyproject); err != nil {
-		return fmt.Errorf("failed to parse pyproject.toml: %w", err)
+		return errors.Config("pyproject.toml", "parse", err)
 	}
 
 	// Navigate to or create tool.weg.dependencies.apps
@@ -164,13 +164,13 @@ func addToAppConfig(path, name, url, branch string, isLocal bool) error {
 	// Write back
 	f, err := os.Create(pyprojectPath)
 	if err != nil {
-		return fmt.Errorf("failed to open pyproject.toml for writing: %w", err)
+		return errors.Config("pyproject.toml", "write", err)
 	}
 	defer f.Close()
 
 	encoder := toml.NewEncoder(f)
 	if err := encoder.Encode(pyproject); err != nil {
-		return fmt.Errorf("failed to write pyproject.toml: %w", err)
+		return errors.Config("pyproject.toml", "write", err)
 	}
 
 	PrintInfo("Added %s to pyproject.toml", name)
@@ -186,13 +186,13 @@ func addToBenchConfig(path, name, url, branch string, isLocal bool) error {
 	// Read existing file
 	data, err := os.ReadFile(wegPath)
 	if err != nil {
-		return fmt.Errorf("failed to read weg.toml: %w", err)
+		return errors.Config("weg.toml", "read", err)
 	}
 
 	// Parse existing config
 	var wegConfig map[string]any
 	if err := toml.Unmarshal(data, &wegConfig); err != nil {
-		return fmt.Errorf("failed to parse weg.toml: %w", err)
+		return errors.Config("weg.toml", "parse", err)
 	}
 
 	// Get or create apps section
@@ -220,13 +220,13 @@ func addToBenchConfig(path, name, url, branch string, isLocal bool) error {
 	// Write back
 	f, err := os.Create(wegPath)
 	if err != nil {
-		return fmt.Errorf("failed to open weg.toml for writing: %w", err)
+		return errors.Config("weg.toml", "write", err)
 	}
 	defer f.Close()
 
 	encoder := toml.NewEncoder(f)
 	if err := encoder.Encode(wegConfig); err != nil {
-		return fmt.Errorf("failed to write weg.toml: %w", err)
+		return errors.Config("weg.toml", "write", err)
 	}
 
 	PrintInfo("Added %s to weg.toml", name)

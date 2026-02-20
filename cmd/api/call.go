@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	internalapi "github.com/gavindsouza/weg/internal/api"
+	wegerrors "github.com/gavindsouza/weg/internal/errors"
 	"github.com/gavindsouza/weg/internal/remote"
 	"github.com/spf13/cobra"
 )
@@ -60,7 +61,7 @@ func runCall(cmd *cobra.Command, args []string) error {
 		}
 
 		if err := json.Unmarshal(argsData, &kwargs); err != nil {
-			return fmt.Errorf("invalid --args JSON: %w", err)
+			return wegerrors.Validation("args", fmt.Sprintf("invalid JSON: %v", err))
 		}
 	}
 
@@ -68,7 +69,7 @@ func runCall(cmd *cobra.Command, args []string) error {
 	for _, arg := range args[1:] {
 		parts := strings.SplitN(arg, "=", 2)
 		if len(parts) != 2 {
-			return fmt.Errorf("invalid argument format: %s (expected key=value)", arg)
+			return wegerrors.Validation("argument", fmt.Sprintf("invalid format: %s (expected key=value)", arg))
 		}
 		key := parts[0]
 		value := parts[1]

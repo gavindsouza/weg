@@ -51,7 +51,7 @@ func runListApps(cmd *cobra.Command, args []string) error {
 func listBenchApps(result *config.DetectionResult) error {
 	cfg, err := config.ParseWegToml(result.BenchPath)
 	if err != nil {
-		return fmt.Errorf("failed to parse config: %w", err)
+		return wegerrors.Config("config", "parse", err)
 	}
 
 	var apps []AppListItem
@@ -77,7 +77,7 @@ func listAppDeps(result *config.DetectionResult) error {
 	pyprojectPath := result.Path + "/pyproject.toml"
 	cfg, err := config.ParsePyproject(pyprojectPath)
 	if err != nil {
-		return fmt.Errorf("failed to parse config: %w", err)
+		return wegerrors.Config("config", "parse", err)
 	}
 
 	var apps []AppListItem

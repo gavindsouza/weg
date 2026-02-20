@@ -63,34 +63,34 @@ func removeFromAppConfig(path, name string) error {
 	// Read existing file
 	data, err := os.ReadFile(pyprojectPath)
 	if err != nil {
-		return fmt.Errorf("failed to read pyproject.toml: %w", err)
+		return errors.Config("pyproject.toml", "read", err)
 	}
 
 	// Parse existing config
 	var pyproject map[string]any
 	if err := toml.Unmarshal(data, &pyproject); err != nil {
-		return fmt.Errorf("failed to parse pyproject.toml: %w", err)
+		return errors.Config("pyproject.toml", "parse", err)
 	}
 
 	// Navigate to tool.weg.dependencies.apps
 	tool, ok := pyproject["tool"].(map[string]any)
 	if !ok {
-		return fmt.Errorf("app %s not found in configuration", name)
+		return errors.NotFound("app", name)
 	}
 
 	weg, ok := tool["weg"].(map[string]any)
 	if !ok {
-		return fmt.Errorf("app %s not found in configuration", name)
+		return errors.NotFound("app", name)
 	}
 
 	deps, ok := weg["dependencies"].(map[string]any)
 	if !ok {
-		return fmt.Errorf("app %s not found in configuration", name)
+		return errors.NotFound("app", name)
 	}
 
 	apps, ok := deps["apps"].([]any)
 	if !ok {
-		return fmt.Errorf("app %s not found in configuration", name)
+		return errors.NotFound("app", name)
 	}
 
 	// Find and remove the app
@@ -113,7 +113,7 @@ func removeFromAppConfig(path, name string) error {
 	}
 
 	if !found {
-		return fmt.Errorf("app %s not found in configuration", name)
+		return errors.NotFound("app", name)
 	}
 
 	deps["apps"] = newApps
@@ -121,13 +121,13 @@ func removeFromAppConfig(path, name string) error {
 	// Write back
 	f, err := os.Create(pyprojectPath)
 	if err != nil {
-		return fmt.Errorf("failed to open pyproject.toml for writing: %w", err)
+		return errors.Config("pyproject.toml", "write", err)
 	}
 	defer f.Close()
 
 	encoder := toml.NewEncoder(f)
 	if err := encoder.Encode(pyproject); err != nil {
-		return fmt.Errorf("failed to write pyproject.toml: %w", err)
+		return errors.Config("pyproject.toml", "write", err)
 	}
 
 	PrintInfo("Removed %s from pyproject.toml", name)
@@ -142,30 +142,30 @@ func removeFromBenchConfig(path, name string) error {
 
 	// Prevent removing frappe
 	if name == "frappe" {
-		return fmt.Errorf("cannot remove frappe - it is required")
+		return errors.Validation("app", "cannot remove frappe - it is required")
 	}
 
 	// Read existing file
 	data, err := os.ReadFile(wegPath)
 	if err != nil {
-		return fmt.Errorf("failed to read weg.toml: %w", err)
+		return errors.Config("weg.toml", "read", err)
 	}
 
 	// Parse existing config
 	var wegConfig map[string]any
 	if err := toml.Unmarshal(data, &wegConfig); err != nil {
-		return fmt.Errorf("failed to parse weg.toml: %w", err)
+		return errors.Config("weg.toml", "parse", err)
 	}
 
 	// Get apps section
 	apps, ok := wegConfig["apps"].(map[string]any)
 	if !ok {
-		return fmt.Errorf("app %s not found in configuration", name)
+		return errors.NotFound("app", name)
 	}
 
 	// Check if app exists
 	if _, exists := apps[name]; !exists {
-		return fmt.Errorf("app %s not found in configuration", name)
+		return errors.NotFound("app", name)
 	}
 
 	// Remove the app
@@ -174,13 +174,13 @@ func removeFromBenchConfig(path, name string) error {
 	// Write back
 	f, err := os.Create(wegPath)
 	if err != nil {
-		return fmt.Errorf("failed to open weg.toml for writing: %w", err)
+		return errors.Config("weg.toml", "write", err)
 	}
 	defer f.Close()
 
 	encoder := toml.NewEncoder(f)
 	if err := encoder.Encode(wegConfig); err != nil {
-		return fmt.Errorf("failed to write weg.toml: %w", err)
+		return errors.Config("weg.toml", "write", err)
 	}
 
 	PrintInfo("Removed %s from weg.toml", name)

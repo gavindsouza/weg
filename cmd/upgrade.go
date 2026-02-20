@@ -130,29 +130,29 @@ func runUpgrade(cmd *cobra.Command, args []string) error {
 	}
 
 	// Show upgrade plan
-	fmt.Printf("\nUpgrading from Frappe %s to %s\n\n", currentVersion, targetVersion)
-	fmt.Println("Environment changes:")
+	output.Printf("\nUpgrading from Frappe %s to %s\n", currentVersion, targetVersion)
+	output.Print("Environment changes:")
 	if currentInfo.PythonVersion != targetInfo.PythonVersion {
-		fmt.Printf("  Python: %s → %s\n", currentInfo.PythonVersion, targetInfo.PythonVersion)
+		output.Printf("  Python: %s → %s", currentInfo.PythonVersion, targetInfo.PythonVersion)
 	}
 	if currentInfo.NodeVersion != targetInfo.NodeVersion {
-		fmt.Printf("  Node: %s → %s\n", currentInfo.NodeVersion, targetInfo.NodeVersion)
+		output.Printf("  Node: %s → %s", currentInfo.NodeVersion, targetInfo.NodeVersion)
 	}
 	if currentInfo.PackageManager != targetInfo.PackageManager {
-		fmt.Printf("  Package manager: %s → %s\n", currentInfo.PackageManager, targetInfo.PackageManager)
+		output.Printf("  Package manager: %s → %s", currentInfo.PackageManager, targetInfo.PackageManager)
 	}
-	fmt.Println()
+	output.Print("")
 
-	fmt.Println("This will:")
-	fmt.Println("  1. Update weg.toml configuration")
-	fmt.Println("  2. Regenerate devbox environment")
-	fmt.Println("  3. Checkout", targetVersion, "branch for frappe")
-	fmt.Println("  4. Reinstall all Python dependencies")
-	fmt.Println("  5. Reinstall all Node dependencies")
+	output.Print("This will:")
+	output.Print("  1. Update weg.toml configuration")
+	output.Print("  2. Regenerate devbox environment")
+	output.Printf("  3. Checkout %s branch for frappe", targetVersion)
+	output.Print("  4. Reinstall all Python dependencies")
+	output.Print("  5. Reinstall all Node dependencies")
 	if !noMigrate {
-		fmt.Println("  6. Run database migrations")
+		output.Print("  6. Run database migrations")
 	}
-	fmt.Println()
+	output.Print("")
 
 	// Confirm unless -y
 	if !yes {
@@ -203,7 +203,7 @@ func runUpgrade(cmd *cobra.Command, args []string) error {
 		PrintInfo("[6/6] Skipping database migrations (--no-migrate)")
 	}
 
-	fmt.Println()
+	output.Print("")
 	PrintInfo("Upgrade complete! Run 'weg start' to start services.")
 	return nil
 }

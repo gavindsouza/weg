@@ -9,6 +9,7 @@ import (
 	"github.com/gavindsouza/weg/internal/completion"
 	"github.com/gavindsouza/weg/internal/config"
 	wegerrors "github.com/gavindsouza/weg/internal/errors"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -55,13 +56,13 @@ func runList(cmd *cobra.Command, args []string) error {
 	// Verify app exists
 	appPath := filepath.Join(benchPath, "apps", appName)
 	if _, err := os.Stat(appPath); os.IsNotExist(err) {
-		return fmt.Errorf("app %s not found", appName)
+		return wegerrors.NotFound("app", appName)
 	}
 
 	fixturesPath := filepath.Join(appPath, appName, "fixtures")
 	if _, err := os.Stat(fixturesPath); os.IsNotExist(err) {
-		fmt.Printf("No fixtures directory found for %s\n", appName)
-		fmt.Printf("Expected location: %s\n", fixturesPath)
+		output.Printf("No fixtures directory found for %s", appName)
+		output.Printf("Expected location: %s", fixturesPath)
 		return nil
 	}
 
@@ -78,13 +79,13 @@ func runList(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(jsonFiles) == 0 {
-		fmt.Printf("No fixture files found in %s\n", fixturesPath)
+		output.Printf("No fixture files found in %s", fixturesPath)
 		return nil
 	}
 
-	fmt.Printf("Fixtures for %s (%s):\n\n", appName, fixturesPath)
-	fmt.Printf("%-40s %s\n", "FILE", "SIZE")
-	fmt.Println(strings.Repeat("-", 55))
+	output.Printf("Fixtures for %s (%s):\n", appName, fixturesPath)
+	output.Printf("%-40s %s", "FILE", "SIZE")
+	output.Print(strings.Repeat("-", 55))
 
 	for _, e := range jsonFiles {
 		info, err := e.Info()
@@ -92,7 +93,7 @@ func runList(cmd *cobra.Command, args []string) error {
 			continue
 		}
 		size := formatSize(info.Size())
-		fmt.Printf("%-40s %s\n", e.Name(), size)
+		output.Printf("%-40s %s", e.Name(), size)
 	}
 
 	return nil

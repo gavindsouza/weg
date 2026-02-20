@@ -215,23 +215,22 @@ func GetConfigPath() string {
 	return configPath
 }
 
-// PrintVerbose prints a message only in verbose mode
+// PrintVerbose prints a message only in verbose mode.
+// Delegates to output.Verbosef for consistent output handling.
 func PrintVerbose(format string, args ...any) {
-	if verbose {
-		fmt.Printf(format+"\n", args...)
-	}
+	output.Verbosef(format, args...)
 }
 
-// PrintInfo prints a message unless quiet mode is enabled
+// PrintInfo prints a message unless quiet mode is enabled.
+// Delegates to output.Printf for consistent output handling.
 func PrintInfo(format string, args ...any) {
-	if !quiet {
-		fmt.Printf(format+"\n", args...)
-	}
+	output.Printf(format, args...)
 }
 
-// PrintError prints an error message (always shown)
+// PrintError prints an error message to stderr (always shown).
+// Delegates to output.Errorf for consistent output handling.
 func PrintError(format string, args ...any) {
-	fmt.Fprintf(os.Stderr, "Error: "+format+"\n", args...)
+	output.Errorf(format, args...)
 }
 
 // GetProjectRoot returns the detected project root (may be empty if not in a project)

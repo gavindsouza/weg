@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"os"
 
+	wegerrors "github.com/gavindsouza/weg/internal/errors"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/workspace"
 	"github.com/spf13/cobra"
 )
@@ -33,12 +35,12 @@ func runStatus(cmd *cobra.Command, args []string) error {
 
 	// Check if we're in a weg clone
 	if _, err := os.Stat(".weg"); os.IsNotExist(err) {
-		return fmt.Errorf("not a weg remote clone (no .weg directory)")
+		return wegerrors.NotFound("remote clone", ".weg")
 	}
 
 	// Check if workspace exists
 	if _, err := os.Stat(workspace.WorkspaceDir); os.IsNotExist(err) {
-		fmt.Println("No workspace found. Run 'weg workspace expand' to create one.")
+		output.Print("No workspace found. Run 'weg workspace expand' to create one.")
 		return nil
 	}
 
@@ -48,7 +50,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(statuses) == 0 {
-		fmt.Println("Workspace is empty. Run 'weg workspace expand' to extract code files.")
+		output.Print("Workspace is empty. Run 'weg workspace expand' to extract code files.")
 		return nil
 	}
 
@@ -70,39 +72,39 @@ func runStatus(cmd *cobra.Command, args []string) error {
 
 	// Print results
 	if len(conflicts) > 0 {
-		fmt.Println("Conflicts (both source and workspace modified):")
+		output.Print("Conflicts (both source and workspace modified):")
 		for _, f := range conflicts {
-			fmt.Printf("  ! %s\n", f)
+			output.Printf("  ! %s", f)
 		}
-		fmt.Println()
+		output.Print("")
 	}
 
 	if len(modified) > 0 {
-		fmt.Println("Modified (ready to collapse):")
+		output.Print("Modified (ready to collapse):")
 		for _, f := range modified {
-			fmt.Printf("  ~ %s\n", f)
+			output.Printf("  ~ %s", f)
 		}
-		fmt.Println()
+		output.Print("")
 	}
 
 	if len(stale) > 0 {
-		fmt.Println("Stale (source JSON deleted):")
+		output.Print("Stale (source JSON deleted):")
 		for _, f := range stale {
-			fmt.Printf("  - %s\n", f)
+			output.Printf("  - %s", f)
 		}
-		fmt.Println()
+		output.Print("")
 	}
 
 	// Summary
 	total := len(statuses)
 	if len(synced) == total {
-		fmt.Println("Workspace is in sync with JSON files.")
+		output.Print("Workspace is in sync with JSON files.")
 	} else {
-		fmt.Printf("Summary: %d synced, %d modified, %d conflicts, %d stale\n",
+		output.Printf("Summary: %d synced, %d modified, %d conflicts, %d stale",
 			len(synced), len(modified), len(conflicts), len(stale))
 
 		if len(modified) > 0 {
-			fmt.Println("\nRun 'weg workspace collapse' to update JSON files.")
+			output.Print("\nRun 'weg workspace collapse' to update JSON files.")
 		}
 	}
 

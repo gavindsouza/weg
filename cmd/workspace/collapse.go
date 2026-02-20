@@ -9,6 +9,8 @@ import (
 	"os/exec"
 	"path/filepath"
 
+	wegerrors "github.com/gavindsouza/weg/internal/errors"
+	wegoutput "github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/workspace"
 	"github.com/spf13/cobra"
 )
@@ -49,22 +51,22 @@ func runCollapse(cmd *cobra.Command, args []string) error {
 
 	// Check if we're in a weg clone
 	if _, err := os.Stat(".weg"); os.IsNotExist(err) {
-		return fmt.Errorf("not a weg remote clone (no .weg directory)")
+		return wegerrors.NotFound("remote clone", ".weg")
 	}
 
 	// Check if workspace exists
 	if _, err := os.Stat(workspace.WorkspaceDir); os.IsNotExist(err) {
-		return fmt.Errorf("no workspace found (run 'weg workspace expand' first)")
+		return wegerrors.NotFound("workspace", "")
 	}
 
 	// Run validation if requested
 	if collapseValidate {
-		fmt.Println("Running linters...")
+		wegoutput.Print("Running linters...")
 		if err := runLinters(cwd); err != nil {
 			return fmt.Errorf("validation failed: %w", err)
 		}
-		fmt.Println("Validation passed")
-		fmt.Println()
+		wegoutput.Print("Validation passed")
+		wegoutput.Print("")
 	}
 
 	result, err := workspace.Collapse(workspace.CollapseOptions{
@@ -84,36 +86,36 @@ func runCollapse(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(result.Updated) > 0 {
-		fmt.Printf("%sUpdated %d files:\n", prefix, len(result.Updated))
+		wegoutput.Printf("%sUpdated %d files:", prefix, len(result.Updated))
 		for _, f := range result.Updated {
-			fmt.Printf("  ~ %s\n", f)
+			wegoutput.Printf("  ~ %s", f)
 		}
 	}
 
 	if len(result.Unchanged) > 0 && cmd.Flags().Changed("verbose") {
-		fmt.Printf("\nUnchanged: %d files\n", len(result.Unchanged))
+		wegoutput.Printf("\nUnchanged: %d files", len(result.Unchanged))
 	}
 
 	if len(result.Conflicts) > 0 {
-		fmt.Printf("\nConflicts (use --force to overwrite):\n")
+		wegoutput.Printf("\nConflicts (use --force to overwrite):")
 		for _, f := range result.Conflicts {
-			fmt.Printf("  ! %s\n", f)
+			wegoutput.Printf("  ! %s", f)
 		}
-		fmt.Println("\nBoth the source JSON and workspace file were modified.")
-		fmt.Println("Options:")
-		fmt.Println("  weg workspace collapse --force  # Use workspace version")
-		fmt.Println("  weg workspace expand --force    # Use JSON version")
+		wegoutput.Print("\nBoth the source JSON and workspace file were modified.")
+		wegoutput.Print("Options:")
+		wegoutput.Print("  weg workspace collapse --force  # Use workspace version")
+		wegoutput.Print("  weg workspace expand --force    # Use JSON version")
 	}
 
 	if len(result.Errors) > 0 {
-		fmt.Printf("\nErrors:\n")
+		wegoutput.Printf("\nErrors:")
 		for _, e := range result.Errors {
-			fmt.Printf("  x %s\n", e)
+			wegoutput.Printf("  x %s", e)
 		}
 	}
 
 	if len(result.Updated) == 0 && len(result.Conflicts) == 0 && len(result.Errors) == 0 {
-		fmt.Println("Nothing to collapse. Workspace is in sync.")
+		wegoutput.Print("Nothing to collapse. Workspace is in sync.")
 	}
 
 	return nil
@@ -126,7 +128,7 @@ func runLinters(baseDir string) error {
 
 	// Run ruff on Python files if ruff is available
 	if _, err := exec.LookPath("ruff"); err == nil {
-		fmt.Println("  Running ruff...")
+		wegoutput.Print("  Running ruff...")
 		cmd := exec.Command("ruff", "check", workspaceDir)
 		cmd.Dir = baseDir
 		output, err := cmd.CombinedOutput()
@@ -134,15 +136,15 @@ func runLinters(baseDir string) error {
 			fmt.Printf("%s", output)
 			hasErrors = true
 		} else {
-			fmt.Println("  ruff: no issues")
+			wegoutput.Print("  ruff: no issues")
 		}
 	} else {
-		fmt.Println("  (ruff not found, skipping Python linting)")
+		wegoutput.Print("  (ruff not found, skipping Python linting)")
 	}
 
 	// Run eslint on JavaScript files if eslint is available
 	if _, err := exec.LookPath("eslint"); err == nil {
-		fmt.Println("  Running eslint...")
+		wegoutput.Print("  Running eslint...")
 		cmd := exec.Command("eslint", workspaceDir, "--ext", ".js")
 		cmd.Dir = baseDir
 		output, err := cmd.CombinedOutput()
@@ -153,14 +155,14 @@ func runLinters(baseDir string) error {
 				hasErrors = true
 			}
 		} else {
-			fmt.Println("  eslint: no issues")
+			wegoutput.Print("  eslint: no issues")
 		}
 	} else {
-		fmt.Println("  (eslint not found, skipping JavaScript linting)")
+		wegoutput.Print("  (eslint not found, skipping JavaScript linting)")
 	}
 
 	if hasErrors {
-		return fmt.Errorf("linting errors found")
+		return wegerrors.Operation("lint", "errors found", nil)
 	}
 
 	return nil

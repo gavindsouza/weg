@@ -3,6 +3,8 @@ package cloud
 import (
 	"fmt"
 
+	wegerrors "github.com/gavindsouza/weg/internal/errors"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -31,7 +33,7 @@ func init() {
 
 func runCloudLogs(cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("site name is required")
+		return wegerrors.Validation("site", "name is required")
 	}
 
 	client, err := getAuthenticatedClient("")
@@ -47,7 +49,7 @@ func runCloudLogs(cmd *cobra.Command, args []string) error {
 	}
 
 	for _, line := range logs {
-		fmt.Println(line)
+		output.Print(line)
 	}
 
 	return nil

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/gavindsouza/weg/internal/config"
+	wegerrors "github.com/gavindsouza/weg/internal/errors"
 	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/prompt"
 	"github.com/spf13/cobra"
@@ -43,7 +44,7 @@ func runDrop(cmd *cobra.Command, args []string) error {
 
 	// Check if path exists
 	if _, err := os.Stat(benchPath); os.IsNotExist(err) {
-		return fmt.Errorf("path does not exist: %s", benchPath)
+		return wegerrors.NotFound("path", benchPath)
 	}
 
 	// Verify it's a bench
@@ -59,7 +60,7 @@ func runDrop(cmd *cobra.Command, args []string) error {
 		// It's an app with .weg - ask if they want to remove just .weg
 		return handleAppWithWeg(benchPath)
 	default:
-		return fmt.Errorf("path is not a bench: %s", benchPath)
+		return wegerrors.Validation("path", fmt.Sprintf("not a bench: %s", benchPath))
 	}
 
 	// Load bench info for display
@@ -71,19 +72,19 @@ func runDrop(cmd *cobra.Command, args []string) error {
 
 	// Confirm
 	if !dropForce {
-		fmt.Printf("This will permanently delete bench '%s' at:\n", benchName)
-		fmt.Printf("  %s\n\n", benchPath)
+		output.Printf("This will permanently delete bench '%s' at:", benchName)
+		output.Printf("  %s", benchPath)
 
 		// List what will be deleted
 		appsDir := filepath.Join(benchPath, "apps")
 		if entries, err := os.ReadDir(appsDir); err == nil && len(entries) > 0 {
-			fmt.Printf("Apps to be deleted (%d):\n", len(entries))
+			output.Printf("Apps to be deleted (%d):", len(entries))
 			for _, e := range entries {
 				if e.IsDir() {
-					fmt.Printf("  - %s\n", e.Name())
+					output.Printf("  - %s", e.Name())
 				}
 			}
-			fmt.Println()
+			output.Print("")
 		}
 
 		sitesDir := filepath.Join(benchPath, "sites")
@@ -95,11 +96,11 @@ func runDrop(cmd *cobra.Command, args []string) error {
 				}
 			}
 			if len(sites) > 0 {
-				fmt.Printf("Sites to be deleted (%d):\n", len(sites))
+				output.Printf("Sites to be deleted (%d):", len(sites))
 				for _, s := range sites {
-					fmt.Printf("  - %s\n", s)
+					output.Printf("  - %s", s)
 				}
-				fmt.Println()
+				output.Print("")
 			}
 		}
 

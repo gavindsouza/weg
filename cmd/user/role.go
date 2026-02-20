@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/gavindsouza/weg/internal/api"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -106,7 +107,7 @@ finally:
 		return fmt.Errorf("failed to add role: %s", result.Error)
 	}
 
-	fmt.Printf("Added role '%s' to %s\n", role, email)
+	output.Printf("Added role '%s' to %s", role, email)
 	return nil
 }
 
@@ -150,7 +151,7 @@ finally:
 		return fmt.Errorf("failed to remove role: %s", result.Error)
 	}
 
-	fmt.Printf("Removed role '%s' from %s\n", role, email)
+	output.Printf("Removed role '%s' from %s", role, email)
 	return nil
 }
 
@@ -196,13 +197,13 @@ finally:
 
 	roles, ok := result.Data.([]any)
 	if !ok || len(roles) == 0 {
-		fmt.Printf("No roles assigned to %s\n", email)
+		output.Printf("No roles assigned to %s", email)
 		return nil
 	}
 
-	fmt.Printf("Roles for %s:\n", email)
+	output.Printf("Roles for %s:", email)
 	for _, r := range roles {
-		fmt.Printf("  - %s\n", r.(string))
+		output.Printf("  - %s", r.(string))
 	}
 
 	return nil
@@ -283,20 +284,20 @@ finally:
 		return fmt.Errorf("unexpected response format")
 	}
 
-	fmt.Printf("User: %s\n", email)
-	fmt.Println(strings.Repeat("-", 50))
-	fmt.Printf("Name:       %s %s\n", getString(data, "first_name"), getString(data, "last_name"))
-	fmt.Printf("Full Name:  %s\n", getString(data, "full_name"))
-	fmt.Printf("Enabled:    %v\n", getBool(data, "enabled"))
-	fmt.Printf("User Type:  %s\n", getString(data, "user_type"))
-	fmt.Printf("Created:    %s\n", getString(data, "creation"))
-	fmt.Printf("Last Login: %s\n", getString(data, "last_login"))
-	fmt.Printf("Last Active:%s\n", getString(data, "last_active"))
+	output.Printf("User: %s", email)
+	output.Print(strings.Repeat("-", 50))
+	output.Printf("Name:       %s %s", getString(data, "first_name"), getString(data, "last_name"))
+	output.Printf("Full Name:  %s", getString(data, "full_name"))
+	output.Printf("Enabled:    %v", getBool(data, "enabled"))
+	output.Printf("User Type:  %s", getString(data, "user_type"))
+	output.Printf("Created:    %s", getString(data, "creation"))
+	output.Printf("Last Login: %s", getString(data, "last_login"))
+	output.Printf("Last Active:%s", getString(data, "last_active"))
 
 	if roles, ok := data["roles"].([]any); ok && len(roles) > 0 {
-		fmt.Printf("\nRoles:\n")
+		output.Printf("\nRoles:")
 		for _, r := range roles {
-			fmt.Printf("  - %s\n", r.(string))
+			output.Printf("  - %s", r.(string))
 		}
 	}
 

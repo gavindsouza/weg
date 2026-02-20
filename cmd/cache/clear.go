@@ -98,18 +98,18 @@ func runClear(cmd *cobra.Command, args []string) error {
 			}
 		}
 		if site == "" {
-			return fmt.Errorf("no site specified and no default site found. Use --site or --all")
+			return wegerrors.Usage("no site specified and no default site found. Use --site or --all")
 		}
 		sites = []string{site}
 	}
 
 	if len(sites) == 0 {
-		return fmt.Errorf("no sites found to clear cache")
+		return wegerrors.NotFound("sites", "")
 	}
 
 	// Clear cache for each site
 	for _, site := range sites {
-		output.Infof("Clearing cache for %s...\n", site)
+		output.Infof("Clearing cache for %s...", site)
 
 		executor := api.NewExecutor(benchPath, site, "Administrator")
 
@@ -135,25 +135,25 @@ finally:
 
 		result, err := executor.ExecuteRaw(formattedScript)
 		if err != nil {
-			return fmt.Errorf("failed to clear cache for %s: %w", site, err)
+			return wegerrors.Operation("clear cache", site, err)
 		}
 
 		if !result.Success {
-			return fmt.Errorf("failed to clear cache for %s: %s", site, result.Error)
+			return wegerrors.Operation("clear cache", fmt.Sprintf("%s: %s", site, result.Error), nil)
 		}
 	}
 
 	// Also clear local Python bytecode
 	appsDir := filepath.Join(benchPath, "apps")
 	if _, err := os.Stat(appsDir); err == nil {
-		fmt.Println("Clearing Python bytecode...")
+		output.Print("Clearing Python bytecode...")
 		clearPycache(appsDir)
 	}
 
 	if len(sites) == 1 {
-		fmt.Printf("Cache cleared for %s\n", sites[0])
+		output.Printf("Cache cleared for %s", sites[0])
 	} else {
-		fmt.Printf("Cache cleared for %d sites\n", len(sites))
+		output.Printf("Cache cleared for %d sites", len(sites))
 	}
 	return nil
 }

@@ -72,7 +72,7 @@ func runDrop(cmd *cobra.Command, args []string) error {
 
 	// Check if site exists
 	if _, err := os.Stat(sitePath); os.IsNotExist(err) {
-		return fmt.Errorf("site %s does not exist", siteName)
+		return wegerrors.NotFound("site", siteName)
 	}
 
 	// Confirm

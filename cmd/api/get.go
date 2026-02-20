@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	internalapi "github.com/gavindsouza/weg/internal/api"
+	wegerrors "github.com/gavindsouza/weg/internal/errors"
+	wegoutput "github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/remote"
 	"github.com/spf13/cobra"
 )
@@ -63,13 +65,13 @@ func runGet(cmd *cobra.Command, args []string) error {
 
 	if getFilters != "" {
 		if err := json.Unmarshal([]byte(getFilters), &filters); err != nil {
-			return fmt.Errorf("invalid filters JSON: %w", err)
+			return wegerrors.Validation("filters", fmt.Sprintf("invalid JSON: %v", err))
 		}
 	}
 
 	if getFields != "" {
 		if err := json.Unmarshal([]byte(getFields), &fields); err != nil {
-			return fmt.Errorf("invalid fields JSON: %w", err)
+			return wegerrors.Validation("fields", fmt.Sprintf("invalid JSON: %v", err))
 		}
 	}
 
@@ -121,7 +123,7 @@ func runGet(cmd *cobra.Command, args []string) error {
 // printResult formats and prints the result (local mode)
 func printResult(result *internalapi.Result) error {
 	if !result.Success {
-		return fmt.Errorf("API error: %s", result.Error)
+		return wegerrors.API(0, result.Error, nil)
 	}
 	return printData(result.Data)
 }
@@ -129,7 +131,7 @@ func printResult(result *internalapi.Result) error {
 // printRemoteResult formats and prints the result (remote mode)
 func printRemoteResult(result *RemoteResult) error {
 	if !result.Success {
-		return fmt.Errorf("API error: %s", result.Error)
+		return wegerrors.API(0, result.Error, nil)
 	}
 	return printData(result.Data)
 }
@@ -150,6 +152,6 @@ func printData(data any) error {
 		return err
 	}
 
-	fmt.Println(string(output))
+	wegoutput.Print(string(output))
 	return nil
 }

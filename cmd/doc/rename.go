@@ -2,10 +2,10 @@ package doc
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/gavindsouza/weg/internal/api"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -78,11 +78,11 @@ finally:
 
 	if !result.Success {
 		if result.Traceback != "" {
-			fmt.Fprintf(os.Stderr, "%s\n", result.Traceback)
+			output.Errorf("%s", result.Traceback)
 		}
 		return fmt.Errorf("failed to rename: %s", result.Error)
 	}
 
-	fmt.Printf("Renamed %s: %s -> %s\n", doctype, oldName, result.Data)
+	output.Printf("Renamed %s: %s -> %v", doctype, oldName, result.Data)
 	return nil
 }

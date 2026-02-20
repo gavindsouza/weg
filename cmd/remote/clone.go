@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	wegerrors "github.com/gavindsouza/weg/internal/errors"
 	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/remote"
 	"github.com/gavindsouza/weg/internal/workspace"
@@ -113,7 +114,7 @@ func runClone(cobraCmd *cobra.Command, args []string) error {
 
 	// Check if directory already exists
 	if _, err := os.Stat(dirName); err == nil {
-		return fmt.Errorf("directory %s already exists", dirName)
+		return wegerrors.Validation("path", fmt.Sprintf("directory %s already exists", dirName))
 	}
 
 	// Get credentials - resolution hierarchy:
@@ -144,7 +145,7 @@ func runClone(cobraCmd *cobra.Command, args []string) error {
 					apiKey = auth.APIKey
 					apiSecret = auth.APISecret
 					fromGlobal = true
-					fmt.Printf("Using saved credentials for %s\n", siteHost)
+					output.Printf("Using saved credentials for %s", siteHost)
 				}
 			}
 		}
@@ -153,20 +154,20 @@ func runClone(cobraCmd *cobra.Command, args []string) error {
 	// Interactive prompt if needed
 	if apiKey == "" || apiSecret == "" {
 		if cloneNonInteractive {
-			return fmt.Errorf("credentials required: set WEG_API_KEY and WEG_API_SECRET, use --api-key/--api-secret, or save globally with 'weg remote login'")
+			return wegerrors.Validation("credentials", "credentials required: set WEG_API_KEY and WEG_API_SECRET, use --api-key/--api-secret, or save globally with 'weg remote login'")
 		}
 
-		fmt.Println()
-		fmt.Println("SECURITY SETUP REQUIRED")
-		fmt.Println()
-		fmt.Println("Remote sync requires API access to modify site customizations.")
-		fmt.Println("Before proceeding, ensure you have API credentials for the site.")
-		fmt.Println()
-		fmt.Println("To create API credentials on your Frappe site:")
-		fmt.Println("  1. Go to User Settings > API Access")
-		fmt.Println("  2. Generate a new API Key + Secret")
-		fmt.Println("  3. Ensure the user has permissions for customizations")
-		fmt.Println()
+		output.Print("")
+		output.Print("SECURITY SETUP REQUIRED")
+		output.Print("")
+		output.Print("Remote sync requires API access to modify site customizations.")
+		output.Print("Before proceeding, ensure you have API credentials for the site.")
+		output.Print("")
+		output.Print("To create API credentials on your Frappe site:")
+		output.Print("  1. Go to User Settings > API Access")
+		output.Print("  2. Generate a new API Key + Secret")
+		output.Print("  3. Ensure the user has permissions for customizations")
+		output.Print("")
 
 		reader := bufio.NewReader(os.Stdin)
 
@@ -184,7 +185,7 @@ func runClone(cobraCmd *cobra.Command, args []string) error {
 	}
 
 	if apiKey == "" || apiSecret == "" {
-		return fmt.Errorf("API key and secret are required")
+		return wegerrors.Validation("credentials", "API key and secret are required")
 	}
 
 	// Create client and test connection
@@ -194,7 +195,7 @@ func runClone(cobraCmd *cobra.Command, args []string) error {
 	if err := client.Ping(); err != nil {
 		return fmt.Errorf("failed to connect to site: %w", err)
 	}
-	fmt.Println("Connected")
+	output.Print("Connected")
 
 	// Offer to save credentials globally if not already from global
 	if !fromGlobal && !cloneNonInteractive {
@@ -207,9 +208,9 @@ func runClone(cobraCmd *cobra.Command, args []string) error {
 				APIKey:    apiKey,
 				APISecret: apiSecret,
 			}); err != nil {
-				fmt.Fprintf(os.Stderr, "Warning: Failed to save global credentials: %v\n", err)
+				output.Warningf("Failed to save global credentials: %v", err)
 			} else {
-				fmt.Println("Credentials saved to ~/.config/weg/credentials.toml")
+				output.Print("Credentials saved to ~/.config/weg/credentials.toml")
 			}
 		}
 	}
@@ -219,7 +220,7 @@ func runClone(cobraCmd *cobra.Command, args []string) error {
 	if err != nil {
 		frappeVersion = "unknown"
 	}
-	fmt.Printf("Frappe version: %s\n", frappeVersion)
+	output.Printf("Frappe version: %s", frappeVersion)
 
 	// Create site config
 	config := remote.NewSiteConfig(siteURL, dirName)
@@ -274,7 +275,7 @@ func runClone(cobraCmd *cobra.Command, args []string) error {
 	}
 
 	// Initialize git repo
-	fmt.Println("Initializing git repository...")
+	output.Print("Initializing git repository...")
 	gitInit := exec.Command("git", "init")
 	gitInit.Dir = dirName
 	if err := gitInit.Run(); err != nil {
@@ -283,7 +284,7 @@ func runClone(cobraCmd *cobra.Command, args []string) error {
 
 	// Save config
 	if err := config.Save(dirName); err != nil {
-		return fmt.Errorf("failed to save config: %w", err)
+		return wegerrors.Config("site.toml", "write", err)
 	}
 
 	// Save credentials (gitignored)
@@ -294,7 +295,7 @@ func runClone(cobraCmd *cobra.Command, args []string) error {
 		},
 	}
 	if err := creds.Save(dirName); err != nil {
-		return fmt.Errorf("failed to save credentials: %w", err)
+		return wegerrors.Config("credentials", "write", err)
 	}
 
 	// Ensure credentials are gitignored
@@ -309,7 +310,7 @@ func runClone(cobraCmd *cobra.Command, args []string) error {
 	}
 
 	// Fetch entities
-	fmt.Println("Fetching customizations...")
+	output.Print("Fetching customizations...")
 	fetcher := remote.NewFetcher(client, config)
 	result, err := fetcher.FetchAll()
 	if err != nil {
@@ -341,7 +342,7 @@ func runClone(cobraCmd *cobra.Command, args []string) error {
 		mods := make(map[string]bool)
 		for _, entity := range result.Entities {
 			if err := remote.WriteEntity(dirName, entity); err != nil {
-				fmt.Fprintf(os.Stderr, "Error: Failed to write %s: %v\n", entity.Name, err)
+				output.Errorf("Failed to write %s: %v", entity.Name, err)
 				continue
 			}
 			mods[entity.Module] = true
@@ -360,13 +361,13 @@ func runClone(cobraCmd *cobra.Command, args []string) error {
 	// Update sync timestamp
 	config.Sync.LastSync = time.Now()
 	if err := config.Save(dirName); err != nil {
-		return fmt.Errorf("failed to save config: %w", err)
+		return wegerrors.Config("site.toml", "write", err)
 	}
 
 	// Create git commits
 	if cloneNoHistory {
 		// Simple: single initial commit
-		fmt.Println("Creating initial commit...")
+		output.Print("Creating initial commit...")
 		gitAdd := exec.Command("git", "add", "-A")
 		gitAdd.Dir = dirName
 		if err := gitAdd.Run(); err != nil {
@@ -380,12 +381,12 @@ func runClone(cobraCmd *cobra.Command, args []string) error {
 		gitCommit.Run() // Might fail if nothing to commit, that's ok
 	} else {
 		// Full history reconstruction from Version DocType
-		fmt.Println("Fetching version history...")
+		output.Print("Fetching version history...")
 		history, entitiesWithoutHistory, err := fetcher.FetchHistoryWithDocs(result.Entities)
 		if err != nil {
 			// Fall back to simple commit if history fetch fails
-			fmt.Printf("Warning: Could not fetch version history: %v\n", err)
-			fmt.Println("Creating simple initial commit...")
+			output.Warningf("Could not fetch version history: %v", err)
+			output.Print("Creating simple initial commit...")
 			gitAdd := exec.Command("git", "add", "-A")
 			gitAdd.Dir = dirName
 			gitAdd.Run()
@@ -396,7 +397,7 @@ func runClone(cobraCmd *cobra.Command, args []string) error {
 			gitCommit.Run()
 		} else {
 			// Fetch user information for author names
-			fmt.Println("Fetching user information...")
+			output.Print("Fetching user information...")
 			users, err := fetcher.FetchUsers(history)
 			if err != nil {
 				// Non-fatal: we'll fall back to email-derived names
@@ -407,7 +408,7 @@ func runClone(cobraCmd *cobra.Command, args []string) error {
 
 			if len(commitPlan) == 0 {
 				// No history found, create a single commit
-				fmt.Println("No version history found, creating initial commit...")
+				output.Print("No version history found, creating initial commit...")
 				gitAdd := exec.Command("git", "add", "-A")
 				gitAdd.Dir = dirName
 				gitAdd.Run()
@@ -434,7 +435,7 @@ func runClone(cobraCmd *cobra.Command, args []string) error {
 					// Write file contents for this commit (historical state)
 					for filePath, content := range commit.FileContents {
 						if err := writeFileContent(dirName, filePath, content); err != nil {
-							fmt.Fprintf(os.Stderr, "Error: Failed to write %s: %v\n", filePath, err)
+							output.Errorf("Failed to write %s: %v", filePath, err)
 							continue
 						}
 						// Track module from path
@@ -495,8 +496,8 @@ func runClone(cobraCmd *cobra.Command, args []string) error {
 				// Check if there are uncommitted changes
 				gitStatus := exec.Command("git", "status", "--porcelain")
 				gitStatus.Dir = dirName
-				output, _ := gitStatus.Output()
-				if len(strings.TrimSpace(string(output))) > 0 {
+				statusOutput, _ := gitStatus.Output()
+				if len(strings.TrimSpace(string(statusOutput))) > 0 {
 					commitMsg := fmt.Sprintf("chore(config): initialize weg config\n\nSource: %s", siteURL)
 					gitCommit := exec.Command("git", "commit",
 						"--author", "Weg <noreply@weg.io>",
@@ -510,21 +511,21 @@ func runClone(cobraCmd *cobra.Command, args []string) error {
 	}
 
 	// Initialize workspace
-	fmt.Println("Initializing workspace...")
+	output.Print("Initializing workspace...")
 	initWorkspace(dirName)
 
 	// Summary
-	fmt.Println()
-	fmt.Printf("Cloned to %s/\n", dirName)
-	fmt.Println()
-	fmt.Printf("  Entities: %d\n", len(result.Entities))
-	fmt.Printf("  Modules:  %d\n", len(modules(result.Entities)))
-	fmt.Println()
-	fmt.Println("Next steps:")
-	fmt.Printf("  cd %s\n", dirName)
-	fmt.Println("  weg workspace expand    # Extract scripts for editing")
-	fmt.Println("  weg remote status       # Check sync state")
-	fmt.Println("  weg remote push         # Push local changes")
+	output.Print("")
+	output.Printf("Cloned to %s/", dirName)
+	output.Print("")
+	output.Printf("  Entities: %d", len(result.Entities))
+	output.Printf("  Modules:  %d", len(modules(result.Entities)))
+	output.Print("")
+	output.Print("Next steps:")
+	output.Printf("  cd %s", dirName)
+	output.Print("  weg workspace expand    # Extract scripts for editing")
+	output.Print("  weg remote status       # Check sync state")
+	output.Print("  weg remote push         # Push local changes")
 
 	return nil
 }
@@ -593,7 +594,7 @@ repos:
 		os.WriteFile(precommitPath, []byte(precommitConfig), 0644)
 	}
 
-	fmt.Println("Workspace initialized")
+	output.Print("Workspace initialized")
 }
 
 // writeFileContent writes JSON content to a file path

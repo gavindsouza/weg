@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"github.com/gavindsouza/weg/internal/config"
+	"github.com/gavindsouza/weg/internal/errors"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/state"
 	"github.com/gavindsouza/weg/tools"
 	"github.com/spf13/cobra"
@@ -94,9 +96,9 @@ func initFresh(path string) error {
 
 	// Interactive prompt
 	if !AssumeYes() {
-		fmt.Println("\nWhat would you like to create?")
-		fmt.Println("  1. New Frappe app (app-centric development)")
-		fmt.Println("  2. New bench (traditional multi-app setup)")
+		output.Print("\nWhat would you like to create?")
+		output.Print("  1. New Frappe app (app-centric development)")
+		output.Print("  2. New bench (traditional multi-app setup)")
 		fmt.Print("\nChoice [1]: ")
 
 		reader := bufio.NewReader(os.Stdin)
@@ -157,7 +159,7 @@ func initFreshApp(path string) error {
 
 	// Validate database choice
 	if !tools.IsDatabaseSupported(frappeVersion, database) {
-		return fmt.Errorf("database %s is not supported for Frappe %s", database, frappeVersion)
+		return errors.Validation("database", fmt.Sprintf("%s is not supported for Frappe %s", database, frappeVersion))
 	}
 
 	// Create pyproject.toml with [tool.weg]
@@ -185,14 +187,14 @@ database = "%s"
 	}
 
 	if err := os.WriteFile(pyprojectPath, []byte(pyprojectContent), 0644); err != nil {
-		return fmt.Errorf("failed to write pyproject.toml: %w", err)
+		return errors.Config("pyproject.toml", "write", err)
 	}
 
 	PrintInfo("Created pyproject.toml with [tool.weg] configuration")
 
 	// Set up development tooling unless skipped
 	if !skipDevTooling {
-		fmt.Println()
+		output.Print("")
 		if err := scaffoldAI(path); err != nil {
 			PrintVerbose("Warning: failed to scaffold AI tooling: %v", err)
 		}
@@ -257,7 +259,7 @@ func initFreshBench(path string) error {
 
 	// Validate database choice
 	if !tools.IsDatabaseSupported(frappeVersion, database) {
-		return fmt.Errorf("database %s is not supported for Frappe %s", database, frappeVersion)
+		return errors.Validation("database", fmt.Sprintf("%s is not supported for Frappe %s", database, frappeVersion))
 	}
 
 	// Create weg.toml
@@ -289,7 +291,7 @@ default = true
 	}
 
 	if err := os.WriteFile(wegPath, []byte(wegContent), 0644); err != nil {
-		return fmt.Errorf("failed to write weg.toml: %w", err)
+		return errors.Config("weg.toml", "write", err)
 	}
 
 	PrintInfo("Created weg.toml configuration")
@@ -371,7 +373,7 @@ database = "%s"
 
 	// Set up development tooling unless skipped
 	if !skipDevTooling {
-		fmt.Println()
+		output.Print("")
 		if err := scaffoldAI(path); err != nil {
 			PrintVerbose("Warning: failed to scaffold AI tooling: %v", err)
 		}
@@ -458,7 +460,7 @@ name = "%s"%s
 	// Write weg.toml
 	wegPath := filepath.Join(path, "weg.toml")
 	if err := os.WriteFile(wegPath, []byte(wegContent), 0644); err != nil {
-		return fmt.Errorf("failed to write weg.toml: %w", err)
+		return errors.Config("weg.toml", "write", err)
 	}
 
 	// Create initial state
@@ -483,7 +485,7 @@ name = "%s"%s
 	}
 
 	if err := st.Save(path); err != nil {
-		return fmt.Errorf("failed to save state: %w", err)
+		return errors.State("save", err)
 	}
 
 	PrintInfo("Created weg.toml from existing bench")

@@ -53,14 +53,14 @@ func runSet(cmd *cobra.Command, args []string) error {
 	// Only support weg.toml for now (pyproject.toml editing is more complex)
 	if result.Context == config.ContextWegApp {
 		output.Warning("Config editing for pyproject.toml not yet supported")
-		fmt.Printf("To set %s = %q, please edit %s manually\n", key, value, result.ConfigPath)
+		output.Printf("To set %s = %q, please edit %s manually", key, value, result.ConfigPath)
 		return nil
 	}
 
 	// Read the current config file
 	data, err := os.ReadFile(result.ConfigPath)
 	if err != nil {
-		return fmt.Errorf("failed to read config: %w", err)
+		return wegerrors.Config("config", "read", err)
 	}
 
 	content := string(data)
@@ -76,17 +76,17 @@ func runSet(cmd *cobra.Command, args []string) error {
 		updated, found = updateTOMLValue(content, "bench", "name", value)
 	default:
 		output.Warningf("Key %q not supported for automatic editing", key)
-		fmt.Printf("To set %s = %q, please edit %s manually\n", key, value, result.ConfigPath)
+		output.Printf("To set %s = %q, please edit %s manually", key, value, result.ConfigPath)
 		return nil
 	}
 
 	if !found {
-		return fmt.Errorf("key %q not found in config file", key)
+		return wegerrors.NotFound("key", key)
 	}
 
 	// Write back
 	if err := os.WriteFile(result.ConfigPath, []byte(updated), 0644); err != nil {
-		return fmt.Errorf("failed to write config: %w", err)
+		return wegerrors.Config("config", "write", err)
 	}
 
 	output.Successf("Set %s = %q", key, value)

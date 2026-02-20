@@ -109,36 +109,36 @@ func runMpApp(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to get app details: %w", err)
 	}
 
-	fmt.Printf("App: %s\n", app.Name)
-	fmt.Printf("Title: %s\n", app.Title)
-	fmt.Printf("Status: %s\n", app.Status)
+	output.Printf("App: %s", app.Name)
+	output.Printf("Title: %s", app.Title)
+	output.Printf("Status: %s", app.Status)
 	if app.Description != "" {
-		fmt.Printf("Description: %s\n", app.Description)
+		output.Printf("Description: %s", app.Description)
 	}
 
 	// Show versions
 	if len(app.Sources) > 0 {
-		fmt.Println("\nSupported Versions:")
+		output.Print("\nSupported Versions:")
 		for _, src := range app.Sources {
-			fmt.Printf("  - %s\n", src.Version)
+			output.Printf("  - %s", src.Version)
 		}
 	}
 
 	// Get analytics
 	analytics, err := client.GetAppAnalytics(appName)
 	if err != nil {
-		fmt.Printf("\nAnalytics: (unavailable)\n")
+		output.Print("\nAnalytics: (unavailable)")
 	} else {
-		fmt.Println("\nAnalytics:")
-		fmt.Printf("  Total Installs: %d\n", analytics.TotalInstalls)
-		fmt.Printf("  Active Installs: %d\n", analytics.TotalActiveInstalls)
+		output.Print("\nAnalytics:")
+		output.Printf("  Total Installs: %d", analytics.TotalInstalls)
+		output.Printf("  Active Installs: %d", analytics.TotalActiveInstalls)
 		if analytics.RevenueData != nil {
-			fmt.Printf("  Total Revenue: %.2f %s\n", analytics.RevenueData.TotalRevenue, analytics.RevenueData.Currency)
-			fmt.Printf("  Monthly Revenue: %.2f %s\n", analytics.RevenueData.MonthlyRevenue, analytics.RevenueData.Currency)
+			output.Printf("  Total Revenue: %.2f %s", analytics.RevenueData.TotalRevenue, analytics.RevenueData.Currency)
+			output.Printf("  Monthly Revenue: %.2f %s", analytics.RevenueData.MonthlyRevenue, analytics.RevenueData.Currency)
 		}
 	}
 
-	fmt.Println("\nUse 'weg cloud mp subs", appName, "' for subscription details")
+	output.Printf("\nUse 'weg cloud mp subs %s' for subscription details", appName)
 
 	return nil
 }
@@ -162,7 +162,7 @@ func runMpSubs(cmd *cobra.Command, args []string) error {
 	}
 
 	if output.EffectiveFormat() != output.FormatJSON {
-		output.Printf("Subscriptions for %s\n", appName)
+		output.Printf("Subscriptions for %s", appName)
 	}
 
 	type SubRow struct {

@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/gavindsouza/weg/internal/api"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -105,12 +106,12 @@ finally:
 		return fmt.Errorf("failed to create user: %s", result.Error)
 	}
 
-	fmt.Printf("Created user: %s\n", email)
+	output.Printf("Created user: %s", email)
 	if createRole != "" {
-		fmt.Printf("Assigned role: %s\n", createRole)
+		output.Printf("Assigned role: %s", createRole)
 	}
 	if createPassword == "" {
-		fmt.Println("No password set. Use 'weg user password' to set one.")
+		output.Print("No password set. Use 'weg user password' to set one.")
 	}
 
 	return nil

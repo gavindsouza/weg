@@ -7,6 +7,7 @@ import (
 
 	"github.com/gavindsouza/weg/internal/config"
 	wegerrors "github.com/gavindsouza/weg/internal/errors"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -47,7 +48,7 @@ func runGet(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	fmt.Println(value)
+	output.Print(value)
 	return nil
 }
 
@@ -62,18 +63,18 @@ func getConfigValue(result *config.DetectionResult, key string) (string, error) 
 		return getValueFromBenchConfig(cfg, parts)
 	}
 
-	return "", fmt.Errorf("key not found: %s", key)
+	return "", wegerrors.NotFound("key", key)
 }
 
 func getValueFromBenchConfig(cfg *config.BenchConfig, parts []string) (string, error) {
 	if len(parts) == 0 {
-		return "", fmt.Errorf("empty key")
+		return "", wegerrors.Validation("key", "must not be empty")
 	}
 
 	switch parts[0] {
 	case "frappe":
 		if len(parts) < 2 {
-			return "", fmt.Errorf("missing frappe key")
+			return "", wegerrors.NotFound("key", "frappe")
 		}
 		switch parts[1] {
 		case "version":
@@ -83,7 +84,7 @@ func getValueFromBenchConfig(cfg *config.BenchConfig, parts []string) (string, e
 		}
 	case "bench":
 		if len(parts) < 2 {
-			return "", fmt.Errorf("missing bench key")
+			return "", wegerrors.NotFound("key", "bench")
 		}
 		switch parts[1] {
 		case "name":
@@ -91,12 +92,12 @@ func getValueFromBenchConfig(cfg *config.BenchConfig, parts []string) (string, e
 		}
 	case "apps":
 		if len(parts) < 3 {
-			return "", fmt.Errorf("usage: apps.<name>.<key>")
+			return "", wegerrors.Usage("usage: apps.<name>.<key>")
 		}
 		appName := parts[1]
 		appCfg, ok := cfg.Apps[appName]
 		if !ok {
-			return "", fmt.Errorf("app not found: %s", appName)
+			return "", wegerrors.NotFound("app", appName)
 		}
 		switch parts[2] {
 		case "url":
@@ -108,5 +109,5 @@ func getValueFromBenchConfig(cfg *config.BenchConfig, parts []string) (string, e
 		}
 	}
 
-	return "", fmt.Errorf("key not found: %s", strings.Join(parts, "."))
+	return "", wegerrors.NotFound("key", strings.Join(parts, "."))
 }

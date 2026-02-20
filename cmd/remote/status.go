@@ -13,6 +13,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	wegerrors "github.com/gavindsouza/weg/internal/errors"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/remote"
 	"github.com/spf13/cobra"
 )
@@ -42,47 +44,47 @@ func init() {
 func runStatus(cobraCmd *cobra.Command, args []string) error {
 	// Check if we're in a remote site directory
 	if !remote.IsRemoteSite(".") {
-		return fmt.Errorf("not a remote site clone (no .weg/site.toml found)")
+		return wegerrors.NotFound("remote clone", ".weg/site.toml")
 	}
 
 	// Load config
 	config, err := remote.LoadSiteConfig(".")
 	if err != nil {
-		return fmt.Errorf("failed to load config: %w", err)
+		return wegerrors.Config("site.toml", "read", err)
 	}
 
-	fmt.Printf("Remote site: %s\n", config.Site.URL)
-	fmt.Printf("Last sync:   %s\n", config.Sync.LastSync.Format("2006-01-02 15:04:05"))
-	fmt.Println()
+	output.Printf("Remote site: %s", config.Site.URL)
+	output.Printf("Last sync:   %s", config.Sync.LastSync.Format("2006-01-02 15:04:05"))
+	output.Print("")
 
 	// Check git status for local changes
 	gitStatus := exec.Command("git", "status", "--porcelain")
-	output, err := gitStatus.Output()
+	gitOut, err := gitStatus.Output()
 	if err != nil {
 		return fmt.Errorf("failed to get git status: %w", err)
 	}
 
-	localChanges := strings.TrimSpace(string(output))
+	localChanges := strings.TrimSpace(string(gitOut))
 	if localChanges == "" {
-		fmt.Println("Local:  No changes")
+		output.Print("Local:  No changes")
 	} else {
 		lines := strings.Split(localChanges, "\n")
-		fmt.Printf("Local:  %d file(s) changed\n", len(lines))
+		output.Printf("Local:  %d file(s) changed", len(lines))
 		for _, line := range lines {
 			if len(line) > 3 {
 				status := line[:2]
 				file := line[3:]
 				switch {
 				case strings.HasPrefix(status, "M"):
-					fmt.Printf("  modified:   %s\n", file)
+					output.Printf("  modified:   %s", file)
 				case strings.HasPrefix(status, "A"):
-					fmt.Printf("  added:      %s\n", file)
+					output.Printf("  added:      %s", file)
 				case strings.HasPrefix(status, "D"):
-					fmt.Printf("  deleted:    %s\n", file)
+					output.Printf("  deleted:    %s", file)
 				case strings.HasPrefix(status, "?"):
-					fmt.Printf("  untracked:  %s\n", file)
+					output.Printf("  untracked:  %s", file)
 				default:
-					fmt.Printf("  %s %s\n", status, file)
+					output.Printf("  %s %s", status, file)
 				}
 			}
 		}
@@ -93,48 +95,48 @@ func runStatus(cobraCmd *cobra.Command, args []string) error {
 	unpushed, err := gitLog.Output()
 	if err == nil && len(strings.TrimSpace(string(unpushed))) > 0 {
 		lines := strings.Split(strings.TrimSpace(string(unpushed)), "\n")
-		fmt.Printf("\nUnpushed commits: %d\n", len(lines))
+		output.Printf("\nUnpushed commits: %d", len(lines))
 		for _, line := range lines {
-			fmt.Printf("  %s\n", line)
+			output.Printf("  %s", line)
 		}
 	}
 
 	// Check remote if requested
 	if statusRemote {
-		fmt.Println()
-		fmt.Println("Checking remote...")
+		output.Print("")
+		output.Print("Checking remote...")
 
 		creds, err := remote.LoadCredentials(".")
 		if err != nil {
-			return fmt.Errorf("failed to load credentials: %w", err)
+			return wegerrors.Config("credentials", "read", err)
 		}
 
 		client := remote.NewClientFromConfig(config, creds)
 		if err := client.Ping(); err != nil {
 			return fmt.Errorf("failed to connect: %w", err)
 		}
-		fmt.Println("Connected")
+		output.Print("Connected")
 
 		// Fetch remote entities and compare with local
 		remoteChanges, err := detectRemoteChanges(client, config, ".")
 		if err != nil {
-			fmt.Printf("Warning: Could not detect remote changes: %v\n", err)
+			output.Warningf("Could not detect remote changes: %v", err)
 		} else if len(remoteChanges) == 0 {
-			fmt.Println("Remote: No changes detected")
+			output.Print("Remote: No changes detected")
 		} else {
-			fmt.Printf("Remote: %d entity change(s) detected\n", len(remoteChanges))
+			output.Printf("Remote: %d entity change(s) detected", len(remoteChanges))
 			for _, change := range remoteChanges {
-				fmt.Printf("  %s: %s\n", change.Status, change.Name)
+				output.Printf("  %s: %s", change.Status, change.Name)
 			}
-			fmt.Println("\nRun 'weg remote pull' to fetch remote changes.")
+			output.Print("\nRun 'weg remote pull' to fetch remote changes.")
 		}
 	}
 
 	// Show sync instructions
 	if localChanges != "" {
-		fmt.Println()
-		fmt.Println("To sync changes:")
-		fmt.Println("  weg sync -m \"description\"")
+		output.Print("")
+		output.Print("To sync changes:")
+		output.Print("  weg sync -m \"description\"")
 	}
 
 	return nil

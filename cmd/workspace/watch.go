@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
+	wegerrors "github.com/gavindsouza/weg/internal/errors"
 	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/workspace"
 	"github.com/spf13/cobra"
@@ -46,13 +47,13 @@ func runWatch(cmd *cobra.Command, args []string) error {
 
 	// Check if we're in a weg clone
 	if _, err := os.Stat(".weg"); os.IsNotExist(err) {
-		return fmt.Errorf("not a weg remote clone (no .weg directory)")
+		return wegerrors.NotFound("remote clone", ".weg")
 	}
 
 	// Check if workspace exists
 	workspaceDir := filepath.Join(cwd, workspace.WorkspaceDir)
 	if _, err := os.Stat(workspaceDir); os.IsNotExist(err) {
-		return fmt.Errorf("no workspace found (run 'weg workspace expand' first)")
+		return wegerrors.NotFound("workspace", "")
 	}
 
 	// Create watcher
@@ -76,9 +77,9 @@ func runWatch(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to watch directory: %w", err)
 	}
 
-	output.Infof("Watching %s/ for changes...\n", workspace.WorkspaceDir)
-	fmt.Println("Press Ctrl+C to stop.")
-	fmt.Println()
+	output.Infof("Watching %s/ for changes...", workspace.WorkspaceDir)
+	output.Print("Press Ctrl+C to stop.")
+	output.Print("")
 
 	// Handle graceful shutdown
 	sigChan := make(chan os.Signal, 1)
@@ -109,7 +110,7 @@ func runWatch(cmd *cobra.Command, args []string) error {
 
 				debounceTimer = time.AfterFunc(debounceDelay, func() {
 					relPath, _ := filepath.Rel(cwd, event.Name)
-					fmt.Printf("Changed: %s\n", relPath)
+					output.Printf("Changed: %s", relPath)
 
 					// Run collapse
 					result, err := workspace.Collapse(workspace.CollapseOptions{
@@ -117,15 +118,15 @@ func runWatch(cmd *cobra.Command, args []string) error {
 					})
 
 					if err != nil {
-						fmt.Printf("  Error: %v\n", err)
+						output.Errorf("%v", err)
 					} else if len(result.Updated) > 0 {
 						for _, f := range result.Updated {
-							fmt.Printf("  Collapsed: %s\n", f)
+							output.Printf("  Collapsed: %s", f)
 						}
 					} else if len(result.Unchanged) > 0 {
-						fmt.Println("  (no changes to collapse)")
+						output.Print("  (no changes to collapse)")
 					}
-					fmt.Println()
+					output.Print("")
 				})
 			}
 
@@ -140,10 +141,10 @@ func runWatch(cmd *cobra.Command, args []string) error {
 			if !ok {
 				return nil
 			}
-			fmt.Printf("Watch error: %v\n", err)
+			output.Errorf("Watch error: %v", err)
 
 		case <-sigChan:
-			fmt.Println("\nStopping watch...")
+			output.Print("\nStopping watch...")
 			return nil
 		}
 	}

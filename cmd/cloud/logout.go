@@ -1,11 +1,12 @@
 package cloud
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/gavindsouza/weg/internal/cloud"
+	wegerrors "github.com/gavindsouza/weg/internal/errors"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -61,7 +62,7 @@ func runLogout(cmd *cobra.Command, args []string) error {
 
 	// Check if we have credentials for this cloud
 	if creds == nil || creds.Clouds == nil || creds.Clouds[cloudName] == nil {
-		return fmt.Errorf("not logged in to cloud '%s'", cloudName)
+		return wegerrors.NotFound("cloud login", cloudName)
 	}
 
 	// Remove from credentials
@@ -77,11 +78,11 @@ func runLogout(cmd *cobra.Command, args []string) error {
 
 	// Save updated files
 	if err := cloud.SaveCredentials(creds, logoutGlobal); err != nil {
-		return fmt.Errorf("failed to save credentials: %w", err)
+		return wegerrors.Config("credentials", "write", err)
 	}
 	if config != nil {
 		if err := cloud.SaveConfig(config, logoutGlobal); err != nil {
-			return fmt.Errorf("failed to save config: %w", err)
+			return wegerrors.Config("cloud config", "write", err)
 		}
 	}
 
@@ -89,7 +90,7 @@ func runLogout(cmd *cobra.Command, args []string) error {
 	if logoutGlobal {
 		scope = "global"
 	}
-	fmt.Printf("Logged out from cloud '%s' (%s)\n", cloudName, scope)
+	output.Printf("Logged out from cloud '%s' (%s)", cloudName, scope)
 	return nil
 }
 
@@ -125,11 +126,11 @@ func removeAllCredentials(global bool) error {
 	}
 
 	if len(removed) == 0 {
-		fmt.Println("No credentials found to remove")
+		output.Print("No credentials found to remove")
 	} else {
-		fmt.Println("Removed credentials:")
+		output.Print("Removed credentials:")
 		for _, f := range removed {
-			fmt.Printf("  %s\n", f)
+			output.Printf("  %s", f)
 		}
 	}
 	return nil

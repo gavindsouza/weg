@@ -9,6 +9,7 @@ import (
 	"github.com/gavindsouza/weg/internal/completion"
 	"github.com/gavindsouza/weg/internal/config"
 	wegerrors "github.com/gavindsouza/weg/internal/errors"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/state"
 	"github.com/spf13/cobra"
 )
@@ -98,7 +99,7 @@ func resolveSiteForMaintenance(args []string) (string, string, error) {
 	}
 
 	if site == "" {
-		return "", "", fmt.Errorf("no site specified and no default site found")
+		return "", "", wegerrors.Usage("no site specified and no default site found")
 	}
 
 	return benchPath, site, nil
@@ -141,7 +142,7 @@ finally:
 		return fmt.Errorf("failed to enable maintenance mode: %s", result.Error)
 	}
 
-	fmt.Printf("Maintenance mode enabled for %s\n", site)
+	output.Printf("Maintenance mode enabled for %s", site)
 	return nil
 }
 
@@ -182,7 +183,7 @@ finally:
 		return fmt.Errorf("failed to disable maintenance mode: %s", result.Error)
 	}
 
-	fmt.Printf("Maintenance mode disabled for %s\n", site)
+	output.Printf("Maintenance mode disabled for %s", site)
 	return nil
 }
 
@@ -233,6 +234,6 @@ finally:
 		modeStr = "on"
 	}
 
-	fmt.Printf("Maintenance mode for %s: %s\n", site, modeStr)
+	output.Printf("Maintenance mode for %s: %s", site, modeStr)
 	return nil
 }

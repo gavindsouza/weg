@@ -92,7 +92,7 @@ func runPassword(cmd *cobra.Command, args []string) error {
 	}
 
 	if site == "" {
-		return fmt.Errorf("no site specified and no default site found. Use --site flag")
+		return wegerrors.Usage("no site specified and no default site found. Use --site flag")
 	}
 
 	// Determine user
@@ -111,7 +111,7 @@ func runPassword(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(password) < 4 {
-		return fmt.Errorf("password must be at least 4 characters")
+		return wegerrors.Validation("password", "must be at least 4 characters")
 	}
 
 	output.Infof("Setting password for %s on %s...", user, site)
@@ -149,9 +149,9 @@ finally:
 		return fmt.Errorf("failed to set password: %s", apiResult.Error)
 	}
 
-	fmt.Printf("Password updated for %s\n", user)
+	output.Printf("Password updated for %s", user)
 	if passwordLogout {
-		fmt.Println("All existing sessions have been logged out")
+		output.Print("All existing sessions have been logged out")
 	}
 	return nil
 }
@@ -176,7 +176,7 @@ func promptPassword(user string) (string, error) {
 		}
 
 		if string(password) != string(confirm) {
-			return "", fmt.Errorf("passwords do not match")
+			return "", wegerrors.Validation("password", "passwords do not match")
 		}
 
 		return string(password), nil

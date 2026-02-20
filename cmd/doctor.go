@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/gavindsouza/weg/internal/config"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/runtime"
 	"github.com/spf13/cobra"
 )
@@ -50,8 +51,8 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	// Detect context
 	result, err := config.DetectProjectContext(absPath)
 	if err != nil {
-		fmt.Println("[ ] Weg project")
-		fmt.Println("    Not a weg-managed project. Run 'weg init' first.")
+		output.Print("[ ] Weg project")
+		output.Print("    Not a weg-managed project. Run 'weg init' first.")
 		return nil
 	}
 
@@ -62,14 +63,14 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	case config.ContextWegBench:
 		benchPath = result.BenchPath
 	default:
-		fmt.Println("[ ] Weg project")
-		fmt.Println("    Not a weg-managed project. Run 'weg init' first.")
+		output.Print("[ ] Weg project")
+		output.Print("    Not a weg-managed project. Run 'weg init' first.")
 		return nil
 	}
 
-	fmt.Println("Weg Doctor")
-	fmt.Println("==========")
-	fmt.Println()
+	output.Print("Weg Doctor")
+	output.Print("==========")
+	output.Print("")
 
 	checks := []checkResult{}
 
@@ -110,21 +111,21 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	issues := 0
 	for _, c := range checks {
 		if c.ok {
-			fmt.Printf("[x] %s\n", c.name)
+			output.Printf("[x] %s", c.name)
 		} else {
-			fmt.Printf("[ ] %s\n", c.name)
+			output.Printf("[ ] %s", c.name)
 			issues++
 		}
 		if c.message != "" {
-			fmt.Printf("    %s\n", c.message)
+			output.Printf("    %s", c.message)
 		}
 	}
 
-	fmt.Println()
+	output.Print("")
 	if issues == 0 {
-		fmt.Println("All checks passed!")
+		output.Print("All checks passed!")
 	} else {
-		fmt.Printf("%d issue(s) found.\n", issues)
+		output.Printf("%d issue(s) found.", issues)
 	}
 
 	return nil

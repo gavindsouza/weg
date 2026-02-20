@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	internalapi "github.com/gavindsouza/weg/internal/api"
+	wegerrors "github.com/gavindsouza/weg/internal/errors"
 	"github.com/gavindsouza/weg/internal/remote"
 	"github.com/spf13/cobra"
 )
@@ -37,7 +38,7 @@ func runPut(cmd *cobra.Command, args []string) error {
 	// Parse doctype/name
 	arg := args[0]
 	if !strings.Contains(arg, "/") {
-		return fmt.Errorf("expected format: <doctype>/<name>")
+		return wegerrors.Usage("expected format: <doctype>/<name>")
 	}
 
 	parts := strings.SplitN(arg, "/", 2)
@@ -47,7 +48,7 @@ func runPut(cmd *cobra.Command, args []string) error {
 	// Parse document data
 	var doc map[string]any
 	if err := json.Unmarshal([]byte(putData), &doc); err != nil {
-		return fmt.Errorf("invalid JSON data: %w", err)
+		return wegerrors.Validation("data", fmt.Sprintf("invalid JSON: %v", err))
 	}
 
 	// Remote mode

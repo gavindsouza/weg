@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 
 	"github.com/gavindsouza/weg/internal/config"
+	wegerrors "github.com/gavindsouza/weg/internal/errors"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -52,58 +54,58 @@ func runCurrent(cmd *cobra.Command, args []string) error {
 		}
 	case config.ContextBench:
 		benchPath = result.BenchPath
-		fmt.Println("Traditional bench (not weg-managed)")
-		fmt.Printf("Path: %s\n", benchPath)
+		output.Print("Traditional bench (not weg-managed)")
+		output.Printf("Path: %s", benchPath)
 		return nil
 	case config.ContextApp:
-		fmt.Println("Frappe app directory (not initialized with weg)")
-		fmt.Printf("Path: %s\n", cwd)
-		fmt.Println("\nRun 'weg init' to initialize weg in this directory.")
+		output.Print("Frappe app directory (not initialized with weg)")
+		output.Printf("Path: %s", cwd)
+		output.Print("\nRun 'weg init' to initialize weg in this directory.")
 		return nil
 	default:
-		return fmt.Errorf("not in a Frappe project directory")
+		return wegerrors.NotFound("project", "")
 	}
 
-	fmt.Println("Current Bench")
-	fmt.Println("=============")
-	fmt.Printf("Path:   %s\n", benchPath)
-	fmt.Printf("Config: %s\n", configPath)
+	output.Print("Current Bench")
+	output.Print("=============")
+	output.Printf("Path:   %s", benchPath)
+	output.Printf("Config: %s", configPath)
 
 	// Load and display config
 	if result.Context == config.ContextWegBench {
 		cfg, err := config.ParseWegToml(configPath)
 		if err == nil {
-			fmt.Println()
-			fmt.Printf("Name:     %s\n", cfg.Bench.Name)
-			fmt.Printf("Frappe:   %s\n", cfg.Frappe.Version)
-			fmt.Printf("Database: %s\n", cfg.Frappe.Database)
+			output.Print("")
+			output.Printf("Name:     %s", cfg.Bench.Name)
+			output.Printf("Frappe:   %s", cfg.Frappe.Version)
+			output.Printf("Database: %s", cfg.Frappe.Database)
 
 			if len(cfg.Apps) > 0 {
-				fmt.Printf("Apps:     %d configured\n", len(cfg.Apps))
+				output.Printf("Apps:     %d configured", len(cfg.Apps))
 			}
 			if len(cfg.Sites) > 0 {
-				fmt.Printf("Sites:    %d configured\n", len(cfg.Sites))
+				output.Printf("Sites:    %d configured", len(cfg.Sites))
 			}
 		}
 	} else if result.Context == config.ContextWegApp {
 		// Try weg.toml in .weg first
 		wegTomlPath := filepath.Join(benchPath, "weg.toml")
 		if cfg, err := config.ParseWegToml(wegTomlPath); err == nil {
-			fmt.Println()
-			fmt.Printf("Name:     %s\n", cfg.Bench.Name)
-			fmt.Printf("Frappe:   %s\n", cfg.Frappe.Version)
-			fmt.Printf("Database: %s\n", cfg.Frappe.Database)
+			output.Print("")
+			output.Printf("Name:     %s", cfg.Bench.Name)
+			output.Printf("Frappe:   %s", cfg.Frappe.Version)
+			output.Printf("Database: %s", cfg.Frappe.Database)
 		} else {
 			// Try pyproject.toml
 			pyprojectPath := filepath.Join(cwd, "pyproject.toml")
 			if appCfg, err := config.ParsePyproject(pyprojectPath); err == nil && appCfg != nil {
-				fmt.Println()
-				fmt.Println("App-centric configuration")
+				output.Print("")
+				output.Print("App-centric configuration")
 				if len(appCfg.Compatibility.Frappe) > 0 {
-					fmt.Printf("Compatible Frappe: %v\n", appCfg.Compatibility.Frappe)
+					output.Printf("Compatible Frappe: %v", appCfg.Compatibility.Frappe)
 				}
 				if appCfg.Dev.Frappe != "" {
-					fmt.Printf("Dev Frappe:        %s\n", appCfg.Dev.Frappe)
+					output.Printf("Dev Frappe:        %s", appCfg.Dev.Frappe)
 				}
 			}
 		}

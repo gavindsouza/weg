@@ -9,6 +9,7 @@ import (
 	"github.com/gavindsouza/weg/internal/api"
 	"github.com/gavindsouza/weg/internal/config"
 	wegerrors "github.com/gavindsouza/weg/internal/errors"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/state"
 	"github.com/spf13/cobra"
 )
@@ -92,12 +93,12 @@ finally:
 
 	users, ok := result.Data.([]any)
 	if !ok || len(users) == 0 {
-		fmt.Println("No users found")
+		output.Print("No users found")
 		return nil
 	}
 
-	fmt.Printf("%-35s %-25s %-8s %s\n", "EMAIL", "NAME", "ENABLED", "LAST LOGIN")
-	fmt.Println(strings.Repeat("-", 90))
+	output.Printf("%-35s %-25s %-8s %s", "EMAIL", "NAME", "ENABLED", "LAST LOGIN")
+	output.Print(strings.Repeat("-", 90))
 	for _, u := range users {
 		user := u.(map[string]any)
 		email := user["name"].(string)
@@ -113,7 +114,7 @@ finally:
 		if ll, ok := user["last_login"].(string); ok {
 			lastLogin = ll
 		}
-		fmt.Printf("%-35s %-25s %-8s %s\n", email, truncate(fullName, 25), enabled, lastLogin)
+		output.Printf("%-35s %-25s %-8s %s", email, truncate(fullName, 25), enabled, lastLogin)
 	}
 
 	return nil
@@ -162,7 +163,7 @@ func resolveContext(siteName string) (string, string, error) {
 	}
 
 	if site == "" {
-		return "", "", fmt.Errorf("no site specified and no default site found")
+		return "", "", wegerrors.Usage("no site specified and no default site found")
 	}
 
 	return benchPath, site, nil

@@ -5,8 +5,9 @@ package cmd
 
 import (
 	"bytes"
-	"os"
 	"testing"
+
+	"github.com/gavindsouza/weg/internal/output"
 )
 
 func TestRootCommand_Setup(t *testing.T) {
@@ -165,39 +166,22 @@ func TestGetConfigPath(t *testing.T) {
 }
 
 func TestPrintVerbose(t *testing.T) {
-	// Save original values
-	origVerbose := verbose
-	origStdout := os.Stdout
-	defer func() {
-		verbose = origVerbose
-		os.Stdout = origStdout
-	}()
-
-	// Create pipe to capture stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	// Test verbose=false (should not print)
-	verbose = false
-	PrintVerbose("test message %s", "arg")
-	w.Close()
+	output.SaveForTest(t)
 
 	var buf bytes.Buffer
-	buf.ReadFrom(r)
+	output.Writer = &buf
+
+	// Test normal level (should not print)
+	output.Level = output.VerbosityNormal
+	PrintVerbose("test message %s", "arg")
 	if buf.String() != "" {
-		t.Errorf("expected no output when verbose=false, got: %s", buf.String())
+		t.Errorf("expected no output at normal verbosity, got: %s", buf.String())
 	}
 
-	// Test verbose=true (should print)
-	r, w, _ = os.Pipe()
-	os.Stdout = w
-
-	verbose = true
-	PrintVerbose("test message %s", "arg")
-	w.Close()
-
+	// Test verbose level (should print)
 	buf.Reset()
-	buf.ReadFrom(r)
+	output.Level = output.VerbosityVerbose
+	PrintVerbose("test message %s", "arg")
 	expected := "test message arg\n"
 	if buf.String() != expected {
 		t.Errorf("expected %q, got %q", expected, buf.String())
@@ -205,38 +189,22 @@ func TestPrintVerbose(t *testing.T) {
 }
 
 func TestPrintInfo(t *testing.T) {
-	// Save original values
-	origQuiet := quiet
-	origStdout := os.Stdout
-	defer func() {
-		quiet = origQuiet
-		os.Stdout = origStdout
-	}()
-
-	// Test quiet=true (should not print)
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	quiet = true
-	PrintInfo("test message %s", "arg")
-	w.Close()
+	output.SaveForTest(t)
 
 	var buf bytes.Buffer
-	buf.ReadFrom(r)
+	output.Writer = &buf
+
+	// Test quiet level (should not print)
+	output.Level = output.VerbosityQuiet
+	PrintInfo("test message %s", "arg")
 	if buf.String() != "" {
-		t.Errorf("expected no output when quiet=true, got: %s", buf.String())
+		t.Errorf("expected no output at quiet verbosity, got: %s", buf.String())
 	}
 
-	// Test quiet=false (should print)
-	r, w, _ = os.Pipe()
-	os.Stdout = w
-
-	quiet = false
-	PrintInfo("test message %s", "arg")
-	w.Close()
-
+	// Test normal level (should print)
 	buf.Reset()
-	buf.ReadFrom(r)
+	output.Level = output.VerbosityNormal
+	PrintInfo("test message %s", "arg")
 	expected := "test message arg\n"
 	if buf.String() != expected {
 		t.Errorf("expected %q, got %q", expected, buf.String())
@@ -244,19 +212,13 @@ func TestPrintInfo(t *testing.T) {
 }
 
 func TestPrintError(t *testing.T) {
-	// Save original stderr
-	origStderr := os.Stderr
-	defer func() { os.Stderr = origStderr }()
-
-	r, w, _ := os.Pipe()
-	os.Stderr = w
-
-	PrintError("test error %s", "message")
-	w.Close()
+	output.SaveForTest(t)
 
 	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	expected := "Error: test error message\n"
+	output.ErrWriter = &buf
+
+	PrintError("test error %s", "message")
+	expected := "✗ test error message\n"
 	if buf.String() != expected {
 		t.Errorf("expected %q, got %q", expected, buf.String())
 	}

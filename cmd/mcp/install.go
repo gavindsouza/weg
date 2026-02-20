@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	internalconfig "github.com/gavindsouza/weg/internal/config"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -55,7 +56,7 @@ func runInstall(cmd *cobra.Command, args []string) error {
 
 	// Check if weg entry already exists
 	if _, exists := servers["weg"]; exists && !installForce {
-		fmt.Println("weg entry already exists in .mcp.json (use --force to overwrite)")
+		output.Print("weg entry already exists in .mcp.json (use --force to overwrite)")
 		return nil
 	}
 
@@ -76,6 +77,6 @@ func runInstall(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to write .mcp.json: %w", err)
 	}
 
-	fmt.Printf("Updated %s with weg MCP server\n", mcpPath)
+	output.Printf("Updated %s with weg MCP server", mcpPath)
 	return nil
 }

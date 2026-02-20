@@ -4,8 +4,8 @@ Copyright © 2025 Gavin <me@gavv.in>
 package remote
 
 import (
-	"fmt"
-
+	wegerrors "github.com/gavindsouza/weg/internal/errors"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/remote"
 	"github.com/spf13/cobra"
 )
@@ -27,54 +27,54 @@ Shows:
 func runInfo(cobraCmd *cobra.Command, args []string) error {
 	// Check if we're in a remote site directory
 	if !remote.IsRemoteSite(".") {
-		return fmt.Errorf("not a remote site clone (no .weg/site.toml found)")
+		return wegerrors.NotFound("remote clone", ".weg/site.toml")
 	}
 
 	// Load config
 	config, err := remote.LoadSiteConfig(".")
 	if err != nil {
-		return fmt.Errorf("failed to load config: %w", err)
+		return wegerrors.Config("site.toml", "read", err)
 	}
 
 	// Site info
-	fmt.Println("Site Information")
-	fmt.Println("================")
-	fmt.Printf("  URL:      %s\n", config.Site.URL)
-	fmt.Printf("  Name:     %s\n", config.Site.Name)
-	fmt.Printf("  Cloned:   %s\n", config.Site.ClonedAt.Format("2006-01-02 15:04:05"))
-	fmt.Printf("  Frappe:   %s\n", config.Site.Frappe.Version)
-	fmt.Println()
+	output.Print("Site Information")
+	output.Print("================")
+	output.Printf("  URL:      %s", config.Site.URL)
+	output.Printf("  Name:     %s", config.Site.Name)
+	output.Printf("  Cloned:   %s", config.Site.ClonedAt.Format("2006-01-02 15:04:05"))
+	output.Printf("  Frappe:   %s", config.Site.Frappe.Version)
+	output.Print("")
 
 	// Apps
 	if len(config.Site.Apps) > 0 {
-		fmt.Println("Installed Apps")
-		fmt.Println("--------------")
+		output.Print("Installed Apps")
+		output.Print("--------------")
 		for name, app := range config.Site.Apps {
-			fmt.Printf("  %-20s %s\n", name, app.Version)
+			output.Printf("  %-20s %s", name, app.Version)
 		}
-		fmt.Println()
+		output.Print("")
 	}
 
 	// Modules
 	if len(config.Modules) > 0 {
-		fmt.Println("Modules")
-		fmt.Println("-------")
+		output.Print("Modules")
+		output.Print("-------")
 		for name, mod := range config.Modules {
 			syncStatus := "+"
 			if !mod.Sync {
 				syncStatus = "-"
 			}
-			fmt.Printf("  %s %-20s (app: %s)\n", syncStatus, name, mod.App)
+			output.Printf("  %s %-20s (app: %s)", syncStatus, name, mod.App)
 		}
-		fmt.Println()
+		output.Print("")
 	}
 
 	// Sync settings
-	fmt.Println("Sync Configuration")
-	fmt.Println("------------------")
-	fmt.Printf("  Last sync: %s\n", config.Sync.LastSync.Format("2006-01-02 15:04:05"))
-	fmt.Println()
-	fmt.Println("  Entity types:")
+	output.Print("Sync Configuration")
+	output.Print("------------------")
+	output.Printf("  Last sync: %s", config.Sync.LastSync.Format("2006-01-02 15:04:05"))
+	output.Print("")
+	output.Print("  Entity types:")
 	printEntityStatus("    DocTypes", config.Sync.Entities.DocType)
 	printEntityStatus("    Custom Fields", config.Sync.Entities.CustomField)
 	printEntityStatus("    Property Setters", config.Sync.Entities.PropertySetter)
@@ -88,10 +88,10 @@ func runInfo(cobraCmd *cobra.Command, args []string) error {
 
 	// Exclusions
 	if len(config.Sync.Exclude.Patterns) > 0 {
-		fmt.Println()
-		fmt.Println("  Exclusion patterns:")
+		output.Print("")
+		output.Print("  Exclusion patterns:")
 		for _, p := range config.Sync.Exclude.Patterns {
-			fmt.Printf("    - %s\n", p)
+			output.Printf("    - %s", p)
 		}
 	}
 
@@ -103,5 +103,5 @@ func printEntityStatus(name string, enabled bool) {
 	if !enabled {
 		status = "-"
 	}
-	fmt.Printf("  %s %s\n", status, name)
+	output.Printf("  %s %s", status, name)
 }

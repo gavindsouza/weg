@@ -67,7 +67,7 @@ func runConsole(cmd *cobra.Command, args []string) error {
 	}
 
 	if site == "" {
-		return fmt.Errorf("no site specified and no default site found")
+		return wegerrors.Usage("no site specified and no default site found")
 	}
 
 	return runBenchHelper(benchPath, []string{"frappe", "--site", site, "db-console"})

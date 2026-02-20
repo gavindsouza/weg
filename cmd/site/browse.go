@@ -10,6 +10,7 @@ import (
 	"github.com/gavindsouza/weg/internal/completion"
 	"github.com/gavindsouza/weg/internal/config"
 	wegerrors "github.com/gavindsouza/weg/internal/errors"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/runtime"
 	"github.com/spf13/cobra"
 )
@@ -63,7 +64,7 @@ func runBrowse(cmd *cobra.Command, args []string) error {
 	} else {
 		site = getDefaultSiteForBrowse(benchPath)
 		if site == "" {
-			return fmt.Errorf("no site found. Create one with 'weg sync'")
+			return wegerrors.Usage("no site found. Create one with 'weg sync'")
 		}
 	}
 
@@ -96,7 +97,7 @@ func runBrowse(cmd *cobra.Command, args []string) error {
 	}
 
 	// Also print the URL for convenience
-	fmt.Printf("Site URL: http://%s:%d\n", site, rtConfig.Ports.Web)
+	output.Printf("Site URL: http://%s:%d", site, rtConfig.Ports.Web)
 
 	return nil
 }

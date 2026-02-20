@@ -73,12 +73,12 @@ func runInstall(cmd *cobra.Command, args []string) error {
 
 	// Check if site exists
 	if _, err := os.Stat(sitePath); os.IsNotExist(err) {
-		return fmt.Errorf("site %s does not exist", siteName)
+		return wegerrors.NotFound("site", siteName)
 	}
 
 	// Check if app is installed
 	if _, err := os.Stat(appPath); os.IsNotExist(err) {
-		return fmt.Errorf("app %s is not installed. Run 'weg app get %s' first", appName, appName)
+		return wegerrors.NotFound("app", appName)
 	}
 
 	output.Infof("Installing %s on %s...", appName, siteName)

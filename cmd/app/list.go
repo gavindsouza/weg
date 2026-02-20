@@ -48,7 +48,7 @@ func runList(cmd *cobra.Command, args []string) error {
 		appsDir = filepath.Join(benchPath, "apps")
 		benchConfig, err := config.ParseWegToml(absPath)
 		if err != nil {
-			return fmt.Errorf("failed to parse weg.toml: %w", err)
+			return wegerrors.Config("weg.toml", "parse", err)
 		}
 		configuredApps = benchConfig.Apps
 
@@ -58,7 +58,7 @@ func runList(cmd *cobra.Command, args []string) error {
 		// For app-centric, show the main app and dependencies
 		appConfig, err := config.ParsePyproject(absPath)
 		if err != nil {
-			return fmt.Errorf("failed to parse pyproject.toml: %w", err)
+			return wegerrors.Config("pyproject.toml", "parse", err)
 		}
 		configuredApps = make(map[string]config.AppSettings)
 		configuredApps["frappe"] = config.AppSettings{

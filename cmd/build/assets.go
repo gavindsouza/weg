@@ -55,7 +55,7 @@ func runAssets(cmd *cobra.Command, args []string) error {
 	}
 
 	if assetsHard {
-		fmt.Println("Cleaning old bundles...")
+		output.Print("Cleaning old bundles...")
 		cleanBundles(benchPath, site)
 	}
 
@@ -67,7 +67,7 @@ func runAssets(cmd *cobra.Command, args []string) error {
 		buildArgs = append(buildArgs, "--production")
 	}
 
-	output.Infof("Building assets for site %s...\n", site)
+	output.Infof("Building assets for site %s...", site)
 
 	// Run frappe build via bench_helper
 	sitesDir := filepath.Join(benchPath, "sites")
@@ -81,10 +81,10 @@ func runAssets(cmd *cobra.Command, args []string) error {
 	buildCmd.Stderr = os.Stderr
 
 	if err := buildCmd.Run(); err != nil {
-		return fmt.Errorf("build failed: %w", err)
+		return wegerrors.Operation("build", "", err)
 	}
 
-	fmt.Println("Build completed successfully")
+	output.Print("Build completed successfully")
 	return nil
 }
 
@@ -137,7 +137,7 @@ func resolveContext(siteName string) (string, string, error) {
 	}
 
 	if site == "" {
-		return "", "", fmt.Errorf("no site specified and no default site found")
+		return "", "", wegerrors.Usage("no site specified and no default site found")
 	}
 
 	return benchPath, site, nil

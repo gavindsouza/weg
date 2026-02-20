@@ -65,7 +65,7 @@ func runGet(cmd *cobra.Command, args []string) error {
 	}
 
 	if st.HasApp(appName) {
-		return fmt.Errorf("app %s is already installed", appName)
+		return wegerrors.Validation("app", fmt.Sprintf("%s is already installed", appName))
 	}
 
 	output.Infof("Installing %s...", appName)
@@ -89,7 +89,7 @@ func runGet(cmd *cobra.Command, args []string) error {
 	})
 
 	if err := st.Save(absPath); err != nil {
-		return fmt.Errorf("failed to save state: %w", err)
+		return wegerrors.State("save", err)
 	}
 
 	// Also update config file
@@ -134,7 +134,7 @@ func addAppToWegToml(path, name, url, branch string) error {
 	wegPath := filepath.Join(path, "weg.toml")
 	cfg, err := config.ParseWegToml(path)
 	if err != nil {
-		return fmt.Errorf("failed to read weg.toml: %w", err)
+		return wegerrors.Config("weg.toml", "read", err)
 	}
 
 	if cfg.Apps == nil {
@@ -152,7 +152,7 @@ func addAppToWegToml(path, name, url, branch string) error {
 	defer f.Close()
 
 	if err := toml.NewEncoder(f).Encode(cfg); err != nil {
-		return fmt.Errorf("failed to encode weg.toml: %w", err)
+		return wegerrors.Config("weg.toml", "write", err)
 	}
 
 	return nil

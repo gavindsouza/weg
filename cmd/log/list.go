@@ -1,12 +1,12 @@
 package log
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -36,40 +36,40 @@ func runList(cmd *cobra.Command, args []string) error {
 	siteLogs := filepath.Join(benchPath, "sites", site, "logs")
 	benchLogs := filepath.Join(benchPath, "logs")
 
-	fmt.Printf("Log files for %s:\n\n", site)
+	output.Printf("Log files for %s:\n", site)
 
 	// Site-specific logs
 	if entries, err := os.ReadDir(siteLogs); err == nil && len(entries) > 0 {
-		fmt.Printf("Site logs (%s):\n", siteLogs)
-		fmt.Printf("%-40s %10s %s\n", "FILE", "SIZE", "MODIFIED")
-		fmt.Println(strings.Repeat("-", 70))
+		output.Printf("Site logs (%s):", siteLogs)
+		output.Printf("%-40s %10s %s", "FILE", "SIZE", "MODIFIED")
+		output.Print(strings.Repeat("-", 70))
 		for _, e := range entries {
 			if strings.HasSuffix(e.Name(), ".log") {
 				info, err := e.Info()
 				if err != nil {
 					continue
 				}
-				fmt.Printf("%-40s %10s %s\n",
+				output.Printf("%-40s %10s %s",
 					e.Name(),
 					formatSize(info.Size()),
 					info.ModTime().Format(time.RFC822))
 			}
 		}
-		fmt.Println()
+		output.Print("")
 	}
 
 	// Bench logs
 	if entries, err := os.ReadDir(benchLogs); err == nil && len(entries) > 0 {
-		fmt.Printf("Bench logs (%s):\n", benchLogs)
-		fmt.Printf("%-40s %10s %s\n", "FILE", "SIZE", "MODIFIED")
-		fmt.Println(strings.Repeat("-", 70))
+		output.Printf("Bench logs (%s):", benchLogs)
+		output.Printf("%-40s %10s %s", "FILE", "SIZE", "MODIFIED")
+		output.Print(strings.Repeat("-", 70))
 		for _, e := range entries {
 			if strings.HasSuffix(e.Name(), ".log") {
 				info, err := e.Info()
 				if err != nil {
 					continue
 				}
-				fmt.Printf("%-40s %10s %s\n",
+				output.Printf("%-40s %10s %s",
 					e.Name(),
 					formatSize(info.Size()),
 					info.ModTime().Format(time.RFC822))

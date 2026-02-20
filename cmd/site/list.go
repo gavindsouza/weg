@@ -47,7 +47,7 @@ func runList(cmd *cobra.Command, args []string) error {
 		sitesDir = filepath.Join(benchPath, "sites")
 		benchConfig, err := config.ParseWegToml(absPath)
 		if err != nil {
-			return fmt.Errorf("failed to parse weg.toml: %w", err)
+			return wegerrors.Config("weg.toml", "parse", err)
 		}
 		configuredSites = benchConfig.Sites
 

@@ -10,6 +10,7 @@ import (
 	"github.com/gavindsouza/weg/internal/completion"
 	"github.com/gavindsouza/weg/internal/config"
 	wegerrors "github.com/gavindsouza/weg/internal/errors"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/state"
 	"github.com/spf13/cobra"
 )
@@ -89,7 +90,7 @@ func runHostsAdd(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(sites) == 0 {
-		return fmt.Errorf("no sites found")
+		return wegerrors.NotFound("sites", "")
 	}
 
 	// Read current hosts file
@@ -120,7 +121,7 @@ func runHostsAdd(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(toAdd) == 0 {
-		fmt.Println("All sites already in /etc/hosts")
+		output.Print("All sites already in /etc/hosts")
 		return nil
 	}
 
@@ -140,7 +141,7 @@ func runHostsAdd(cmd *cobra.Command, args []string) error {
 	}
 
 	for _, site := range toAdd {
-		fmt.Printf("Added: %s\n", site)
+		output.Printf("Added: %s", site)
 	}
 	return nil
 }
@@ -190,7 +191,7 @@ func runHostsRemove(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(removed) == 0 {
-		fmt.Println("No matching sites found in /etc/hosts")
+		output.Print("No matching sites found in /etc/hosts")
 		return nil
 	}
 
@@ -205,7 +206,7 @@ func runHostsRemove(cmd *cobra.Command, args []string) error {
 	}
 
 	for _, site := range removed {
-		fmt.Printf("Removed: %s\n", site)
+		output.Printf("Removed: %s", site)
 	}
 	return nil
 }
@@ -230,8 +231,8 @@ func runHostsList(cmd *cobra.Command, args []string) error {
 	}
 	defer file.Close()
 
-	fmt.Println("Site entries in /etc/hosts:")
-	fmt.Println()
+	output.Print("Site entries in /etc/hosts:")
+	output.Print("")
 
 	found := false
 	scanner := bufio.NewScanner(file)
@@ -243,7 +244,7 @@ func runHostsList(cmd *cobra.Command, args []string) error {
 			for _, host := range fields[1:] {
 				// Show if it's one of our sites or ends in .localhost
 				if sitesMap[host] || strings.HasSuffix(host, ".localhost") {
-					fmt.Printf("  %s -> %s\n", host, fields[0])
+					output.Printf("  %s -> %s", host, fields[0])
 					found = true
 				}
 			}
@@ -251,7 +252,7 @@ func runHostsList(cmd *cobra.Command, args []string) error {
 	}
 
 	if !found {
-		fmt.Println("  (no site entries found)")
+		output.Print("  (no site entries found)")
 	}
 
 	return nil

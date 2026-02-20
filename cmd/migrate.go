@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/gavindsouza/weg/internal/config"
+	"github.com/gavindsouza/weg/internal/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -34,7 +35,7 @@ func init() {
 func runMigrate(cmd *cobra.Command, args []string) error {
 	targetMode := strings.ToLower(args[0])
 	if targetMode != "app" && targetMode != "bench" {
-		return fmt.Errorf("invalid mode: %s (must be 'app' or 'bench')", targetMode)
+		return errors.Validation("mode", fmt.Sprintf("must be 'app' or 'bench', got %s", targetMode))
 	}
 
 	cwd, err := os.Getwd()
@@ -64,7 +65,7 @@ func migrateToench(cwd string, result *config.DetectionResult) error {
 	}
 
 	if result.Context != config.ContextWegApp {
-		return fmt.Errorf("can only migrate from app-centric mode. Current: %s", result.Context.String())
+		return errors.Usagef("can only migrate from app-centric mode. Current: %s", result.Context.String())
 	}
 
 	wegDir := filepath.Join(cwd, ".weg")
@@ -75,7 +76,7 @@ func migrateToench(cwd string, result *config.DetectionResult) error {
 	// Read current weg.toml
 	cfg, err := config.ParseWegToml(wegDir)
 	if err != nil {
-		return fmt.Errorf("failed to read config: %w", err)
+		return errors.Config("config", "read", err)
 	}
 
 	// Create new bench directory structure at current level
@@ -126,7 +127,7 @@ func migrateToench(cwd string, result *config.DetectionResult) error {
 
 	// 6. Write weg.toml to current directory
 	if err := writeWegToml(filepath.Join(cwd, "weg.toml"), cfg); err != nil {
-		return fmt.Errorf("failed to write weg.toml: %w", err)
+		return errors.Config("weg.toml", "write", err)
 	}
 
 	// 7. Move devbox files
@@ -185,7 +186,7 @@ func migrateToApp(cwd string, result *config.DetectionResult) error {
 	}
 
 	if result.Context != config.ContextWegBench {
-		return fmt.Errorf("can only migrate from bench-centric mode. Current: %s", result.Context.String())
+		return errors.Usagef("can only migrate from bench-centric mode. Current: %s", result.Context.String())
 	}
 
 	PrintInfo("Migrating to app-centric mode...")
@@ -195,7 +196,7 @@ func migrateToApp(cwd string, result *config.DetectionResult) error {
 	// Find the primary app (non-frappe, local or first custom app)
 	cfg, err := config.ParseWegToml(cwd)
 	if err != nil {
-		return fmt.Errorf("failed to read config: %w", err)
+		return errors.Config("config", "read", err)
 	}
 
 	var primaryApp string
@@ -268,7 +269,7 @@ func migrateToApp(cwd string, result *config.DetectionResult) error {
 
 	// Write weg.toml to .weg
 	if err := writeWegToml(filepath.Join(wegDir, "weg.toml"), cfg); err != nil {
-		return fmt.Errorf("failed to write weg.toml: %w", err)
+		return errors.Config("weg.toml", "write", err)
 	}
 
 	// Remove old weg.toml from bench root

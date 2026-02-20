@@ -10,6 +10,7 @@ import (
 	"os"
 	"strings"
 
+	wegerrors "github.com/gavindsouza/weg/internal/errors"
 	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/remote"
 	"github.com/spf13/cobra"
@@ -81,12 +82,12 @@ func runLogin(cobraCmd *cobra.Command, args []string) error {
 
 	// Interactive prompt if needed
 	if apiKey == "" || apiSecret == "" {
-		fmt.Println("Enter API credentials for", siteHost)
-		fmt.Println()
-		fmt.Println("To create API credentials on your Frappe site:")
-		fmt.Println("  1. Go to User Settings > API Access")
-		fmt.Println("  2. Generate a new API Key + Secret")
-		fmt.Println()
+		output.Printf("Enter API credentials for %v", siteHost)
+		output.Print("")
+		output.Print("To create API credentials on your Frappe site:")
+		output.Print("  1. Go to User Settings > API Access")
+		output.Print("  2. Generate a new API Key + Secret")
+		output.Print("")
 
 		reader := bufio.NewReader(os.Stdin)
 
@@ -104,7 +105,7 @@ func runLogin(cobraCmd *cobra.Command, args []string) error {
 	}
 
 	if apiKey == "" || apiSecret == "" {
-		return fmt.Errorf("API key and secret are required")
+		return wegerrors.Validation("credentials", "API key and secret are required")
 	}
 
 	// Test connection
@@ -113,20 +114,20 @@ func runLogin(cobraCmd *cobra.Command, args []string) error {
 	if err := client.Ping(); err != nil {
 		return fmt.Errorf("failed to connect: %w", err)
 	}
-	fmt.Println("Connected")
+	output.Print("Connected")
 
 	// Save credentials
 	if err := remote.SaveGlobalCredentials(siteHost, &remote.CredentialAuth{
 		APIKey:    apiKey,
 		APISecret: apiSecret,
 	}); err != nil {
-		return fmt.Errorf("failed to save credentials: %w", err)
+		return wegerrors.Config("credentials", "write", err)
 	}
 
-	fmt.Printf("Credentials saved for %s\n", siteHost)
-	fmt.Println()
-	fmt.Println("You can now clone this site without entering credentials:")
-	fmt.Printf("  weg remote clone %s\n", siteURL)
+	output.Printf("Credentials saved for %s", siteHost)
+	output.Print("")
+	output.Print("You can now clone this site without entering credentials:")
+	output.Printf("  weg remote clone %s", siteURL)
 
 	return nil
 }

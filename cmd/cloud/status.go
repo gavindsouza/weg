@@ -72,42 +72,42 @@ func showAccountOverview(client *cloud.Client) error {
 	}
 
 	if user.Name != "" {
-		fmt.Printf("Account: %s (%s)\n", user.Name, user.Email)
+		output.Printf("Account: %s (%s)", user.Name, user.Email)
 	} else {
-		fmt.Printf("Account: %s\n", user.Email)
+		output.Printf("Account: %s", user.Email)
 	}
 	if user.Team != "" {
-		fmt.Printf("Team: %s\n", user.Team)
+		output.Printf("Team: %s", user.Team)
 	}
-	fmt.Println()
+	output.Print("")
 
 	// Get benches
 	benches, err := client.ListBenches("")
 	if err == nil && len(benches) > 0 {
-		fmt.Printf("Benches (%d):\n", len(benches))
+		output.Printf("Benches (%d):", len(benches))
 		t := output.NewTable("Name", "Version", "Sites", "Apps", "Status")
 		for _, b := range benches {
 			t.Row(b.Name, b.FrappeVersion, b.SiteCount, b.AppCount, b.Status)
 		}
 		t.Flush()
-		fmt.Println()
+		output.Print("")
 	}
 
 	// Get sites
 	sites, err := client.ListSites("")
 	if err == nil && len(sites) > 0 {
-		fmt.Printf("Sites (%d):\n", len(sites))
+		output.Printf("Sites (%d):", len(sites))
 		t := output.NewTable("Name", "Status", "Plan", "Region")
 		for _, s := range sites {
 			t.Row(s.Name, s.Status, s.Plan, s.Region)
 		}
 		t.Flush()
-		fmt.Println()
+		output.Print("")
 	}
 
 	if (benches == nil || len(benches) == 0) && (sites == nil || len(sites) == 0) {
-		fmt.Println("No benches or sites found.")
-		fmt.Println("\nYou may only have marketplace apps. Use 'weg cloud mp' to check.")
+		output.Print("No benches or sites found.")
+		output.Print("\nYou may only have marketplace apps. Use 'weg cloud mp' to check.")
 	}
 
 	return nil
@@ -119,23 +119,23 @@ func showSiteStatus(client *cloud.Client, siteName string) error {
 		return fmt.Errorf("failed to get site: %w", err)
 	}
 
-	fmt.Printf("Site: %s\n", site.Name)
-	fmt.Printf("Status: %s\n", site.Status)
+	output.Printf("Site: %s", site.Name)
+	output.Printf("Status: %s", site.Status)
 	if site.BenchTitle != "" {
-		fmt.Printf("Bench: %s\n", site.BenchTitle)
+		output.Printf("Bench: %s", site.BenchTitle)
 	}
 	if site.FrappeVersion != "" {
-		fmt.Printf("Frappe: %s\n", site.FrappeVersion)
+		output.Printf("Frappe: %s", site.FrappeVersion)
 	}
-	fmt.Printf("Created: %s\n", site.CreatedAt)
+	output.Printf("Created: %s", site.CreatedAt)
 
 	if site.UpdateAvailable {
-		fmt.Println("\n[!] Updates available")
+		output.Print("\n[!] Updates available")
 	}
 
 	// Show installed apps
 	if len(site.InstalledApps) > 0 {
-		fmt.Println("\nInstalled Apps:")
+		output.Print("\nInstalled Apps:")
 		t := output.NewTable("App", "Branch", "Commit")
 		for _, app := range site.InstalledApps {
 			hash := app.Hash
@@ -150,16 +150,16 @@ func showSiteStatus(client *cloud.Client, siteName string) error {
 	// Show running jobs
 	runningJobs, err := client.GetRunningJobs(siteName)
 	if err == nil && len(runningJobs) > 0 {
-		fmt.Println("\nRunning Jobs:")
+		output.Print("\nRunning Jobs:")
 		for _, job := range runningJobs {
-			fmt.Printf("  - %s (%s) started %s\n", job.JobType, job.Name, job.Start)
+			output.Printf("  - %s (%s) started %s", job.JobType, job.Name, job.Start)
 		}
 	}
 
 	// Show recent jobs
 	recentJobs, err := client.GetSiteJobs(siteName, 5)
 	if err == nil && len(recentJobs) > 0 {
-		fmt.Println("\nRecent Jobs:")
+		output.Print("\nRecent Jobs:")
 		t := output.NewTable("Type", "Status", "Duration", "Started")
 		for _, job := range recentJobs {
 			t.Row(job.JobType, job.Status, job.Duration, job.Creation)
@@ -177,11 +177,11 @@ func showBenchStatus(client *cloud.Client, benchName string) error {
 		return fmt.Errorf("failed to get bench info: %w", err)
 	}
 
-	fmt.Printf("Bench: %s\n", benchName)
-	fmt.Println("\nRecent Jobs:")
+	output.Printf("Bench: %s", benchName)
+	output.Print("\nRecent Jobs:")
 
 	if len(jobs) == 0 {
-		fmt.Println("  No recent jobs")
+		output.Print("  No recent jobs")
 		return nil
 	}
 
@@ -210,26 +210,26 @@ func trackJob(client *cloud.Client, jobID string, watch bool) error {
 			fmt.Print("\033[H\033[2J")
 		}
 
-		fmt.Printf("Job: %s\n", job.Name)
-		fmt.Printf("Type: %s\n", job.JobType)
-		fmt.Printf("Status: %s\n", job.Status)
+		output.Printf("Job: %s", job.Name)
+		output.Printf("Type: %s", job.JobType)
+		output.Printf("Status: %s", job.Status)
 		if job.Site != "" {
-			fmt.Printf("Site: %s\n", job.Site)
+			output.Printf("Site: %s", job.Site)
 		}
-		fmt.Printf("Started: %s\n", job.Start)
+		output.Printf("Started: %s", job.Start)
 
 		if job.Status == "Success" || job.Status == "Failure" {
 			if job.End != "" {
-				fmt.Printf("Ended: %s\n", job.End)
+				output.Printf("Ended: %s", job.End)
 			}
 			if job.Duration != "" {
-				fmt.Printf("Duration: %s\n", job.Duration)
+				output.Printf("Duration: %s", job.Duration)
 			}
 			return nil
 		}
 
 		if !watch {
-			fmt.Println("\nJob is still running. Use --watch to follow progress.")
+			output.Print("\nJob is still running. Use --watch to follow progress.")
 			return nil
 		}
 

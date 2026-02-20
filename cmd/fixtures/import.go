@@ -8,6 +8,7 @@ import (
 
 	"github.com/gavindsouza/weg/internal/api"
 	"github.com/gavindsouza/weg/internal/completion"
+	wegerrors "github.com/gavindsouza/weg/internal/errors"
 	"github.com/gavindsouza/weg/internal/output"
 	"github.com/spf13/cobra"
 )
@@ -45,7 +46,7 @@ func runImport(cmd *cobra.Command, args []string) error {
 	// Verify app exists
 	appPath := filepath.Join(benchPath, "apps", appName)
 	if _, err := os.Stat(appPath); os.IsNotExist(err) {
-		return fmt.Errorf("app %s not found", appName)
+		return wegerrors.NotFound("app", appName)
 	}
 
 	// Check if fixtures directory exists
@@ -86,21 +87,21 @@ finally:
 
 	if !result.Success {
 		if result.Traceback != "" {
-			fmt.Fprintf(os.Stderr, "%s\n", result.Traceback)
+			output.Errorf("%s", result.Traceback)
 		}
 		return fmt.Errorf("failed to import fixtures: %s", result.Error)
 	}
 
 	// List imported files
 	if entries, err := os.ReadDir(fixturesPath); err == nil && len(entries) > 0 {
-		fmt.Println("\nImported fixtures:")
+		output.Print("\nImported fixtures:")
 		for _, e := range entries {
 			if strings.HasSuffix(e.Name(), ".json") {
-				fmt.Printf("  - %s\n", e.Name())
+				output.Printf("  - %s", e.Name())
 			}
 		}
 	}
 
-	fmt.Println("\nFixtures imported successfully")
+	output.Print("\nFixtures imported successfully")
 	return nil
 }

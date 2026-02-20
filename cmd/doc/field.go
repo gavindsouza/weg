@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/gavindsouza/weg/internal/api"
+	wegoutput "github.com/gavindsouza/weg/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -103,20 +104,20 @@ finally:
 
 	switch v := result.Data.(type) {
 	case nil:
-		fmt.Println("null")
+		wegoutput.Print("null")
 	case string:
-		fmt.Println(v)
+		wegoutput.Print(v)
 	case float64:
 		if v == float64(int(v)) {
-			fmt.Printf("%.0f\n", v)
+			wegoutput.Printf("%.0f", v)
 		} else {
-			fmt.Printf("%v\n", v)
+			wegoutput.Printf("%v", v)
 		}
 	case bool:
-		fmt.Printf("%v\n", v)
+		wegoutput.Printf("%v", v)
 	default:
 		output, _ := json.MarshalIndent(v, "", "  ")
-		fmt.Println(string(output))
+		wegoutput.Print(string(output))
 	}
 
 	return nil
@@ -179,6 +180,6 @@ finally:
 		return fmt.Errorf("failed to set value: %s", result.Error)
 	}
 
-	fmt.Printf("Set %s.%s = %s\n", doctype, field, valueStr)
+	wegoutput.Printf("Set %s.%s = %s", doctype, field, valueStr)
 	return nil
 }

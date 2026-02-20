@@ -59,7 +59,7 @@ func runSwitch(cmd *cobra.Command, args []string) error {
 
 	// Check if app is installed
 	if !apps.IsGitRepo(appPath) {
-		return fmt.Errorf("app %s is not installed", appName)
+		return wegerrors.NotFound("app", appName)
 	}
 
 	// Get current branch
@@ -69,7 +69,7 @@ func runSwitch(cmd *cobra.Command, args []string) error {
 	}
 
 	if currentBranch == branch {
-		fmt.Printf("%s is already on branch %s\n", appName, branch)
+		output.Printf("%s is already on branch %s", appName, branch)
 		return nil
 	}
 
@@ -87,9 +87,9 @@ func runSwitch(cmd *cobra.Command, args []string) error {
 		Verbose:   true,
 	}
 
-	fmt.Println("Reinstalling dependencies...")
+	output.Print("Reinstalling dependencies...")
 	if err := apps.InstallPythonDeps(appPath, opts); err != nil {
-		fmt.Printf("Warning: failed to install Python deps: %v\n", err)
+		output.Warningf("failed to install Python deps: %v", err)
 	}
 	if err := apps.InstallNodeDeps(appPath, opts); err != nil {
 		// Node deps optional
@@ -110,7 +110,7 @@ func runSwitch(cmd *cobra.Command, args []string) error {
 	}
 
 	output.Successf("Successfully switched %s to %s", appName, branch)
-	fmt.Println("Note: Remember to update weg.toml and run 'weg build' if needed")
+	output.Print("Note: Remember to update weg.toml and run 'weg build' if needed")
 
 	return nil
 }

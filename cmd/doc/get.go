@@ -11,6 +11,7 @@ import (
 	"github.com/gavindsouza/weg/internal/completion"
 	"github.com/gavindsouza/weg/internal/config"
 	wegerrors "github.com/gavindsouza/weg/internal/errors"
+	wegoutput "github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/state"
 	"github.com/spf13/cobra"
 )
@@ -79,7 +80,7 @@ finally:
 	}
 
 	output, _ := json.MarshalIndent(result.Data, "", "  ")
-	fmt.Println(string(output))
+	wegoutput.Print(string(output))
 	return nil
 }
 
@@ -120,7 +121,7 @@ func resolveContext(siteName string) (string, string, error) {
 	}
 
 	if site == "" {
-		return "", "", fmt.Errorf("no site specified and no default site found")
+		return "", "", wegerrors.Usage("no site specified and no default site found")
 	}
 
 	return benchPath, site, nil

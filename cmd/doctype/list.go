@@ -10,6 +10,7 @@ import (
 	"github.com/gavindsouza/weg/internal/completion"
 	"github.com/gavindsouza/weg/internal/config"
 	wegerrors "github.com/gavindsouza/weg/internal/errors"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/state"
 	"github.com/spf13/cobra"
 )
@@ -117,12 +118,12 @@ finally:
 
 	doctypes, ok := result.Data.([]any)
 	if !ok || len(doctypes) == 0 {
-		fmt.Println("No DocTypes found")
+		output.Print("No DocTypes found")
 		return nil
 	}
 
-	fmt.Printf("%-40s %s\n", "DOCTYPE", "MODULE")
-	fmt.Println(strings.Repeat("-", 60))
+	output.Printf("%-40s %s", "DOCTYPE", "MODULE")
+	output.Print(strings.Repeat("-", 60))
 	for _, dt := range doctypes {
 		d := dt.(map[string]any)
 		name := d["name"].(string)
@@ -130,7 +131,7 @@ finally:
 		if m, ok := d["module"].(string); ok {
 			module = m
 		}
-		fmt.Printf("%-40s %s\n", name, module)
+		output.Printf("%-40s %s", name, module)
 	}
 
 	return nil
@@ -172,7 +173,7 @@ func resolveContext(siteName string) (string, string, error) {
 	}
 
 	if site == "" {
-		return "", "", fmt.Errorf("no site specified and no default site found")
+		return "", "", wegerrors.Usage("no site specified and no default site found")
 	}
 
 	return benchPath, site, nil

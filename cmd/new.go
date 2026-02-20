@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/gavindsouza/weg/internal/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -80,15 +81,15 @@ func runNew(cmd *cobra.Command, args []string) error {
 	if info, err := os.Stat(targetPath); err == nil {
 		dirExists = true
 		if !info.IsDir() {
-			return fmt.Errorf("path exists but is not a directory: %s", targetPath)
+			return errors.Validation("path", fmt.Sprintf("%s exists but is not a directory", targetPath))
 		}
 
 		// Check for existing app structure
 		if _, err := os.Stat(filepath.Join(targetPath, moduleName, "hooks.py")); err == nil {
-			return fmt.Errorf("app already exists at %s", targetPath)
+			return errors.Validation("app", fmt.Sprintf("already exists at %s", targetPath))
 		}
 		if _, err := os.Stat(filepath.Join(targetPath, "hooks.py")); err == nil {
-			return fmt.Errorf("app already exists at %s (flat structure)", targetPath)
+			return errors.Validation("app", fmt.Sprintf("already exists at %s (flat structure)", targetPath))
 		}
 	}
 
@@ -143,7 +144,7 @@ func runNew(cmd *cobra.Command, args []string) error {
 
 	// Validate version
 	if version != "14" && version != "15" && version != "16" {
-		return fmt.Errorf("invalid version: %s (must be 14, 15, or 16)", version)
+		return errors.Validation("version", fmt.Sprintf("must be 14, 15, or 16, got %s", version))
 	}
 
 	// Database

@@ -94,19 +94,19 @@ func runMigrate(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(sites) == 0 {
-		return fmt.Errorf("no site specified and no default site found")
+		return wegerrors.Usage("no site specified and no default site found")
 	}
 
 	// Run migrations for each site
 	for _, site := range sites {
-		output.Infof("Running migrations for %s...\n", site)
+		output.Infof("Running migrations for %s...", site)
 
 		cmdArgs := []string{"frappe", "--site", site, "migrate"}
 		if err := runBench(benchPath, cmdArgs); err != nil {
-			return fmt.Errorf("migration failed for %s: %w", site, err)
+			return wegerrors.Operation("migration", site, err)
 		}
 
-		fmt.Printf("Migrations complete for %s\n", site)
+		output.Printf("Migrations complete for %s", site)
 	}
 
 	return nil

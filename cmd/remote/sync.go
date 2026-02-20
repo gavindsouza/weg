@@ -5,11 +5,11 @@ package remote
 
 import (
 	"fmt"
-	"os"
 	"os/exec"
 	"strings"
 	"time"
 
+	wegerrors "github.com/gavindsouza/weg/internal/errors"
 	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/remote"
 	"github.com/spf13/cobra"
@@ -48,18 +48,18 @@ func init() {
 func runSync(cobraCmd *cobra.Command, args []string) error {
 	// Check if we're in a remote site directory
 	if !remote.IsRemoteSite(".") {
-		return fmt.Errorf("not a remote site clone (no .weg/site.toml found)")
+		return wegerrors.NotFound("remote clone", ".weg/site.toml")
 	}
 
 	// Load config and credentials
 	config, err := remote.LoadSiteConfig(".")
 	if err != nil {
-		return fmt.Errorf("failed to load config: %w", err)
+		return wegerrors.Config("site.toml", "read", err)
 	}
 
 	creds, err := remote.LoadCredentials(".")
 	if err != nil {
-		return fmt.Errorf("failed to load credentials: %w", err)
+		return wegerrors.Config("credentials", "read", err)
 	}
 
 	// Check for local changes
@@ -68,12 +68,12 @@ func runSync(cobraCmd *cobra.Command, args []string) error {
 	hasLocalChanges := len(strings.TrimSpace(string(statusOutput))) > 0
 
 	if hasLocalChanges && syncMessage == "" && !syncDryRun {
-		return fmt.Errorf("local changes detected; provide a commit message with -m \"message\"")
+		return wegerrors.Validation("changes", "local changes detected; provide a commit message with -m \"message\"")
 	}
 
 	if syncDryRun {
-		fmt.Println("Dry run mode - no changes will be made")
-		fmt.Println()
+		output.Print("Dry run mode - no changes will be made")
+		output.Print("")
 	}
 
 	// Connect
@@ -82,11 +82,11 @@ func runSync(cobraCmd *cobra.Command, args []string) error {
 	if err := client.Ping(); err != nil {
 		return fmt.Errorf("failed to connect: %w", err)
 	}
-	fmt.Println("Connected")
+	output.Print("Connected")
 
 	// Step 1: Commit local changes FIRST (before pull overwrites them)
 	if hasLocalChanges {
-		fmt.Println("\n[1/3] Committing local changes...")
+		output.Print("\n[1/3] Committing local changes...")
 
 		if !syncDryRun {
 			// Stage all changes
@@ -105,22 +105,22 @@ func runSync(cobraCmd *cobra.Command, args []string) error {
 			if err := gitCommit.Run(); err != nil {
 				// Might fail if nothing to commit, that's ok
 			} else {
-				fmt.Printf("  Committed: %s\n", commitMsg)
+				output.Printf("  Committed: %s", commitMsg)
 			}
 		} else {
-			fmt.Printf("  Would commit: %s\n", syncMessage)
+			output.Printf("  Would commit: %s", syncMessage)
 		}
 	} else {
-		fmt.Println("\n[1/3] No local changes to commit")
+		output.Print("\n[1/3] No local changes to commit")
 	}
 
 	// Step 2: Push local changes to remote
-	fmt.Println("\n[2/3] Pushing to remote...")
+	output.Print("\n[2/3] Pushing to remote...")
 
 	var pushFailed int
 	if syncDryRun {
 		entities, _ := findLocalEntities(".")
-		fmt.Printf("  Would push %d entities\n", len(entities))
+		output.Printf("  Would push %d entities", len(entities))
 	} else {
 		entities, err := findLocalEntities(".")
 		if err != nil {
@@ -130,17 +130,17 @@ func runSync(cobraCmd *cobra.Command, args []string) error {
 		pushed := 0
 		for _, e := range entities {
 			if err := pushEntity(client, e); err != nil {
-				fmt.Fprintf(os.Stderr, "Error: Failed: %s - %v\n", e.name, err)
+				output.Errorf("Failed: %s - %v", e.name, err)
 				pushFailed++
 			} else {
 				pushed++
 			}
 		}
-		fmt.Printf("  Pushed: %d, Failed: %d\n", pushed, pushFailed)
+		output.Printf("  Pushed: %d, Failed: %d", pushed, pushFailed)
 	}
 
 	// Step 3: Pull remote changes (to get any other changes from remote)
-	fmt.Println("\n[3/3] Pulling remote changes...")
+	output.Print("\n[3/3] Pulling remote changes...")
 	fetcher := remote.NewFetcher(client, config)
 	result, err := fetcher.FetchAll()
 	if err != nil {
@@ -150,7 +150,7 @@ func runSync(cobraCmd *cobra.Command, args []string) error {
 	if !syncDryRun {
 		for _, entity := range result.Entities {
 			if err := remote.WriteEntity(".", entity); err != nil {
-				fmt.Fprintf(os.Stderr, "Error: Failed to write %s: %v\n", entity.Name, err)
+				output.Errorf("Failed to write %s: %v", entity.Name, err)
 			}
 		}
 
@@ -167,18 +167,18 @@ func runSync(cobraCmd *cobra.Command, args []string) error {
 		// Update sync timestamp
 		config.Sync.LastSync = time.Now()
 		if err := config.Save("."); err != nil {
-			return fmt.Errorf("failed to save config: %w", err)
+			return wegerrors.Config("site.toml", "write", err)
 		}
 	}
-	fmt.Printf("  Fetched %d entities\n", len(result.Entities))
+	output.Printf("  Fetched %d entities", len(result.Entities))
 
-	fmt.Println()
+	output.Print("")
 
 	if pushFailed > 0 {
-		fmt.Printf("Sync completed with %d failures\n", pushFailed)
-		return fmt.Errorf("%d entities failed to sync", pushFailed)
+		output.Printf("Sync completed with %d failures", pushFailed)
+		return wegerrors.Operation("sync", fmt.Sprintf("%d entities failed", pushFailed), nil)
 	}
 
-	fmt.Println("Sync complete")
+	output.Print("Sync complete")
 	return nil
 }

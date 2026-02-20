@@ -102,13 +102,13 @@ func runRestore(cmd *cobra.Command, args []string) error {
 	}
 
 	if site == "" {
-		return fmt.Errorf("no site specified and no default site found")
+		return wegerrors.Usage("no site specified and no default site found")
 	}
 
 	// Load site config
 	siteConfig, err := loadSiteConfig(benchPath, site)
 	if err != nil {
-		return fmt.Errorf("failed to load site config: %w", err)
+		return wegerrors.Config("site config", "read", err)
 	}
 
 	// Check for devbox
@@ -123,7 +123,7 @@ func runRestore(cmd *cobra.Command, args []string) error {
 		output.Printf("Database: %s", siteConfig.DBName)
 		output.Print("")
 		if !prompt.ConfirmDanger("Continue with restore?") {
-			return fmt.Errorf("restore cancelled")
+			return wegerrors.Operation("restore", "cancelled", nil)
 		}
 	}
 

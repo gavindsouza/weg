@@ -8,6 +8,7 @@ import (
 	"github.com/gavindsouza/weg/internal/completion"
 	"github.com/gavindsouza/weg/internal/config"
 	wegerrors "github.com/gavindsouza/weg/internal/errors"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/state"
 	"github.com/spf13/cobra"
 )
@@ -55,7 +56,7 @@ func runUse(cmd *cobra.Command, args []string) error {
 
 	// Check if site exists
 	if _, err := os.Stat(sitePath); os.IsNotExist(err) {
-		return fmt.Errorf("site %s does not exist", siteName)
+		return wegerrors.NotFound("site", siteName)
 	}
 
 	// Update state
@@ -80,9 +81,9 @@ func runUse(cmd *cobra.Command, args []string) error {
 	// Also update currentsite.txt for bench compatibility
 	currentSitePath := filepath.Join(sitesDir, "currentsite.txt")
 	if err := os.WriteFile(currentSitePath, []byte(siteName), 0644); err != nil {
-		fmt.Printf("Warning: failed to update currentsite.txt: %v\n", err)
+		output.Warningf("failed to update currentsite.txt: %v", err)
 	}
 
-	fmt.Printf("Default site set to %s\n", siteName)
+	output.Printf("Default site set to %s", siteName)
 	return nil
 }

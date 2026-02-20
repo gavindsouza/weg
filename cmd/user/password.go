@@ -9,6 +9,8 @@ import (
 	"syscall"
 
 	"github.com/gavindsouza/weg/internal/api"
+	wegerrors "github.com/gavindsouza/weg/internal/errors"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
@@ -92,9 +94,9 @@ finally:
 		return fmt.Errorf("failed to set password: %s", result.Error)
 	}
 
-	fmt.Printf("Password updated for %s\n", email)
+	output.Printf("Password updated for %s", email)
 	if passwordLogout {
-		fmt.Println("All sessions have been logged out")
+		output.Print("All sessions have been logged out")
 	}
 
 	return nil
@@ -122,7 +124,7 @@ func promptPassword() (string, error) {
 	}
 
 	if string(password) != string(confirm) {
-		return "", fmt.Errorf("passwords do not match")
+		return "", wegerrors.Validation("password", "passwords do not match")
 	}
 
 	return string(password), nil

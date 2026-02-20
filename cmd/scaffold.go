@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 
 	"github.com/gavindsouza/weg/internal/config"
+	"github.com/gavindsouza/weg/internal/errors"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -59,7 +61,7 @@ func runScaffold(cmd *cobra.Command, args []string) error {
 	}
 
 	if result.Context != config.ContextWegApp && result.Context != config.ContextApp {
-		return fmt.Errorf("scaffold should be run from a Frappe app directory")
+		return errors.Usage("scaffold should be run from a Frappe app directory")
 	}
 
 	switch scaffoldType {
@@ -73,19 +75,19 @@ func runScaffold(cmd *cobra.Command, args []string) error {
 		}
 		return scaffoldPrecommit(absPath)
 	default:
-		return fmt.Errorf("unknown scaffold type: %s. Use 'ai', 'precommit', or 'all'", scaffoldType)
+		return errors.Validation("type", fmt.Sprintf("unknown scaffold type: %s. Use 'ai', 'precommit', or 'all'", scaffoldType))
 	}
 }
 
 func scaffoldAI(projectPath string) error {
-	fmt.Println("Scaffolding AI agent configuration...")
+	output.Print("Scaffolding AI agent configuration...")
 
 	// Create CLAUDE.md
 	claudePath := filepath.Join(projectPath, "CLAUDE.md")
 	if err := writeFileIfNotExists(claudePath, tmpl("claude.md")); err != nil {
 		return err
 	}
-	fmt.Printf("  Created %s\n", claudePath)
+	output.Printf("  Created %s", claudePath)
 
 	// Create .claude/commands directory
 	commandsDir := filepath.Join(projectPath, ".claude", "commands")
@@ -98,32 +100,32 @@ func scaffoldAI(projectPath string) error {
 	if err := writeFileIfNotExists(reviewPath, tmpl("frappe-review.md")); err != nil {
 		return err
 	}
-	fmt.Printf("  Created %s\n", reviewPath)
+	output.Printf("  Created %s", reviewPath)
 
-	fmt.Println("AI agent configuration complete!")
+	output.Print("AI agent configuration complete!")
 	return nil
 }
 
 func scaffoldPrecommit(projectPath string) error {
-	fmt.Println("Scaffolding pre-commit configuration...")
+	output.Print("Scaffolding pre-commit configuration...")
 
 	configPath := filepath.Join(projectPath, ".pre-commit-config.yaml")
 	if err := writeFileIfNotExists(configPath, tmpl("scaffold-precommit.yaml")); err != nil {
 		return err
 	}
-	fmt.Printf("  Created %s\n", configPath)
+	output.Printf("  Created %s", configPath)
 
-	fmt.Println("\nPre-commit configuration complete!")
-	fmt.Println("Run these commands to activate:")
-	fmt.Println("  pip install pre-commit")
-	fmt.Println("  pre-commit install")
+	output.Print("\nPre-commit configuration complete!")
+	output.Print("Run these commands to activate:")
+	output.Print("  pip install pre-commit")
+	output.Print("  pre-commit install")
 	return nil
 }
 
 func writeFileIfNotExists(path, content string) error {
 	if !scaffoldForce {
 		if _, err := os.Stat(path); err == nil {
-			fmt.Printf("  Skipping %s (already exists, use --force to overwrite)\n", path)
+			output.Printf("  Skipping %s (already exists, use --force to overwrite)", path)
 			return nil
 		}
 	}

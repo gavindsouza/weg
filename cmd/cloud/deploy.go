@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/gavindsouza/weg/internal/config"
+	wegerrors "github.com/gavindsouza/weg/internal/errors"
 	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/prompt"
 	"github.com/spf13/cobra"
@@ -55,7 +56,7 @@ func runDeploy(cmd *cobra.Command, args []string) error {
 	}
 
 	if result.Context != config.ContextWegApp && result.Context != config.ContextWegBench {
-		return fmt.Errorf("not in a weg-managed project")
+		return wegerrors.Validation("project", "not in a weg-managed project")
 	}
 
 	appName := result.AppName
@@ -69,16 +70,16 @@ func runDeploy(cmd *cobra.Command, args []string) error {
 		siteName = args[0]
 	} else {
 		// Try to get from config or prompt for site selection
-		fmt.Println("No site specified. Available sites:")
+		output.Print("No site specified. Available sites:")
 		sites, err := client.ListSites("")
 		if err != nil {
 			return fmt.Errorf("failed to list sites: %w", err)
 		}
 		if len(sites) == 0 {
-			return fmt.Errorf("no sites found; create a site first with 'weg cloud site create'")
+			return wegerrors.Usage("no sites found; create a site first with 'weg cloud site create'")
 		}
 		for i, site := range sites {
-			fmt.Printf("  [%d] %s\n", i+1, site.Name)
+			output.Printf("  [%d] %s", i+1, site.Name)
 		}
 
 		// Prompt for selection
@@ -97,27 +98,27 @@ func runDeploy(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	output.Infof("Deploying %s to %s...\n", appName, siteName)
+	output.Infof("Deploying %s to %s...", appName, siteName)
 
 	if deployDryRun {
-		fmt.Println("\nDry run - no changes applied")
+		output.Print("\nDry run - no changes applied")
 		return nil
 	}
 
 	// Confirm deployment
 	if !prompt.Confirm("Deploy %s to %s?", appName, siteName) {
-		fmt.Println("Deployment cancelled")
+		output.Print("Deployment cancelled")
 		return nil
 	}
 
 	// Trigger deployment
 	deploy, err := client.DeployToSite(siteName, appName)
 	if err != nil {
-		return fmt.Errorf("deployment failed: %w", err)
+		return wegerrors.Operation("deployment", "", err)
 	}
 
-	fmt.Printf("\nDeployment started: %s\n", deploy.ID)
-	fmt.Printf("Track progress: weg cloud status %s\n", deploy.ID)
+	output.Printf("\nDeployment started: %s", deploy.ID)
+	output.Printf("Track progress: weg cloud status %s", deploy.ID)
 
 	return nil
 }

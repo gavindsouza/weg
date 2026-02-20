@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"os"
 
+	wegerrors "github.com/gavindsouza/weg/internal/errors"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/workspace"
 	"github.com/spf13/cobra"
 )
@@ -49,7 +51,7 @@ func runExpand(cmd *cobra.Command, args []string) error {
 
 	// Check if we're in a weg clone
 	if _, err := os.Stat(".weg"); os.IsNotExist(err) {
-		return fmt.Errorf("not a weg remote clone (no .weg directory)")
+		return wegerrors.NotFound("remote clone", ".weg")
 	}
 
 	result, err := workspace.Expand(workspace.ExpandOptions{
@@ -64,28 +66,28 @@ func runExpand(cmd *cobra.Command, args []string) error {
 
 	// Print results
 	if len(result.Expanded) > 0 {
-		fmt.Printf("Expanded %d files:\n", len(result.Expanded))
+		output.Printf("Expanded %d files:", len(result.Expanded))
 		for _, f := range result.Expanded {
-			fmt.Printf("  + %s\n", f)
+			output.Printf("  + %s", f)
 		}
 	}
 
 	if len(result.Conflicts) > 0 {
-		fmt.Printf("\nConflicts (use --force to overwrite):\n")
+		output.Printf("\nConflicts (use --force to overwrite):")
 		for _, f := range result.Conflicts {
-			fmt.Printf("  ! %s\n", f)
+			output.Printf("  ! %s", f)
 		}
 	}
 
 	if len(result.Errors) > 0 {
-		fmt.Printf("\nErrors:\n")
+		output.Printf("\nErrors:")
 		for _, e := range result.Errors {
-			fmt.Printf("  x %s\n", e)
+			output.Printf("  x %s", e)
 		}
 	}
 
 	if len(result.Expanded) == 0 && len(result.Conflicts) == 0 {
-		fmt.Println("No code fields found to expand.")
+		output.Print("No code fields found to expand.")
 	}
 
 	return nil

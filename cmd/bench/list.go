@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/gavindsouza/weg/internal/config"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -124,16 +125,16 @@ func runList(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(uniqueBenches) == 0 {
-		fmt.Println("No weg-managed benches found.")
-		fmt.Println("\nCreate one with:")
-		fmt.Println("  weg create <name>     # Create traditional bench")
-		fmt.Println("  weg init              # Initialize in current directory")
+		output.Print("No weg-managed benches found.")
+		output.Print("\nCreate one with:")
+		output.Print("  weg create <name>     # Create traditional bench")
+		output.Print("  weg init              # Initialize in current directory")
 		return nil
 	}
 
 	// Print table
-	fmt.Println("NAME                 PATH                                      VERSION  DATABASE")
-	fmt.Println("───────────────────────────────────────────────────────────────────────────────")
+	output.Print("NAME                 PATH                                      VERSION  DATABASE")
+	output.Print("───────────────────────────────────────────────────────────────────────────────")
 
 	for _, b := range uniqueBenches {
 		name := b.Name
@@ -147,7 +148,7 @@ func runList(cmd *cobra.Command, args []string) error {
 			path = "..." + path[len(path)-37:]
 		}
 
-		fmt.Printf("%-20s %-41s %-8s %s\n", name, path, b.Version, b.Database)
+		output.Printf("%-20s %-41s %-8s %s", name, path, b.Version, b.Database)
 	}
 
 	return nil

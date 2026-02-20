@@ -7,6 +7,8 @@ import (
 
 	"github.com/gavindsouza/weg/internal/config"
 	"github.com/gavindsouza/weg/internal/container"
+	wegerrors "github.com/gavindsouza/weg/internal/errors"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -77,7 +79,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 			database = cfg.Frappe.Database
 		}
 	default:
-		return fmt.Errorf("not in a weg-managed project")
+		return wegerrors.Usage("not in a weg-managed project")
 	}
 
 	if database == "" {
@@ -105,16 +107,16 @@ func runInit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to write docker-compose.yml: %w", err)
 	}
 
-	fmt.Println("Generated docker-compose.yml")
-	fmt.Printf("  Mode: %s\n", initMode)
-	fmt.Printf("  Web port: %d\n", initWebPort)
+	output.Print("Generated docker-compose.yml")
+	output.Printf("  Mode: %s", initMode)
+	output.Printf("  Web port: %d", initWebPort)
 	if !initNoDb {
-		fmt.Printf("  Database: %s (port %d)\n", database, initDbPort)
+		output.Printf("  Database: %s (port %d)", database, initDbPort)
 	}
-	fmt.Println()
-	fmt.Println("Next steps:")
-	fmt.Println("  weg docker up       # Start containers")
-	fmt.Println("  weg docker logs     # View logs")
+	output.Print("")
+	output.Print("Next steps:")
+	output.Print("  weg docker up       # Start containers")
+	output.Print("  weg docker logs     # View logs")
 
 	return nil
 }

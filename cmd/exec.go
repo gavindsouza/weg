@@ -75,7 +75,7 @@ func runExec(cmd *cobra.Command, args []string) error {
 	// For other commands, run in the bench context
 	cmdPath, err := exec.LookPath(command)
 	if err != nil {
-		return fmt.Errorf("command not found: %s", command)
+		return errors.NotFound("command", command)
 	}
 
 	env := os.Environ()

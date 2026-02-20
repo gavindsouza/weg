@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"github.com/gavindsouza/weg/internal/api"
+	wegerrors "github.com/gavindsouza/weg/internal/errors"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -47,12 +49,12 @@ func runImport(cmd *cobra.Command, args []string) error {
 
 	var doc map[string]any
 	if err := json.Unmarshal(data, &doc); err != nil {
-		return fmt.Errorf("invalid JSON: %w", err)
+		return wegerrors.Validation("data", fmt.Sprintf("invalid JSON: %v", err))
 	}
 
 	doctype, ok := doc["doctype"].(string)
 	if !ok || doctype == "" {
-		return fmt.Errorf("JSON must contain a 'doctype' field")
+		return wegerrors.Validation("doctype", "JSON must contain a 'doctype' field")
 	}
 
 	benchPath, site, err := resolveContext(importSite)
@@ -118,7 +120,7 @@ finally:
 
 	if !result.Success {
 		if result.Traceback != "" {
-			fmt.Fprintf(os.Stderr, "%s\n", result.Traceback)
+			output.Errorf("%s", result.Traceback)
 		}
 		return fmt.Errorf("failed to import: %s", result.Error)
 	}
@@ -129,11 +131,11 @@ finally:
 		name := resultData["name"]
 		switch action {
 		case "inserted":
-			fmt.Printf("Inserted %s: %s\n", doctype, name)
+			output.Printf("Inserted %s: %s", doctype, name)
 		case "updated":
-			fmt.Printf("Updated %s: %s\n", doctype, name)
+			output.Printf("Updated %s: %s", doctype, name)
 		case "skipped":
-			fmt.Printf("Skipped %s: %s (already exists)\n", doctype, name)
+			output.Printf("Skipped %s: %s (already exists)", doctype, name)
 		}
 	}
 

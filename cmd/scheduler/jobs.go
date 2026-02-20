@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/gavindsouza/weg/internal/api"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -74,18 +75,18 @@ finally:
 
 	jobs, ok := result.Data.([]any)
 	if !ok {
-		fmt.Println("No pending jobs")
+		output.Print("No pending jobs")
 		return nil
 	}
 
 	if len(jobs) == 0 {
-		fmt.Println("No pending jobs")
+		output.Print("No pending jobs")
 		return nil
 	}
 
-	fmt.Printf("Pending jobs for %s:\n\n", site)
-	fmt.Printf("%-40s %-15s %-10s %s\n", "JOB NAME", "QUEUE", "STATUS", "CREATED")
-	fmt.Println("--------------------------------------------------------------------------------")
+	output.Printf("Pending jobs for %s:\n", site)
+	output.Printf("%-40s %-15s %-10s %s", "JOB NAME", "QUEUE", "STATUS", "CREATED")
+	output.Print("--------------------------------------------------------------------------------")
 
 	for _, job := range jobs {
 		j, ok := job.(map[string]any)
@@ -102,7 +103,7 @@ finally:
 			jobName = jobName[:35] + "..."
 		}
 
-		fmt.Printf("%-40s %-15s %-10s %s\n", jobName, queue, status, creation)
+		output.Printf("%-40s %-15s %-10s %s", jobName, queue, status, creation)
 	}
 
 	return nil

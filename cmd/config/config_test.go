@@ -164,19 +164,19 @@ func TestGetValueFromBenchConfig(t *testing.T) {
 			name:    "empty key",
 			parts:   []string{},
 			wantErr: true,
-			errMsg:  "empty key",
+			errMsg:  "invalid key: must not be empty",
 		},
 		{
 			name:    "missing frappe key",
 			parts:   []string{"frappe"},
 			wantErr: true,
-			errMsg:  "missing frappe key",
+			errMsg:  `key "frappe" not found`,
 		},
 		{
 			name:    "missing bench key",
 			parts:   []string{"bench"},
 			wantErr: true,
-			errMsg:  "missing bench key",
+			errMsg:  `key "bench" not found`,
 		},
 		{
 			name:    "apps missing parts",
@@ -188,19 +188,19 @@ func TestGetValueFromBenchConfig(t *testing.T) {
 			name:    "app not found",
 			parts:   []string{"apps", "nonexistent", "url"},
 			wantErr: true,
-			errMsg:  "app not found: nonexistent",
+			errMsg:  `app "nonexistent" not found`,
 		},
 		{
 			name:    "unknown key",
 			parts:   []string{"unknown", "key"},
 			wantErr: true,
-			errMsg:  "key not found: unknown.key",
+			errMsg:  `key "unknown.key" not found`,
 		},
 		{
 			name:    "unknown frappe subkey",
 			parts:   []string{"frappe", "unknown"},
 			wantErr: true,
-			errMsg:  "key not found: frappe.unknown",
+			errMsg:  `key "frappe.unknown" not found`,
 		},
 	}
 

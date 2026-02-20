@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/gavindsouza/weg/internal/output"
 )
 
 func TestVersionCommand_Setup(t *testing.T) {
@@ -50,34 +52,26 @@ func TestRunVersionCmd_Basic(t *testing.T) {
 	BuildDate = "2025-01-01"
 	showApps = false
 
-	// Capture stdout
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
+	// Capture output via output package
+	buf := output.CaptureForTest(t)
 
 	err := runVersionCmd(versionCmd, nil)
-
-	w.Close()
-	os.Stdout = oldStdout
-
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
+	got := buf.String()
 
-	if !bytes.Contains([]byte(output), []byte("weg 1.2.3")) {
-		t.Errorf("expected output to contain version, got: %s", output)
+	if !bytes.Contains([]byte(got), []byte("weg 1.2.3")) {
+		t.Errorf("expected output to contain version, got: %s", got)
 	}
 
-	if !bytes.Contains([]byte(output), []byte("commit: abc123")) {
-		t.Errorf("expected output to contain commit, got: %s", output)
+	if !bytes.Contains([]byte(got), []byte("commit: abc123")) {
+		t.Errorf("expected output to contain commit, got: %s", got)
 	}
 
-	if !bytes.Contains([]byte(output), []byte("built:  2025-01-01")) {
-		t.Errorf("expected output to contain build date, got: %s", output)
+	if !bytes.Contains([]byte(got), []byte("built:  2025-01-01")) {
+		t.Errorf("expected output to contain build date, got: %s", got)
 	}
 }
 
@@ -98,34 +92,26 @@ func TestRunVersionCmd_UnknownCommit(t *testing.T) {
 	BuildDate = "unknown"
 	showApps = false
 
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
+	buf := output.CaptureForTest(t)
 
 	err := runVersionCmd(versionCmd, nil)
-
-	w.Close()
-	os.Stdout = oldStdout
-
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var buf bytes.Buffer
-	buf.ReadFrom(r)
-	output := buf.String()
+	got := buf.String()
 
-	if !bytes.Contains([]byte(output), []byte("weg dev")) {
-		t.Errorf("expected output to contain 'weg dev', got: %s", output)
+	if !bytes.Contains([]byte(got), []byte("weg dev")) {
+		t.Errorf("expected output to contain 'weg dev', got: %s", got)
 	}
 
 	// Should not contain commit or built lines when unknown
-	if bytes.Contains([]byte(output), []byte("commit:")) {
-		t.Errorf("should not show commit when unknown, got: %s", output)
+	if bytes.Contains([]byte(got), []byte("commit:")) {
+		t.Errorf("should not show commit when unknown, got: %s", got)
 	}
 
-	if bytes.Contains([]byte(output), []byte("built:")) {
-		t.Errorf("should not show built when unknown, got: %s", output)
+	if bytes.Contains([]byte(got), []byte("built:")) {
+		t.Errorf("should not show built when unknown, got: %s", got)
 	}
 }
 

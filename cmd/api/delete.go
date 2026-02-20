@@ -1,10 +1,11 @@
 package api
 
 import (
-	"fmt"
 	"strings"
 
 	internalapi "github.com/gavindsouza/weg/internal/api"
+	wegerrors "github.com/gavindsouza/weg/internal/errors"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/remote"
 	"github.com/spf13/cobra"
 )
@@ -26,7 +27,7 @@ func runDelete(cmd *cobra.Command, args []string) error {
 	// Parse doctype/name
 	arg := args[0]
 	if !strings.Contains(arg, "/") {
-		return fmt.Errorf("expected format: <doctype>/<name>")
+		return wegerrors.Usage("expected format: <doctype>/<name>")
 	}
 
 	parts := strings.SplitN(arg, "/", 2)
@@ -47,10 +48,10 @@ func runDelete(cmd *cobra.Command, args []string) error {
 		}
 
 		if result.Success {
-			fmt.Printf("Deleted %s/%s\n", doctype, name)
+			output.Printf("Deleted %s/%s", doctype, name)
 			return nil
 		}
-		return fmt.Errorf("API error: %s", result.Error)
+		return wegerrors.API(0, result.Error, nil)
 	}
 
 	// Local mode
@@ -66,9 +67,9 @@ func runDelete(cmd *cobra.Command, args []string) error {
 	}
 
 	if result.Success {
-		fmt.Printf("Deleted %s/%s\n", doctype, name)
+		output.Printf("Deleted %s/%s", doctype, name)
 		return nil
 	}
 
-	return fmt.Errorf("API error: %s", result.Error)
+	return wegerrors.API(0, result.Error, nil)
 }

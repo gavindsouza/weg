@@ -11,6 +11,7 @@ import (
 
 	"github.com/gavindsouza/weg/internal/config"
 	wegerrors "github.com/gavindsouza/weg/internal/errors"
+	wegoutput "github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/state"
 	"github.com/spf13/cobra"
 )
@@ -82,7 +83,7 @@ func runQuery(cmd *cobra.Command, args []string) error {
 	}
 
 	if site == "" {
-		return fmt.Errorf("no site specified and no default site found")
+		return wegerrors.Usage("no site specified and no default site found")
 	}
 
 	// Get SQL - either from arg or stdin
@@ -96,7 +97,7 @@ func runQuery(cmd *cobra.Command, args []string) error {
 	}
 
 	if sql == "" {
-		return fmt.Errorf("empty SQL query")
+		return wegerrors.Validation("query", "must not be empty")
 	}
 
 	// Build Python code to execute
@@ -154,7 +155,7 @@ finally:
 			fmt.Print(string(output))
 		} else {
 			formatted, _ := json.MarshalIndent(data, "", "  ")
-			fmt.Println(string(formatted))
+			wegoutput.Print(string(formatted))
 		}
 	}
 

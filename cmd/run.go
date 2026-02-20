@@ -13,6 +13,7 @@ import (
 
 	"github.com/gavindsouza/weg/internal/apps"
 	"github.com/gavindsouza/weg/internal/config"
+	"github.com/gavindsouza/weg/internal/errors"
 	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/services"
 	"github.com/gavindsouza/weg/internal/state"
@@ -108,7 +109,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 		// Try without nested directory
 		hooksPath = filepath.Join(appPath, "hooks.py")
 		if _, err := os.Stat(hooksPath); os.IsNotExist(err) {
-			return fmt.Errorf("not a Frappe app (hooks.py not found)")
+			return errors.Usage("not a Frappe app (hooks.py not found)")
 		}
 	}
 	PrintInfo("Detected Frappe app: %s", appName)
@@ -158,7 +159,7 @@ func runRun(cmd *cobra.Command, args []string) error {
 
 	// Validate database support
 	if !tools.IsDatabaseSupported(frappeVersion, database) {
-		return fmt.Errorf("database %s is not supported for Frappe %s", database, frappeVersion)
+		return errors.Validation("database", fmt.Sprintf("%s is not supported for Frappe %s", database, frappeVersion))
 	}
 
 	// Step 6: Create .weg environment
@@ -201,7 +202,7 @@ apps = ["frappe", "%s"]
 
 	wegTomlPath := filepath.Join(wegPath, "weg.toml")
 	if err := os.WriteFile(wegTomlPath, []byte(wegToml), 0644); err != nil {
-		return fmt.Errorf("failed to write weg.toml: %w", err)
+		return errors.Config("weg.toml", "write", err)
 	}
 
 	// Step 7: Install Frappe
@@ -405,7 +406,7 @@ func promptVersion() (string, error) {
 	}
 
 	if answer != "14" && answer != "15" && answer != "16" {
-		return "", fmt.Errorf("invalid version: %s (must be 14, 15, or 16)", answer)
+		return "", errors.Validation("version", fmt.Sprintf("must be 14, 15, or 16, got %s", answer))
 	}
 
 	return answer, nil

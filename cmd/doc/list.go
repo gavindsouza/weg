@@ -8,6 +8,7 @@ import (
 
 	"github.com/gavindsouza/weg/internal/api"
 	"github.com/gavindsouza/weg/internal/completion"
+	wegoutput "github.com/gavindsouza/weg/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -110,11 +111,11 @@ finally:
 	// Format output as table
 	docs, ok := result.Data.([]any)
 	if !ok || len(docs) == 0 {
-		fmt.Println("No documents found")
+		wegoutput.Print("No documents found")
 		return nil
 	}
 
 	output, _ := json.MarshalIndent(docs, "", "  ")
-	fmt.Println(string(output))
+	wegoutput.Print(string(output))
 	return nil
 }

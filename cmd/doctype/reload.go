@@ -2,7 +2,6 @@ package doctype
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -80,11 +79,11 @@ finally:
 
 	if !result.Success {
 		if result.Traceback != "" {
-			fmt.Fprintf(os.Stderr, "%s\n", result.Traceback)
+			output.Errorf("%s", result.Traceback)
 		}
 		return fmt.Errorf("failed to reload: %s", result.Error)
 	}
 
-	fmt.Printf("DocType %s reloaded successfully\n", doctype)
+	output.Printf("DocType %s reloaded successfully", doctype)
 	return nil
 }

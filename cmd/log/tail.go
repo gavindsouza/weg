@@ -62,11 +62,11 @@ func runTail(cmd *cobra.Command, args []string) error {
 	// Find log files based on type
 	logFiles := findLogFiles(benchPath, site, logType)
 	if len(logFiles) == 0 {
-		return fmt.Errorf("no log files found for type '%s'", logType)
+		return wegerrors.NotFound("log type", logType)
 	}
 
 	output.Infof("Tailing logs for %s (type: %s)...\n", site, logType)
-	fmt.Println("Press Ctrl+C to stop")
+	output.Print("Press Ctrl+C to stop")
 
 	// Use tail -f to follow logs
 	tailArgs := []string{"-f", "-n", fmt.Sprintf("%d", tailLines)}
@@ -82,7 +82,7 @@ func runTail(cmd *cobra.Command, args []string) error {
 
 	go func() {
 		<-sigChan
-		fmt.Println("\nStopping log tail...")
+		output.Print("\nStopping log tail...")
 		if tailProcess.Process != nil {
 			tailProcess.Process.Signal(syscall.SIGTERM)
 		}
@@ -197,7 +197,7 @@ func resolveContext(siteName string) (string, string, error) {
 	}
 
 	if site == "" {
-		return "", "", fmt.Errorf("no site specified and no default site found")
+		return "", "", wegerrors.Usage("no site specified and no default site found")
 	}
 
 	return benchPath, site, nil

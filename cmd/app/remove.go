@@ -54,7 +54,7 @@ func runRemove(cmd *cobra.Command, args []string) error {
 
 	// Prevent removing frappe
 	if appName == "frappe" {
-		return fmt.Errorf("cannot remove frappe - it is required")
+		return wegerrors.Validation("app", "cannot remove frappe - it is required")
 	}
 
 	var benchPath, appsDir string
@@ -67,7 +67,7 @@ func runRemove(cmd *cobra.Command, args []string) error {
 		appsDir = filepath.Join(benchPath, "apps")
 		// Can't remove the main app
 		if appName == filepath.Base(absPath) {
-			return fmt.Errorf("cannot remove the main app")
+			return wegerrors.Validation("app", "cannot remove the main app")
 		}
 	default:
 		return wegerrors.NotInProject(absPath)
@@ -80,7 +80,7 @@ func runRemove(cmd *cobra.Command, args []string) error {
 	}
 
 	if !st.HasApp(appName) {
-		return fmt.Errorf("app %s is not installed", appName)
+		return wegerrors.NotFound("app", appName)
 	}
 
 	// Confirm
@@ -104,7 +104,7 @@ func runRemove(cmd *cobra.Command, args []string) error {
 	// Update state
 	st.RemoveApp(appName)
 	if err := st.Save(absPath); err != nil {
-		return fmt.Errorf("failed to save state: %w", err)
+		return wegerrors.State("save", err)
 	}
 
 	output.Successf("Removed %s", appName)

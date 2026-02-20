@@ -27,78 +27,78 @@ func confirmSync() bool {
 
 // displayChanges shows the diff of changes that will be applied
 func displayChanges(diff *state.Diff) {
-	fmt.Printf("\nChanges to apply (%d total):\n\n", diff.TotalChanges())
+	output.Printf("\nChanges to apply (%d total):\n", diff.TotalChanges())
 
 	if len(diff.AppsToAdd) > 0 {
-		fmt.Println("Apps to install:")
+		output.Print("Apps to install:")
 		for _, app := range diff.AppsToAdd {
-			fmt.Printf("  + %s\n", app)
+			output.Printf("  + %s", app)
 		}
 	}
 
 	if len(diff.AppsToRemove) > 0 {
-		fmt.Println("Apps to remove:")
+		output.Print("Apps to remove:")
 		for _, app := range diff.AppsToRemove {
-			fmt.Printf("  - %s\n", app)
+			output.Printf("  - %s", app)
 		}
 	}
 
 	if len(diff.AppsToUpdate) > 0 {
-		fmt.Println("Apps to update:")
+		output.Print("Apps to update:")
 		for _, update := range diff.AppsToUpdate {
 			if update.NewBranch != "" {
-				fmt.Printf("  ~ %s: %s -> %s\n", update.Name, update.OldBranch, update.NewBranch)
+				output.Printf("  ~ %s: %s -> %s", update.Name, update.OldBranch, update.NewBranch)
 			}
 			if update.NewURL != "" {
-				fmt.Printf("  ~ %s: URL changed\n", update.Name)
+				output.Printf("  ~ %s: URL changed", update.Name)
 			}
 			if update.DepsChanged {
-				fmt.Printf("  ~ %s: dependencies changed (will reinstall)\n", update.Name)
+				output.Printf("  ~ %s: dependencies changed (will reinstall)", update.Name)
 			}
 		}
 	}
 
 	if len(diff.SitesToAdd) > 0 {
-		fmt.Println("Sites to create:")
+		output.Print("Sites to create:")
 		for _, site := range diff.SitesToAdd {
-			fmt.Printf("  + %s\n", site)
+			output.Printf("  + %s", site)
 		}
 	}
 
 	if len(diff.SitesToRemove) > 0 {
-		fmt.Println("Sites to remove:")
+		output.Print("Sites to remove:")
 		for _, site := range diff.SitesToRemove {
-			fmt.Printf("  - %s\n", site)
+			output.Printf("  - %s", site)
 		}
 	}
 
 	if len(diff.SitesToUpdate) > 0 {
-		fmt.Println("Sites to update:")
+		output.Print("Sites to update:")
 		for _, update := range diff.SitesToUpdate {
-			fmt.Printf("  ~ %s\n", update.Name)
+			output.Printf("  ~ %s", update.Name)
 			for _, app := range update.AppsToAdd {
-				fmt.Printf("      + install %s\n", app)
+				output.Printf("      + install %s", app)
 			}
 			for _, app := range update.AppsToRemove {
-				fmt.Printf("      - uninstall %s\n", app)
+				output.Printf("      - uninstall %s", app)
 			}
 		}
 	}
 
 	if diff.FrappeChanged {
-		fmt.Println("Frappe settings changed (manual update may be required)")
+		output.Print("Frappe settings changed (manual update may be required)")
 	}
 
 	if diff.ServicesChanged {
-		fmt.Println("Services configuration changed:")
+		output.Print("Services configuration changed:")
 		if diff.NewServices.WebPort != 0 {
-			fmt.Printf("  ~ web port: %d\n", diff.NewServices.WebPort)
+			output.Printf("  ~ web port: %d", diff.NewServices.WebPort)
 		}
 		if diff.NewServices.SocketPort != 0 {
-			fmt.Printf("  ~ socket port: %d\n", diff.NewServices.SocketPort)
+			output.Printf("  ~ socket port: %d", diff.NewServices.SocketPort)
 		}
 		if len(diff.NewServices.Workers) > 0 {
-			fmt.Printf("  ~ workers: %v\n", diff.NewServices.Workers)
+			output.Printf("  ~ workers: %v", diff.NewServices.Workers)
 		}
 	}
 }

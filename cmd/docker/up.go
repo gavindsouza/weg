@@ -5,6 +5,8 @@ import (
 	"os"
 	"os/exec"
 
+	wegerrors "github.com/gavindsouza/weg/internal/errors"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -38,7 +40,7 @@ func runUp(cmd *cobra.Command, args []string) error {
 
 	// Check if docker-compose.yml exists
 	if _, err := os.Stat("docker-compose.yml"); os.IsNotExist(err) {
-		return fmt.Errorf("docker-compose.yml not found. Run 'weg docker init' first")
+		return wegerrors.NotFound("docker-compose.yml", "")
 	}
 
 	cmdArgs := []string{"compose", "up"}
@@ -49,7 +51,7 @@ func runUp(cmd *cobra.Command, args []string) error {
 		cmdArgs = append(cmdArgs, "--build")
 	}
 
-	fmt.Println("Starting containers...")
+	output.Print("Starting containers...")
 
 	execCmd := exec.Command("docker", cmdArgs...)
 	execCmd.Dir = cwd
@@ -62,11 +64,11 @@ func runUp(cmd *cobra.Command, args []string) error {
 	}
 
 	if upDetached {
-		fmt.Println()
-		fmt.Println("Containers started in background")
-		fmt.Println("  weg docker ps      # View status")
-		fmt.Println("  weg docker logs    # View logs")
-		fmt.Println("  weg docker down    # Stop containers")
+		output.Print("")
+		output.Print("Containers started in background")
+		output.Print("  weg docker ps      # View status")
+		output.Print("  weg docker logs    # View logs")
+		output.Print("  weg docker down    # Stop containers")
 	}
 
 	return nil

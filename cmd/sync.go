@@ -92,12 +92,12 @@ func syncAppWithWegToml(path, wegDir, wegTomlPath string) error {
 	// ParseWegToml expects directory path, not file path
 	benchConfig, err := config.ParseWegToml(wegDir)
 	if err != nil {
-		return fmt.Errorf("failed to parse .weg/weg.toml: %w", err)
+		return errors.Config("weg.toml", "parse", err)
 	}
 
 	// Validate config
 	if err := config.ValidateBenchConfig(benchConfig); err != nil {
-		return fmt.Errorf("invalid configuration: %w", err)
+		return errors.Config("config", "validate", err)
 	}
 
 	// Load state from project root (state module adds .weg internally)
@@ -146,7 +146,7 @@ func syncAppWithWegToml(path, wegDir, wegTomlPath string) error {
 	st.Frappe.Database = benchConfig.Frappe.Database
 
 	if err := st.Save(path); err != nil {
-		return fmt.Errorf("failed to save state: %w", err)
+		return errors.State("save", err)
 	}
 
 	PrintInfo("\nSync complete!")
@@ -157,12 +157,12 @@ func syncAppWithWegToml(path, wegDir, wegTomlPath string) error {
 func syncAppWithPyproject(path string) error {
 	appConfig, err := config.ParsePyproject(path)
 	if err != nil {
-		return fmt.Errorf("failed to parse config: no .weg/weg.toml or pyproject.toml found")
+		return errors.Config("config", "parse", fmt.Errorf("no weg.toml or pyproject.toml found"))
 	}
 
 	// Validate config
 	if err := config.ValidateAppConfig(appConfig); err != nil {
-		return fmt.Errorf("invalid configuration: %w", err)
+		return errors.Config("config", "validate", err)
 	}
 
 	// Load state
@@ -207,7 +207,7 @@ func syncAppWithPyproject(path string) error {
 	st.Frappe.Database = appConfig.Dev.Database
 
 	if err := st.Save(path); err != nil {
-		return fmt.Errorf("failed to save state: %w", err)
+		return errors.State("save", err)
 	}
 
 	PrintInfo("\nSync complete!")
@@ -222,18 +222,18 @@ func syncBench(path string, result *config.DetectionResult) error {
 	wegTomlPath := filepath.Join(path, "weg.toml")
 	benchConfig, err := config.ParseWegToml(wegTomlPath)
 	if err != nil {
-		return fmt.Errorf("failed to parse weg.toml: %w", err)
+		return errors.Config("weg.toml", "parse", err)
 	}
 
 	// Validate config
 	if err := config.ValidateBenchConfig(benchConfig); err != nil {
-		return fmt.Errorf("invalid configuration: %w", err)
+		return errors.Config("config", "validate", err)
 	}
 
 	// Load state
 	st, err := state.Load(path)
 	if err != nil {
-		return fmt.Errorf("failed to load state: %w", err)
+		return errors.State("load", err)
 	}
 
 	// Compute diff
@@ -270,7 +270,7 @@ func syncBench(path string, result *config.DetectionResult) error {
 	st.Frappe.Database = benchConfig.Frappe.Database
 
 	if err := st.Save(path); err != nil {
-		return fmt.Errorf("failed to save state: %w", err)
+		return errors.State("save", err)
 	}
 
 	PrintInfo("\nSync complete!")

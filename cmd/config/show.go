@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 
 	"github.com/gavindsouza/weg/internal/config"
+	wegerrors "github.com/gavindsouza/weg/internal/errors"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -31,11 +33,11 @@ func runShow(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to detect context: %w", err)
 	}
 
-	fmt.Printf("Context: %s\n", result.ContextDescription())
-	fmt.Printf("Path: %s\n", result.Path)
+	output.Printf("Context: %s", result.ContextDescription())
+	output.Printf("Path: %s", result.Path)
 
 	if result.ConfigPath != "" {
-		fmt.Printf("Config: %s\n", result.ConfigPath)
+		output.Printf("Config: %s", result.ConfigPath)
 	}
 
 	switch result.Context {
@@ -44,8 +46,8 @@ func runShow(cmd *cobra.Command, args []string) error {
 	case config.ContextWegApp:
 		return showAppConfig(result)
 	default:
-		fmt.Println("\nNo weg configuration found.")
-		fmt.Println(result.SuggestAction())
+		output.Print("\nNo weg configuration found.")
+		output.Print(result.SuggestAction())
 	}
 
 	return nil
@@ -54,34 +56,34 @@ func runShow(cmd *cobra.Command, args []string) error {
 func showBenchConfig(result *config.DetectionResult) error {
 	cfg, err := config.ParseWegToml(result.BenchPath)
 	if err != nil {
-		return fmt.Errorf("failed to parse config: %w", err)
+		return wegerrors.Config("config", "parse", err)
 	}
 
-	fmt.Println()
-	fmt.Println("[frappe]")
-	fmt.Printf("  version = %q\n", cfg.Frappe.Version)
-	fmt.Printf("  database = %q\n", cfg.Frappe.Database)
+	output.Print("")
+	output.Print("[frappe]")
+	output.Printf("  version = %q", cfg.Frappe.Version)
+	output.Printf("  database = %q", cfg.Frappe.Database)
 
-	fmt.Println()
-	fmt.Println("[apps]")
+	output.Print("")
+	output.Print("[apps]")
 	for name, app := range cfg.Apps {
 		if app.Excluded {
 			continue
 		}
 		if app.Path != "" {
-			fmt.Printf("  %s = { path = %q }\n", name, app.Path)
+			output.Printf("  %s = { path = %q }", name, app.Path)
 		} else {
-			fmt.Printf("  %s = { url = %q, branch = %q }\n", name, app.URL, app.Branch)
+			output.Printf("  %s = { url = %q, branch = %q }", name, app.URL, app.Branch)
 		}
 	}
 
 	if len(cfg.Sites) > 0 {
-		fmt.Println()
-		fmt.Println("[[sites]]")
+		output.Print("")
+		output.Print("[[sites]]")
 		for _, site := range cfg.Sites {
-			fmt.Printf("  name = %q\n", site.Name)
+			output.Printf("  name = %q", site.Name)
 			if site.DefaultSite {
-				fmt.Println("  default = true")
+				output.Print("  default = true")
 			}
 		}
 	}
@@ -93,19 +95,19 @@ func showAppConfig(result *config.DetectionResult) error {
 	pyprojectPath := filepath.Join(result.Path, "pyproject.toml")
 	cfg, err := config.ParsePyproject(pyprojectPath)
 	if err != nil {
-		return fmt.Errorf("failed to parse config: %w", err)
+		return wegerrors.Config("config", "parse", err)
 	}
 
-	fmt.Println()
-	fmt.Println("[tool.weg.dev]")
-	fmt.Printf("  frappe = %q\n", cfg.Dev.Frappe)
-	fmt.Printf("  database = %q\n", cfg.Dev.Database)
+	output.Print("")
+	output.Print("[tool.weg.dev]")
+	output.Printf("  frappe = %q", cfg.Dev.Frappe)
+	output.Printf("  database = %q", cfg.Dev.Database)
 
 	if len(cfg.Dependencies.Apps) > 0 {
-		fmt.Println()
-		fmt.Println("[tool.weg.dependencies]")
+		output.Print("")
+		output.Print("[tool.weg.dependencies]")
 		for _, app := range cfg.Dependencies.Apps {
-			fmt.Printf("  %s = { url = %q, branch = %q }\n", app.Name, app.URL, app.Branch)
+			output.Printf("  %s = { url = %q, branch = %q }", app.Name, app.URL, app.Branch)
 		}
 	}
 

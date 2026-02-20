@@ -2,12 +2,12 @@ package cmd
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/gavindsouza/weg/internal/config"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/state"
 	"github.com/spf13/cobra"
 )
@@ -38,12 +38,12 @@ func init() {
 }
 
 func runVersionCmd(cmd *cobra.Command, args []string) error {
-	fmt.Printf("weg %s\n", Version)
+	output.Printf("weg %s", Version)
 	if Commit != "unknown" {
-		fmt.Printf("  commit: %s\n", Commit)
+		output.Printf("  commit: %s", Commit)
 	}
 	if BuildDate != "unknown" {
-		fmt.Printf("  built:  %s\n", BuildDate)
+		output.Printf("  built:  %s", BuildDate)
 	}
 
 	if !showApps {
@@ -78,16 +78,16 @@ func runVersionCmd(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	fmt.Println()
-	fmt.Println("Installed apps:")
+	output.Print("")
+	output.Print("Installed apps:")
 	for name, app := range st.Apps {
 		version := getAppVersion(benchPath, name)
 		if version != "" {
-			fmt.Printf("  %s: %s\n", name, version)
+			output.Printf("  %s: %s", name, version)
 		} else if app.Branch != "" {
-			fmt.Printf("  %s: %s\n", name, app.Branch)
+			output.Printf("  %s: %s", name, app.Branch)
 		} else {
-			fmt.Printf("  %s: (unknown)\n", name)
+			output.Printf("  %s: (unknown)", name)
 		}
 	}
 

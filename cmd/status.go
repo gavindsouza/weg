@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gavindsouza/weg/internal/config"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/runtime"
 	"github.com/gavindsouza/weg/internal/state"
 	"github.com/spf13/cobra"
@@ -47,52 +48,52 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	}
 
 	// Print header
-	fmt.Printf("Weg Status\n")
-	fmt.Printf("==========\n\n")
+	output.Print("Weg Status")
+	output.Printf("==========\n")
 
 	// Context info
-	fmt.Printf("Context:  %s\n", result.ContextDescription())
-	fmt.Printf("Path:     %s\n", absPath)
+	output.Printf("Context:  %s", result.ContextDescription())
+	output.Printf("Path:     %s", absPath)
 	if result.BenchPath != "" {
-		fmt.Printf("Bench:    %s\n", result.BenchPath)
+		output.Printf("Bench:    %s", result.BenchPath)
 	}
 	if result.ConfigPath != "" {
-		fmt.Printf("Config:   %s\n", result.ConfigPath)
+		output.Printf("Config:   %s", result.ConfigPath)
 	}
 	if result.AppName != "" {
-		fmt.Printf("App:      %s\n", result.AppName)
+		output.Printf("App:      %s", result.AppName)
 	}
 
 	// Show default site if in a managed project
 	if result.IsWegManaged() {
 		if site := ResolveDefaultSite(absPath); site != "" {
-			fmt.Printf("Site:     %s (default)\n", site)
+			output.Printf("Site:     %s (default)", site)
 		}
 	}
 
 	// Warn about ambiguous configuration signals
 	if result.IsWegManaged() {
 		if config.HasWegToml(absPath) && config.HasWegSection(absPath) {
-			fmt.Printf("\n⚠ Both weg.toml and pyproject.toml [tool.weg] detected.\n")
-			fmt.Printf("  weg.toml takes precedence. Remove one to avoid confusion.\n")
+			output.Warningf("Both weg.toml and pyproject.toml [tool.weg] detected.")
+			output.Printf("  weg.toml takes precedence. Remove one to avoid confusion.")
 		}
 	}
 
 	// Handle different contexts
 	switch result.Context {
 	case config.ContextFresh:
-		fmt.Printf("\nThis directory is not initialized.\n")
-		fmt.Printf("Run 'weg init' to get started.\n")
+		output.Printf("\nThis directory is not initialized.")
+		output.Print("Run 'weg init' to get started.")
 		return nil
 
 	case config.ContextApp:
-		fmt.Printf("\nThis is a Frappe app without weg configuration.\n")
-		fmt.Printf("Run 'weg init' to add weg management.\n")
+		output.Printf("\nThis is a Frappe app without weg configuration.")
+		output.Print("Run 'weg init' to add weg management.")
 		return nil
 
 	case config.ContextBench:
-		fmt.Printf("\nThis is a traditional bench without weg management.\n")
-		fmt.Printf("Run 'weg init' to import into weg.\n")
+		output.Printf("\nThis is a traditional bench without weg management.")
+		output.Print("Run 'weg init' to import into weg.")
 		return nil
 
 	case config.ContextWegApp:
@@ -106,24 +107,24 @@ func runStatus(cmd *cobra.Command, args []string) error {
 }
 
 func showAppStatus(path string, result *config.DetectionResult) error {
-	fmt.Printf("\n--- App Configuration ---\n\n")
+	output.Printf("\n--- App Configuration ---\n")
 
 	// Parse pyproject.toml
 	appConfig, err := config.ParsePyproject(path)
 	if err != nil {
 		PrintVerbose("Could not parse pyproject.toml: %v", err)
 	} else {
-		fmt.Printf("Compatibility:\n")
-		fmt.Printf("  Frappe:     %v\n", appConfig.Compatibility.Frappe)
-		fmt.Printf("  Databases:  %v\n", appConfig.Compatibility.Databases)
-		fmt.Printf("\nDevelopment:\n")
-		fmt.Printf("  Frappe:     %s\n", appConfig.Dev.Frappe)
-		fmt.Printf("  Database:   %s\n", appConfig.Dev.Database)
+		output.Print("Compatibility:")
+		output.Printf("  Frappe:     %v", appConfig.Compatibility.Frappe)
+		output.Printf("  Databases:  %v", appConfig.Compatibility.Databases)
+		output.Printf("\nDevelopment:")
+		output.Printf("  Frappe:     %s", appConfig.Dev.Frappe)
+		output.Printf("  Database:   %s", appConfig.Dev.Database)
 
 		if len(appConfig.Dependencies.Apps) > 0 {
-			fmt.Printf("\nDependencies:\n")
+			output.Printf("\nDependencies:")
 			for _, dep := range appConfig.Dependencies.Apps {
-				fmt.Printf("  - %s\n", dep.Name)
+				output.Printf("  - %s", dep.Name)
 			}
 		}
 	}
@@ -133,38 +134,38 @@ func showAppStatus(path string, result *config.DetectionResult) error {
 }
 
 func showBenchStatus(path string, result *config.DetectionResult) error {
-	fmt.Printf("\n--- Bench Configuration ---\n\n")
+	output.Printf("\n--- Bench Configuration ---\n")
 
 	// Parse weg.toml
 	benchConfig, err := config.ParseWegToml(path)
 	if err != nil {
 		PrintVerbose("Could not parse weg.toml: %v", err)
 	} else {
-		fmt.Printf("Bench:      %s\n", benchConfig.Bench.Name)
-		fmt.Printf("Frappe:     %s\n", benchConfig.Frappe.Version)
-		fmt.Printf("Database:   %s\n", benchConfig.Frappe.Database)
+		output.Printf("Bench:      %s", benchConfig.Bench.Name)
+		output.Printf("Frappe:     %s", benchConfig.Frappe.Version)
+		output.Printf("Database:   %s", benchConfig.Frappe.Database)
 
-		fmt.Printf("\nApps (%d configured):\n", len(benchConfig.Apps))
+		output.Printf("\nApps (%d configured):", len(benchConfig.Apps))
 		for name, app := range benchConfig.Apps {
 			status := ""
 			if app.Excluded {
 				status = " (excluded)"
 			}
 			if app.URL != "" {
-				fmt.Printf("  - %s @ %s%s\n", name, app.Branch, status)
+				output.Printf("  - %s @ %s%s", name, app.Branch, status)
 			} else if app.Path != "" {
-				fmt.Printf("  - %s (local: %s)%s\n", name, app.Path, status)
+				output.Printf("  - %s (local: %s)%s", name, app.Path, status)
 			}
 		}
 
 		if len(benchConfig.Sites) > 0 {
-			fmt.Printf("\nSites (%d configured):\n", len(benchConfig.Sites))
+			output.Printf("\nSites (%d configured):", len(benchConfig.Sites))
 			for _, site := range benchConfig.Sites {
 				defaultMark := ""
 				if site.DefaultSite {
 					defaultMark = " (default)"
 				}
-				fmt.Printf("  - %s%s\n", site.Name, defaultMark)
+				output.Printf("  - %s%s", site.Name, defaultMark)
 			}
 		}
 
@@ -180,7 +181,7 @@ func showBenchStatus(path string, result *config.DetectionResult) error {
 }
 
 func showStateInfo(path string) error {
-	fmt.Printf("\n--- Current State ---\n\n")
+	output.Printf("\n--- Current State ---\n")
 
 	st, err := state.Load(path)
 	if err != nil {
@@ -188,14 +189,14 @@ func showStateInfo(path string) error {
 	}
 
 	if st.IsEmpty() {
-		fmt.Printf("No state recorded. Run 'weg sync' to initialize.\n")
+		output.Print("No state recorded. Run 'weg sync' to initialize.")
 		return nil
 	}
 
-	fmt.Printf("Last sync: %s\n", formatTime(st.LastSync))
+	output.Printf("Last sync: %s", formatTime(st.LastSync))
 
 	if len(st.Apps) > 0 {
-		fmt.Printf("\nInstalled Apps (%d):\n", len(st.Apps))
+		output.Printf("\nInstalled Apps (%d):", len(st.Apps))
 		for name, app := range st.Apps {
 			branch := app.Branch
 			if branch == "" {
@@ -205,12 +206,12 @@ func showStateInfo(path string) error {
 			if app.Commit != "" && IsVerbose() {
 				commit = fmt.Sprintf(" [%s]", app.Commit[:7])
 			}
-			fmt.Printf("  - %s @ %s%s\n", name, branch, commit)
+			output.Printf("  - %s @ %s%s", name, branch, commit)
 		}
 	}
 
 	if len(st.Sites) > 0 {
-		fmt.Printf("\nActive Sites (%d):\n", len(st.Sites))
+		output.Printf("\nActive Sites (%d):", len(st.Sites))
 		for name, site := range st.Sites {
 			defaultMark := ""
 			if site.DefaultSite {
@@ -220,7 +221,7 @@ func showStateInfo(path string) error {
 			if len(site.Apps) > 0 && IsVerbose() {
 				apps = fmt.Sprintf(" [apps: %v]", site.Apps)
 			}
-			fmt.Printf("  - %s%s%s\n", name, defaultMark, apps)
+			output.Printf("  - %s%s%s", name, defaultMark, apps)
 		}
 	}
 
@@ -234,11 +235,11 @@ func showStateInfo(path string) error {
 	if err != nil {
 		PrintVerbose("Could not check sync status: %v", err)
 	} else if needsSync {
-		fmt.Println()
+		output.Print("")
 		PrintInfo("Configuration has changed since last sync.")
 		PrintInfo("Run 'weg sync' to apply changes.")
 	} else {
-		fmt.Println()
+		output.Print("")
 		PrintInfo("Environment is in sync with configuration.")
 	}
 
@@ -267,10 +268,10 @@ func formatTime(t time.Time) string {
 }
 
 func showWorkerConfig(workers map[string]int) {
-	fmt.Printf("\nWorkers:\n")
+	output.Printf("\nWorkers:")
 
 	if len(workers) == 0 {
-		fmt.Printf("  1 worker (all queues) [default]\n")
+		output.Print("  1 worker (all queues) [default]")
 		return
 	}
 
@@ -297,13 +298,13 @@ func showWorkerConfig(workers map[string]int) {
 		}
 
 		if count == 1 {
-			fmt.Printf("  %d worker (%s) [%s]\n", count, queueDesc, queueType)
+			output.Printf("  %d worker (%s) [%s]", count, queueDesc, queueType)
 		} else {
-			fmt.Printf("  %d workers (%s) [%s]\n", count, queueDesc, queueType)
+			output.Printf("  %d workers (%s) [%s]", count, queueDesc, queueType)
 		}
 	}
 
-	fmt.Printf("  Total: %d worker(s)\n", totalWorkers)
+	output.Printf("  Total: %d worker(s)", totalWorkers)
 }
 
 func showRuntimeStatus(path string) {
@@ -312,11 +313,11 @@ func showRuntimeStatus(path string) {
 		return
 	}
 
-	fmt.Printf("\n--- Runtime Status ---\n\n")
-	fmt.Printf("Status:   running\n")
-	fmt.Printf("Web:      http://localhost:%d\n", rtConfig.Ports.Web)
-	fmt.Printf("SocketIO: port %d\n", rtConfig.Ports.SocketIO)
+	output.Printf("\n--- Runtime Status ---\n")
+	output.Print("Status:   running")
+	output.Printf("Web:      http://localhost:%d", rtConfig.Ports.Web)
+	output.Printf("SocketIO: port %d", rtConfig.Ports.SocketIO)
 	if rtConfig.RunID != "" {
-		fmt.Printf("Run ID:   %s\n", rtConfig.RunID)
+		output.Printf("Run ID:   %s", rtConfig.RunID)
 	}
 }

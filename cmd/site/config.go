@@ -10,6 +10,7 @@ import (
 
 	"github.com/gavindsouza/weg/internal/config"
 	wegerrors "github.com/gavindsouza/weg/internal/errors"
+	wegoutput "github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/state"
 	"github.com/spf13/cobra"
 )
@@ -122,7 +123,7 @@ func resolveSiteConfig() (string, string, error) {
 	}
 
 	if site == "" {
-		return "", "", fmt.Errorf("no site specified and no default site found")
+		return "", "", wegerrors.Usage("no site specified and no default site found")
 	}
 
 	return benchPath, site, nil
@@ -132,12 +133,12 @@ func loadSiteConfigJSON(benchPath, site string) (map[string]any, string, error) 
 	configPath := filepath.Join(benchPath, "sites", site, "site_config.json")
 	data, err := os.ReadFile(configPath)
 	if err != nil {
-		return nil, configPath, fmt.Errorf("failed to read config: %w", err)
+		return nil, configPath, wegerrors.Config("config", "read", err)
 	}
 
 	var cfg map[string]any
 	if err := json.Unmarshal(data, &cfg); err != nil {
-		return nil, configPath, fmt.Errorf("failed to parse config: %w", err)
+		return nil, configPath, wegerrors.Config("config", "parse", err)
 	}
 
 	return cfg, configPath, nil
@@ -146,7 +147,7 @@ func loadSiteConfigJSON(benchPath, site string) (map[string]any, string, error) 
 func saveSiteConfigJSON(path string, cfg map[string]any) error {
 	data, err := json.MarshalIndent(cfg, "", " ")
 	if err != nil {
-		return fmt.Errorf("failed to serialize config: %w", err)
+		return wegerrors.Config("config", "write", err)
 	}
 	return os.WriteFile(path, data, 0600)
 }
@@ -168,28 +169,28 @@ func runConfigGet(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
-		fmt.Println(string(output))
+		wegoutput.Print(string(output))
 	} else {
 		// Show specific key
 		key := args[0]
 		if val, ok := cfg[key]; ok {
 			switch v := val.(type) {
 			case string:
-				fmt.Println(v)
+				wegoutput.Print(v)
 			case float64:
 				if v == float64(int(v)) {
-					fmt.Printf("%.0f\n", v)
+					wegoutput.Printf("%.0f", v)
 				} else {
-					fmt.Printf("%v\n", v)
+					wegoutput.Printf("%v", v)
 				}
 			case bool:
-				fmt.Printf("%v\n", v)
+				wegoutput.Printf("%v", v)
 			default:
 				output, _ := json.MarshalIndent(v, "", "  ")
-				fmt.Println(string(output))
+				wegoutput.Print(string(output))
 			}
 		} else {
-			return fmt.Errorf("key '%s' not found", key)
+			return wegerrors.NotFound("key", key)
 		}
 	}
 
@@ -214,7 +215,7 @@ func runConfigSet(cmd *cobra.Command, args []string) error {
 	if configJSON {
 		// Parse as JSON
 		if err := json.Unmarshal([]byte(valueStr), &value); err != nil {
-			return fmt.Errorf("invalid JSON value: %w", err)
+			return wegerrors.Validation("value", fmt.Sprintf("invalid JSON: %v", err))
 		}
 	} else {
 		// Try to auto-detect type
@@ -244,7 +245,7 @@ func runConfigSet(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	fmt.Printf("Set %s = %v for %s\n", key, value, site)
+	wegoutput.Printf("Set %s = %v for %s", key, value, site)
 	return nil
 }
 
@@ -261,7 +262,7 @@ func runConfigDelete(cmd *cobra.Command, args []string) error {
 
 	key := args[0]
 	if _, ok := cfg[key]; !ok {
-		return fmt.Errorf("key '%s' not found", key)
+		return wegerrors.NotFound("key", key)
 	}
 
 	delete(cfg, key)
@@ -270,6 +271,6 @@ func runConfigDelete(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	fmt.Printf("Deleted %s from %s\n", key, site)
+	wegoutput.Printf("Deleted %s from %s", key, site)
 	return nil
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	internalapi "github.com/gavindsouza/weg/internal/api"
+	wegerrors "github.com/gavindsouza/weg/internal/errors"
 	"github.com/gavindsouza/weg/internal/remote"
 	"github.com/spf13/cobra"
 )
@@ -38,7 +39,7 @@ func runPost(cmd *cobra.Command, args []string) error {
 	// Parse document data
 	var doc map[string]any
 	if err := json.Unmarshal([]byte(postData), &doc); err != nil {
-		return fmt.Errorf("invalid JSON data: %w", err)
+		return wegerrors.Validation("data", fmt.Sprintf("invalid JSON: %v", err))
 	}
 
 	// Remote mode

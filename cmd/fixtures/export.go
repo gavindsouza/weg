@@ -53,7 +53,7 @@ func runExport(cmd *cobra.Command, args []string) error {
 	// Verify app exists
 	appPath := filepath.Join(benchPath, "apps", appName)
 	if _, err := os.Stat(appPath); os.IsNotExist(err) {
-		return fmt.Errorf("app %s not found", appName)
+		return wegerrors.NotFound("app", appName)
 	}
 
 	output.Infof("Exporting fixtures for %s from %s...\n", appName, site)
@@ -95,21 +95,21 @@ finally:
 
 	if !result.Success {
 		if result.Traceback != "" {
-			fmt.Fprintf(os.Stderr, "%s\n", result.Traceback)
+			output.Errorf("%s", result.Traceback)
 		}
 		return fmt.Errorf("failed to export fixtures: %s", result.Error)
 	}
 
 	// Show where fixtures were saved
 	fixturesPath := filepath.Join(appPath, appName, "fixtures")
-	fmt.Printf("Fixtures exported to: %s\n", fixturesPath)
+	output.Printf("Fixtures exported to: %s", fixturesPath)
 
 	// List exported files
 	if entries, err := os.ReadDir(fixturesPath); err == nil && len(entries) > 0 {
-		fmt.Println("\nExported files:")
+		output.Print("\nExported files:")
 		for _, e := range entries {
 			if strings.HasSuffix(e.Name(), ".json") {
-				fmt.Printf("  - %s\n", e.Name())
+				output.Printf("  - %s", e.Name())
 			}
 		}
 	}
@@ -153,7 +153,7 @@ func resolveContext(siteName string) (string, string, error) {
 	}
 
 	if site == "" {
-		return "", "", fmt.Errorf("no site specified and no default site found")
+		return "", "", wegerrors.Usage("no site specified and no default site found")
 	}
 
 	return benchPath, site, nil

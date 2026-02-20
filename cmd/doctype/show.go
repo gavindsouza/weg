@@ -3,12 +3,13 @@ package doctype
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/gavindsouza/weg/internal/api"
 	"github.com/gavindsouza/weg/internal/completion"
+	wegerrors "github.com/gavindsouza/weg/internal/errors"
+	wegoutput "github.com/gavindsouza/weg/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -89,36 +90,36 @@ finally:
 
 	if !result.Success {
 		if result.Traceback != "" {
-			fmt.Fprintf(os.Stderr, "%s\n", result.Traceback)
+			wegoutput.Errorf("%s", result.Traceback)
 		}
 		return fmt.Errorf("failed to get doctype: %s", result.Error)
 	}
 
 	if showJSON {
 		output, _ := json.MarshalIndent(result.Data, "", "  ")
-		fmt.Println(string(output))
+		wegoutput.Print(string(output))
 		return nil
 	}
 
 	data, ok := result.Data.(map[string]any)
 	if !ok {
-		return fmt.Errorf("unexpected response format")
+		return wegerrors.Validation("response", "unexpected format")
 	}
 
-	fmt.Printf("DocType: %s\n", data["name"])
-	fmt.Printf("Module: %s\n", data["module"])
+	wegoutput.Printf("DocType: %s", data["name"])
+	wegoutput.Printf("Module: %s", data["module"])
 	if sub, ok := data["is_submittable"].(float64); ok && sub == 1 {
-		fmt.Println("Submittable: Yes")
+		wegoutput.Print("Submittable: Yes")
 	}
 	if tree, ok := data["is_tree"].(float64); ok && tree == 1 {
-		fmt.Println("Tree: Yes")
+		wegoutput.Print("Tree: Yes")
 	}
 	if single, ok := data["is_single"].(float64); ok && single == 1 {
-		fmt.Println("Single: Yes")
+		wegoutput.Print("Single: Yes")
 	}
-	fmt.Println()
-	fmt.Printf("%-25s %-15s %-6s %s\n", "FIELD", "TYPE", "REQD", "OPTIONS")
-	fmt.Println(strings.Repeat("-", 70))
+	wegoutput.Print("")
+	wegoutput.Printf("%-25s %-15s %-6s %s", "FIELD", "TYPE", "REQD", "OPTIONS")
+	wegoutput.Print(strings.Repeat("-", 70))
 
 	fields, _ := data["fields"].([]any)
 	for _, f := range fields {
@@ -145,7 +146,7 @@ finally:
 			options = options[:22] + "..."
 		}
 
-		fmt.Printf("%-25s %-15s %-6s %s\n", fieldname, fieldtype, reqd, options)
+		wegoutput.Printf("%-25s %-15s %-6s %s", fieldname, fieldtype, reqd, options)
 	}
 
 	return nil

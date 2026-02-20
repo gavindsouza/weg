@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/tools"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
@@ -32,7 +33,7 @@ var createCmd = &cobra.Command{
 		apps := append([]tools.FrappeApp{frappe}, otherApps...)
 		err := create(args[0], apps)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
+			output.Errorf("%s", err)
 			os.Exit(1)
 		}
 		return nil
@@ -59,7 +60,7 @@ func create(benchPath string, apps []tools.FrappeApp) error {
 	success := false
 	defer func() {
 		if !success {
-			fmt.Printf("\nBench path: %s\n", benchPath)
+			output.Printf("\nBench path: %s", benchPath)
 		}
 	}()
 
@@ -236,7 +237,7 @@ func create(benchPath string, apps []tools.FrappeApp) error {
 
 	tools.DebugLog("Bench creation completed successfully")
 	duration := time.Since(startTime)
-	fmt.Printf("\n✅ Bench created in %v at %s\n", duration.Round(time.Second), benchPath)
+	output.Printf("\nBench created in %v at %s", duration.Round(time.Second), benchPath)
 
 	if err := writeOrUpdateDevboxServices(benchPath); err != nil {
 		return fmt.Errorf("failed to write devbox.yaml: %w", err)

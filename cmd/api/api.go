@@ -108,7 +108,7 @@ func detectBenchAndSite() (benchPath, site string, err error) {
 	}
 
 	if site == "" {
-		return "", "", fmt.Errorf("no site found. Create one with 'weg site new'")
+		return "", "", wegerrors.Usage("no site found. Create one with 'weg site new'")
 	}
 
 	return benchPath, site, nil
@@ -128,7 +128,7 @@ func findFirstSite(benchPath string) (string, error) {
 			return name, nil
 		}
 	}
-	return "", fmt.Errorf("no sites found")
+	return "", wegerrors.NotFound("sites", "")
 }
 
 // isRemoteMode returns true if --url flag is set

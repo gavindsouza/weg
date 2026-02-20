@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/url"
 
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/remote"
 	"github.com/spf13/cobra"
 )
@@ -41,7 +42,7 @@ func runLogout(cobraCmd *cobra.Command, args []string) error {
 
 	// Check if credentials exist
 	if !remote.HasGlobalCredentials(siteHost) {
-		fmt.Printf("No saved credentials found for %s\n", siteHost)
+		output.Printf("No saved credentials found for %s", siteHost)
 		return nil
 	}
 
@@ -51,8 +52,8 @@ func runLogout(cobraCmd *cobra.Command, args []string) error {
 	}
 
 	globalDir, _ := remote.GlobalConfigDir()
-	fmt.Printf("Credentials removed for %s\n", siteHost)
-	fmt.Printf("  (stored at %s/credentials.toml)\n", globalDir)
+	output.Printf("Credentials removed for %s", siteHost)
+	output.Printf("  (stored at %s/credentials.toml)", globalDir)
 
 	return nil
 }

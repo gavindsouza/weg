@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	wegerrors "github.com/gavindsouza/weg/internal/errors"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -49,7 +51,7 @@ func runShow(cmd *cobra.Command, args []string) error {
 
 	logFiles := findLogFiles(benchPath, site, logType)
 	if len(logFiles) == 0 {
-		return fmt.Errorf("no log files found for type '%s'", logType)
+		return wegerrors.NotFound("log type", logType)
 	}
 
 	// Read and combine log entries from all files
@@ -70,7 +72,7 @@ func runShow(cmd *cobra.Command, args []string) error {
 	}
 
 	for _, e := range entries {
-		fmt.Println(e.line)
+		output.Print(e.line)
 	}
 
 	return nil

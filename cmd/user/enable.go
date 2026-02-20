@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/gavindsouza/weg/internal/api"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -97,7 +98,7 @@ finally:
 	if enabled {
 		action = "enabled"
 	}
-	fmt.Printf("User %s %s\n", email, action)
+	output.Printf("User %s %s", email, action)
 
 	return nil
 }

@@ -6,6 +6,8 @@ import (
 	"syscall"
 
 	"github.com/gavindsouza/weg/internal/cloud"
+	wegerrors "github.com/gavindsouza/weg/internal/errors"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
@@ -65,12 +67,12 @@ func runLogin(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return fmt.Errorf("failed to read API key: %w", err)
 		}
-		fmt.Println()
+		output.Print("")
 		apiKey = string(keyBytes)
 	}
 
 	if apiKey == "" {
-		return fmt.Errorf("API key is required")
+		return wegerrors.Validation("api_key", "required")
 	}
 
 	// Prompt for API secret if not provided
@@ -80,12 +82,12 @@ func runLogin(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return fmt.Errorf("failed to read API secret: %w", err)
 		}
-		fmt.Println()
+		output.Print("")
 		apiSecret = string(secretBytes)
 	}
 
 	if apiSecret == "" {
-		return fmt.Errorf("API secret is required")
+		return wegerrors.Validation("api_secret", "required")
 	}
 
 	// Combine key:secret for Frappe API token authentication
@@ -102,12 +104,12 @@ func runLogin(cmd *cobra.Command, args []string) error {
 	}
 
 	// Verify the credentials work
-	fmt.Println("Verifying credentials...")
+	output.Print("Verifying credentials...")
 	client := cloud.NewClientWithURL(token, cloudURL)
 
 	user, err := client.GetCurrentUser()
 	if err != nil {
-		return fmt.Errorf("authentication failed: %w", err)
+		return wegerrors.Operation("authentication", "", err)
 	}
 
 	// Handle team selection
@@ -121,22 +123,22 @@ func runLogin(cmd *cobra.Command, args []string) error {
 			team = teams[0].Name
 		} else {
 			// Multiple teams - prompt user to select
-			fmt.Println("\nYou belong to multiple teams:")
+			output.Print("\nYou belong to multiple teams:")
 			for i, t := range teams {
 				status := ""
 				if !t.Enabled {
 					status = " (disabled)"
 				}
 				if t.Name == user.Team {
-					fmt.Printf("  [%d] %s%s (current)\n", i+1, t.Name, status)
+					output.Printf("  [%d] %s%s (current)", i+1, t.Name, status)
 				} else {
-					fmt.Printf("  [%d] %s%s\n", i+1, t.Name, status)
+					output.Printf("  [%d] %s%s", i+1, t.Name, status)
 				}
 			}
 			fmt.Print("\nSelect team (number): ")
 			var selection int
 			if _, err := fmt.Scanf("%d", &selection); err != nil || selection < 1 || selection > len(teams) {
-				fmt.Println("Using current team:", user.Team)
+				output.Printf("Using current team: %s", user.Team)
 				team = user.Team
 			} else {
 				team = teams[selection-1].Name
@@ -177,10 +179,10 @@ func runLogin(cmd *cobra.Command, args []string) error {
 
 	// Save
 	if err := cloud.SaveConfig(config, loginGlobal); err != nil {
-		return fmt.Errorf("failed to save config: %w", err)
+		return wegerrors.Config("cloud config", "write", err)
 	}
 	if err := cloud.SaveCredentials(creds, loginGlobal); err != nil {
-		return fmt.Errorf("failed to save credentials: %w", err)
+		return wegerrors.Config("credentials", "write", err)
 	}
 
 	// Success message
@@ -189,11 +191,11 @@ func runLogin(cmd *cobra.Command, args []string) error {
 		scope = "globally (~/.config/weg/)"
 	}
 
-	fmt.Printf("\nLogged in as %s\n", user.Email)
-	fmt.Printf("  Cloud: %s\n", cloudName)
+	output.Printf("\nLogged in as %s", user.Email)
+	output.Printf("  Cloud: %s", cloudName)
 	if team != "" {
-		fmt.Printf("  Team: %s\n", team)
+		output.Printf("  Team: %s", team)
 	}
-	fmt.Printf("  Saved: %s\n", scope)
+	output.Printf("  Saved: %s", scope)
 	return nil
 }

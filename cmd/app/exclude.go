@@ -8,6 +8,8 @@ import (
 	"github.com/BurntSushi/toml"
 	"github.com/gavindsouza/weg/internal/completion"
 	"github.com/gavindsouza/weg/internal/config"
+	wegerrors "github.com/gavindsouza/weg/internal/errors"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -59,12 +61,12 @@ func setAppExcluded(appName string, excluded bool) error {
 	}
 
 	if result.Context != config.ContextWegBench {
-		return fmt.Errorf("exclude/include only works with weg.toml (bench mode)")
+		return wegerrors.Validation("mode", "exclude/include only works with weg.toml (bench mode)")
 	}
 
 	// Prevent excluding frappe
 	if appName == "frappe" && excluded {
-		return fmt.Errorf("cannot exclude frappe - it is required")
+		return wegerrors.Validation("app", "cannot exclude frappe - it is required")
 	}
 
 	wegPath := filepath.Join(result.Path, "weg.toml")
@@ -72,24 +74,24 @@ func setAppExcluded(appName string, excluded bool) error {
 	// Read existing config
 	data, err := os.ReadFile(wegPath)
 	if err != nil {
-		return fmt.Errorf("failed to read weg.toml: %w", err)
+		return wegerrors.Config("weg.toml", "read", err)
 	}
 
 	var wegConfig map[string]any
 	if err := toml.Unmarshal(data, &wegConfig); err != nil {
-		return fmt.Errorf("failed to parse weg.toml: %w", err)
+		return wegerrors.Config("weg.toml", "parse", err)
 	}
 
 	// Get apps section
 	apps, ok := wegConfig["apps"].(map[string]any)
 	if !ok {
-		return fmt.Errorf("no apps section in weg.toml")
+		return wegerrors.NotFound("apps", "")
 	}
 
 	// Get the app
 	appConfig, ok := apps[appName].(map[string]any)
 	if !ok {
-		return fmt.Errorf("app %s not found in weg.toml", appName)
+		return wegerrors.NotFound("app", appName)
 	}
 
 	// Set/unset excluded flag
@@ -102,21 +104,21 @@ func setAppExcluded(appName string, excluded bool) error {
 	// Write back
 	f, err := os.Create(wegPath)
 	if err != nil {
-		return fmt.Errorf("failed to open weg.toml: %w", err)
+		return wegerrors.Config("weg.toml", "write", err)
 	}
 	defer f.Close()
 
 	encoder := toml.NewEncoder(f)
 	if err := encoder.Encode(wegConfig); err != nil {
-		return fmt.Errorf("failed to write weg.toml: %w", err)
+		return wegerrors.Config("weg.toml", "write", err)
 	}
 
 	if excluded {
-		fmt.Printf("Excluded %s from sync\n", appName)
-		fmt.Println("Run 'weg sync' to apply changes")
+		output.Printf("Excluded %s from sync", appName)
+		output.Print("Run 'weg sync' to apply changes")
 	} else {
-		fmt.Printf("Included %s in sync\n", appName)
-		fmt.Println("Run 'weg sync' to install the app")
+		output.Printf("Included %s in sync", appName)
+		output.Print("Run 'weg sync' to install the app")
 	}
 
 	return nil

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/gavindsouza/weg/internal/api"
+	wegoutput "github.com/gavindsouza/weg/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -74,7 +75,7 @@ finally:
 
 	if !result.Success {
 		if result.Traceback != "" {
-			fmt.Fprintf(os.Stderr, "%s\n", result.Traceback)
+			wegoutput.Errorf("%s", result.Traceback)
 		}
 		return fmt.Errorf("failed to export: %s", result.Error)
 	}
@@ -85,9 +86,9 @@ finally:
 		if err := os.WriteFile(exportOutput, output, 0644); err != nil {
 			return fmt.Errorf("failed to write file: %w", err)
 		}
-		fmt.Printf("Exported %s/%s to %s\n", doctype, name, exportOutput)
+		wegoutput.Printf("Exported %s/%s to %s", doctype, name, exportOutput)
 	} else {
-		fmt.Println(string(output))
+		wegoutput.Print(string(output))
 	}
 
 	return nil

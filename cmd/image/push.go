@@ -1,10 +1,10 @@
 package image
 
 import (
-	"fmt"
 	"os"
 	"os/exec"
 
+	wegerrors "github.com/gavindsouza/weg/internal/errors"
 	"github.com/gavindsouza/weg/internal/output"
 	"github.com/spf13/cobra"
 )
@@ -37,7 +37,7 @@ func runPush(cmd *cobra.Command, args []string) error {
 	execCmd.Stderr = os.Stderr
 
 	if err := execCmd.Run(); err != nil {
-		return fmt.Errorf("push failed: %w", err)
+		return wegerrors.Operation("push", "", err)
 	}
 
 	output.Successf("Successfully pushed %s\n", imageTag)

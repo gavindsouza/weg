@@ -5,10 +5,10 @@ package remote
 
 import (
 	"fmt"
-	"os"
 	"os/exec"
 	"time"
 
+	wegerrors "github.com/gavindsouza/weg/internal/errors"
 	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/remote"
 	"github.com/spf13/cobra"
@@ -45,18 +45,18 @@ func init() {
 func runPull(cobraCmd *cobra.Command, args []string) error {
 	// Check if we're in a remote site directory
 	if !remote.IsRemoteSite(".") {
-		return fmt.Errorf("not a remote site clone (no .weg/site.toml found)")
+		return wegerrors.NotFound("remote clone", ".weg/site.toml")
 	}
 
 	// Load config and credentials
 	config, err := remote.LoadSiteConfig(".")
 	if err != nil {
-		return fmt.Errorf("failed to load config: %w", err)
+		return wegerrors.Config("site.toml", "read", err)
 	}
 
 	creds, err := remote.LoadCredentials(".")
 	if err != nil {
-		return fmt.Errorf("failed to load credentials: %w", err)
+		return wegerrors.Config("credentials", "read", err)
 	}
 
 	// Connect
@@ -65,10 +65,10 @@ func runPull(cobraCmd *cobra.Command, args []string) error {
 	if err := client.Ping(); err != nil {
 		return fmt.Errorf("failed to connect: %w", err)
 	}
-	fmt.Println("Connected")
+	output.Print("Connected")
 
 	// Fetch entities
-	fmt.Println("Fetching customizations...")
+	output.Print("Fetching customizations...")
 	fetcher := remote.NewFetcher(client, config)
 	result, err := fetcher.FetchAll()
 	if err != nil {
@@ -76,9 +76,9 @@ func runPull(cobraCmd *cobra.Command, args []string) error {
 	}
 
 	if pullDryRun {
-		fmt.Printf("\nDry run - would update %d entities:\n", len(result.Entities))
+		output.Printf("\nDry run - would update %d entities:", len(result.Entities))
 		for _, e := range result.Entities {
-			fmt.Printf("  %s: %s\n", e.Type, e.Name)
+			output.Printf("  %s: %s", e.Type, e.Name)
 		}
 		return nil
 	}
@@ -87,20 +87,20 @@ func runPull(cobraCmd *cobra.Command, args []string) error {
 	output.Infof("Updating %d entities...\n", len(result.Entities))
 	for _, entity := range result.Entities {
 		if err := remote.WriteEntity(".", entity); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: Failed to write %s: %v\n", entity.Name, err)
+			output.Errorf("Failed to write %s: %v", entity.Name, err)
 		}
 	}
 
 	// Update config
 	config.Sync.LastSync = time.Now()
 	if err := config.Save("."); err != nil {
-		return fmt.Errorf("failed to save config: %w", err)
+		return wegerrors.Config("site.toml", "write", err)
 	}
 
 	// Check for changes and commit
 	gitStatus := exec.Command("git", "status", "--porcelain")
-	output, _ := gitStatus.Output()
-	if len(output) > 0 {
+	statusOutput, _ := gitStatus.Output()
+	if len(statusOutput) > 0 {
 		gitAdd := exec.Command("git", "add", "-A")
 		gitAdd.Run()
 
@@ -112,9 +112,9 @@ func runPull(cobraCmd *cobra.Command, args []string) error {
 		gitCommit := exec.Command("git", "commit", "-m", commitMsg)
 		gitCommit.Run()
 
-		fmt.Println("Changes committed")
+		output.Print("Changes committed")
 	} else {
-		fmt.Println("Already up to date")
+		output.Print("Already up to date")
 	}
 
 	return nil
