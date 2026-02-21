@@ -338,7 +338,3 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, testing, and code style guidel
 - Go 1.24+ (for building from source)
 - [devbox](https://www.jetify.com/devbox) (installed automatically on first use)
 - Git
-
-## License
-
-MIT
