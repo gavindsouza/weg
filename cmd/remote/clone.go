@@ -330,32 +330,8 @@ func runClone(cobraCmd *cobra.Command, args []string) error {
 	// Write entities to disk (only if not doing history reconstruction)
 	// When doing history reconstruction, entities are written incrementally per commit
 	writeEntitiesUpfront := cloneNoHistory
-	if writeEntitiesUpfront && len(result.Entities) > 0 {
-		bar := progressbar.NewOptions(len(result.Entities),
-			progressbar.OptionSetDescription("Writing files"),
-			progressbar.OptionSetWriter(os.Stdout),
-			progressbar.OptionShowCount(),
-			progressbar.OptionSetWidth(40),
-			progressbar.OptionClearOnFinish(),
-		)
-
-		mods := make(map[string]bool)
-		for _, entity := range result.Entities {
-			if err := remote.WriteEntity(dirName, entity); err != nil {
-				output.Errorf("Failed to write %s: %v", entity.Name, err)
-				continue
-			}
-			mods[entity.Module] = true
-			bar.Add(1)
-		}
-
-		// Update modules.txt
-		var moduleList []string
-		for m := range mods {
-			moduleList = append(moduleList, m)
-		}
-		modulesContent := strings.Join(moduleList, "\n") + "\n"
-		os.WriteFile(modulesFile, []byte(modulesContent), 0644)
+	if writeEntitiesUpfront {
+		writeAllEntities(dirName, result.Entities, modulesFile)
 	}
 
 	// Update sync timestamp
@@ -384,8 +360,11 @@ func runClone(cobraCmd *cobra.Command, args []string) error {
 		output.Print("Fetching version history...")
 		history, entitiesWithoutHistory, err := fetcher.FetchHistoryWithDocs(result.Entities)
 		if err != nil {
-			// Fall back to simple commit if history fetch fails
+			// Fall back to simple commit if history fetch fails.
+			// Entities weren't written upfront (that only happens with --no-history)
+			// and history reconstruction never ran, so write them now.
 			output.Warningf("Could not fetch version history: %v", err)
+			writeAllEntities(dirName, result.Entities, modulesFile)
 			output.Print("Creating simple initial commit...")
 			gitAdd := exec.Command("git", "add", "-A")
 			gitAdd.Dir = dirName
@@ -407,8 +386,10 @@ func runClone(cobraCmd *cobra.Command, args []string) error {
 			commitPlan := remote.BuildCommitPlan(history, result.Entities, entitiesWithoutHistory, users)
 
 			if len(commitPlan) == 0 {
-				// No history found, create a single commit
+				// No history found, create a single commit.
+				// Write current entities since the reconstruction loop won't run.
 				output.Print("No version history found, creating initial commit...")
+				writeAllEntities(dirName, result.Entities, modulesFile)
 				gitAdd := exec.Command("git", "add", "-A")
 				gitAdd.Dir = dirName
 				gitAdd.Run()
@@ -598,6 +579,40 @@ repos:
 }
 
 // writeFileContent writes JSON content to a file path
+// writeAllEntities writes the current state of every entity to disk and updates
+// modules.txt. Used for --no-history clones and as a fallback whenever version
+// history is unavailable, so the working tree is never left empty.
+func writeAllEntities(dirName string, entities []remote.Entity, modulesFile string) {
+	if len(entities) == 0 {
+		return
+	}
+
+	bar := progressbar.NewOptions(len(entities),
+		progressbar.OptionSetDescription("Writing files"),
+		progressbar.OptionSetWriter(os.Stdout),
+		progressbar.OptionShowCount(),
+		progressbar.OptionSetWidth(40),
+		progressbar.OptionClearOnFinish(),
+	)
+
+	mods := make(map[string]bool)
+	for _, entity := range entities {
+		if err := remote.WriteEntity(dirName, entity); err != nil {
+			output.Errorf("Failed to write %s: %v", entity.Name, err)
+			continue
+		}
+		mods[entity.Module] = true
+		bar.Add(1)
+	}
+
+	var moduleList []string
+	for m := range mods {
+		moduleList = append(moduleList, m)
+	}
+	modulesContent := strings.Join(moduleList, "\n") + "\n"
+	os.WriteFile(modulesFile, []byte(modulesContent), 0644)
+}
+
 func writeFileContent(baseDir, filePath string, content map[string]any) error {
 	fullPath := filepath.Join(baseDir, filePath)
 
