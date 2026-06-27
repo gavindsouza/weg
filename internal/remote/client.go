@@ -8,10 +8,14 @@ package remote
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -34,9 +38,22 @@ func NewClient(baseURL, apiKey, apiSecret string) *Client {
 		APIKey:    apiKey,
 		APISecret: apiSecret,
 		HTTPClient: &http.Client{
-			Timeout: 30 * time.Second,
+			Timeout: httpTimeout(),
 		},
 	}
+}
+
+// httpTimeout returns the per-request timeout. Heavy queries (e.g. paginating
+// the Version table with its large `data` blobs) can exceed the old 30s default
+// on big sites, which silently dropped version history from clones.
+// Override with WEG_HTTP_TIMEOUT (seconds).
+func httpTimeout() time.Duration {
+	if v := os.Getenv("WEG_HTTP_TIMEOUT"); v != "" {
+		if secs, err := strconv.Atoi(v); err == nil && secs > 0 {
+			return time.Duration(secs) * time.Second
+		}
+	}
+	return 120 * time.Second
 }
 
 // NewClientFromConfig creates a client from site config and credentials
@@ -86,7 +103,17 @@ func (c *Client) request(method, endpoint string, body any) ([]byte, error) {
 		req.Header.Set("Authorization", fmt.Sprintf("token %s:%s", c.APIKey, c.APISecret))
 	}
 
-	resp, err := c.HTTPClient.Do(req)
+	// Retry transient timeouts. Only safe to retry when there's no body to
+	// re-send (GETs) — reqBody would already be drained on a second attempt.
+	// ponytail: fixed 3 attempts / linear backoff, tune if flaky sites appear.
+	var resp *http.Response
+	for attempt := 1; ; attempt++ {
+		resp, err = c.HTTPClient.Do(req)
+		if err == nil || body != nil || attempt >= 3 || !isTimeout(err) {
+			break
+		}
+		time.Sleep(time.Duration(attempt) * time.Second)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
@@ -106,6 +133,13 @@ func (c *Client) request(method, endpoint string, body any) ([]byte, error) {
 	}
 
 	return respBody, nil
+}
+
+// isTimeout reports whether err is a network/client timeout (including
+// http.Client.Timeout "awaiting headers"), which is worth retrying.
+func isTimeout(err error) bool {
+	var ne net.Error
+	return errors.As(err, &ne) && ne.Timeout()
 }
 
 // Ping tests the connection to the Frappe site
