@@ -426,6 +426,9 @@ credentials.toml
 # Local state - machine-specific
 last_push_commit
 workspace_state.json
+
+# Resumable version-history staging cache
+tmp/
 `
 	return os.WriteFile(gitignorePath, []byte(content), 0644)
 }

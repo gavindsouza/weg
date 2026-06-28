@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	wegerrors "github.com/gavindsouza/weg/internal/errors"
@@ -112,9 +113,17 @@ func runClone(cobraCmd *cobra.Command, args []string) error {
 		dirName = parts[0]
 	}
 
-	// Check if directory already exists
+	// Check if directory already exists. A dir holding a staged version cache is
+	// a resumable partial clone: keep the expensive cache, wipe the rest, rebuild.
 	if _, err := os.Stat(dirName); err == nil {
-		return wegerrors.Validation("path", fmt.Sprintf("directory %s already exists", dirName))
+		if _, err := os.Stat(filepath.Join(dirName, ".weg", "tmp", "versions")); err == nil {
+			output.Print("Resuming previous clone (reusing cached version history)...")
+			if err := resetForResume(dirName); err != nil {
+				return fmt.Errorf("failed to prepare resume: %w", err)
+			}
+		} else {
+			return wegerrors.Validation("path", fmt.Sprintf("directory %s already exists", dirName))
+		}
 	}
 
 	// Get credentials - resolution hierarchy:
@@ -356,138 +365,8 @@ func runClone(cobraCmd *cobra.Command, args []string) error {
 		gitCommit.Dir = dirName
 		gitCommit.Run() // Might fail if nothing to commit, that's ok
 	} else {
-		// Full history reconstruction from Version DocType
-		output.Print("Fetching version history...")
-		history, entitiesWithoutHistory, err := fetcher.FetchHistoryWithDocs(result.Entities)
-		if err != nil {
-			// Fall back to simple commit if history fetch fails.
-			// Entities weren't written upfront (that only happens with --no-history)
-			// and history reconstruction never ran, so write them now.
-			output.Warningf("Could not fetch version history: %v", err)
-			writeAllEntities(dirName, result.Entities, modulesFile)
-			output.Print("Creating simple initial commit...")
-			gitAdd := exec.Command("git", "add", "-A")
-			gitAdd.Dir = dirName
-			gitAdd.Run()
-			commitMsg := fmt.Sprintf("Initial clone from %s\n\nFrappe version: %s\nEntities: %d",
-				siteURL, frappeVersion, len(result.Entities))
-			gitCommit := exec.Command("git", "commit", "-m", commitMsg)
-			gitCommit.Dir = dirName
-			gitCommit.Run()
-		} else {
-			// Fetch user information for author names
-			output.Print("Fetching user information...")
-			users, err := fetcher.FetchUsers(history)
-			if err != nil {
-				// Non-fatal: we'll fall back to email-derived names
-				users = make(map[string]remote.UserInfo)
-			}
-
-			commitPlan := remote.BuildCommitPlan(history, result.Entities, entitiesWithoutHistory, users)
-
-			if len(commitPlan) == 0 {
-				// No history found, create a single commit.
-				// Write current entities since the reconstruction loop won't run.
-				output.Print("No version history found, creating initial commit...")
-				writeAllEntities(dirName, result.Entities, modulesFile)
-				gitAdd := exec.Command("git", "add", "-A")
-				gitAdd.Dir = dirName
-				gitAdd.Run()
-				commitMsg := fmt.Sprintf("Initial clone from %s\n\nFrappe version: %s\nEntities: %d",
-					siteURL, frappeVersion, len(result.Entities))
-				gitCommit := exec.Command("git", "commit", "-m", commitMsg)
-				gitCommit.Dir = dirName
-				gitCommit.Run()
-			} else {
-				output.Infof("Reconstructing %d commits from version history...\n", len(commitPlan))
-
-				bar := progressbar.NewOptions(len(commitPlan),
-					progressbar.OptionSetDescription("Creating commits"),
-					progressbar.OptionSetWriter(os.Stdout),
-					progressbar.OptionShowCount(),
-					progressbar.OptionSetWidth(40),
-					progressbar.OptionClearOnFinish(),
-				)
-
-				// Track modules for modules.txt
-				mods := make(map[string]bool)
-
-				for _, commit := range commitPlan {
-					// Write file contents for this commit (historical state)
-					for filePath, content := range commit.FileContents {
-						if err := writeFileContent(dirName, filePath, content); err != nil {
-							output.Errorf("Failed to write %s: %v", filePath, err)
-							continue
-						}
-						// Track module from path
-						parts := strings.Split(filePath, "/")
-						if len(parts) > 0 {
-							mods[parts[0]] = true
-						}
-					}
-
-					// Stage files for this commit
-					for _, file := range commit.Files {
-						gitAdd := exec.Command("git", "add", file)
-						gitAdd.Dir = dirName
-						gitAdd.Run()
-					}
-
-					// Check if there's anything staged
-					gitDiff := exec.Command("git", "diff", "--cached", "--quiet")
-					gitDiff.Dir = dirName
-					if err := gitDiff.Run(); err == nil {
-						// No changes staged, skip this commit
-						bar.Add(1)
-						continue
-					}
-
-					// Format timestamp for git (RFC3339 or ISO 8601)
-					timestamp := formatGitTimestamp(commit.Timestamp)
-
-					// Create commit with historical timestamp from version.creation
-					// Both author date and committer date are set to preserve timeline
-					gitCommit := exec.Command("git", "commit",
-						"--date", timestamp,
-						"--author", commit.Author,
-						"-m", commit.Message,
-					)
-					gitCommit.Dir = dirName
-					gitCommit.Env = append(os.Environ(), "GIT_COMMITTER_DATE="+timestamp)
-					gitCommit.Run()
-
-					bar.Add(1)
-				}
-
-				// Write modules.txt after all commits
-				if len(mods) > 0 {
-					var moduleList []string
-					for m := range mods {
-						moduleList = append(moduleList, m)
-					}
-					modulesContent := strings.Join(moduleList, "\n") + "\n"
-					os.WriteFile(modulesFile, []byte(modulesContent), 0644)
-				}
-
-				// Final commit for config files
-				gitAdd := exec.Command("git", "add", "-A")
-				gitAdd.Dir = dirName
-				gitAdd.Run()
-
-				// Check if there are uncommitted changes
-				gitStatus := exec.Command("git", "status", "--porcelain")
-				gitStatus.Dir = dirName
-				statusOutput, _ := gitStatus.Output()
-				if len(strings.TrimSpace(string(statusOutput))) > 0 {
-					commitMsg := fmt.Sprintf("chore(config): initialize weg config\n\nSource: %s", siteURL)
-					gitCommit := exec.Command("git", "commit",
-						"--author", "Weg <noreply@weg.io>",
-						"-m", commitMsg,
-					)
-					gitCommit.Dir = dirName
-					gitCommit.Run()
-				}
-			}
+		if err := reconstructHistory(dirName, siteURL, frappeVersion, modulesFile, fetcher, result); err != nil {
+			return err
 		}
 	}
 
@@ -517,6 +396,177 @@ func modules(entities []remote.Entity) map[string]bool {
 		m[e.Module] = true
 	}
 	return m
+}
+
+// reconstructHistory runs the streaming version-history pipeline: a parallel,
+// resumable fetch to an on-disk cache, forward reconstruction into per-version
+// commits (bounded memory), then a reconcile to the current site state.
+func reconstructHistory(dirName, siteURL, frappeVersion, modulesFile string, fetcher *remote.Fetcher, result *remote.FetchResult) error {
+	tmpDir := filepath.Join(dirName, ".weg", "tmp", "versions")
+
+	// Phase 1: fetch versions to disk in parallel, resuming from any cursors.
+	output.Print("Fetching version history...")
+	var mu sync.Mutex
+	counts := map[string]int{}
+	err := fetcher.FetchVersionsToDisk(tmpDir, func(dt string, n int) {
+		mu.Lock()
+		counts[dt] = n
+		total := 0
+		for _, c := range counts {
+			total += c
+		}
+		mu.Unlock()
+		fmt.Printf("\r  fetched %d version records", total)
+	})
+	fmt.Println()
+	if err != nil {
+		// The cache is preserved for resume; make the clone usable now.
+		output.Warningf("Version history incomplete (rerun clone to resume): %v", err)
+		writeAllEntities(dirName, result.Entities, modulesFile)
+		gitCommitAll(dirName, fmt.Sprintf("Initial clone from %s\n\nFrappe version: %s\nEntities: %d (history pending)",
+			siteURL, frappeVersion, len(result.Entities)))
+		return nil
+	}
+
+	// Phase 2: determine which DocType histories are in scope.
+	customDoctypes, err := fetcher.ResolveCustomDoctypes(tmpDir, customDoctypeSet(result.Entities))
+	if err != nil {
+		return fmt.Errorf("failed to resolve custom doctypes: %w", err)
+	}
+
+	// Resolve author names so git blame shows who changed what.
+	output.Print("Fetching user information...")
+	users := map[string]remote.UserInfo{}
+	if owners, err := remote.CollectVersionOwners(tmpDir); err == nil {
+		if u, err := fetcher.Client.GetUsers(owners); err == nil {
+			users = u
+		}
+	}
+
+	// Phase 3: replay history forward into per-version commits.
+	output.Print("Reconstructing history...")
+	commitCount := 0
+	seenPaths, err := fetcher.StreamHistory(tmpDir, customDoctypes, result.Entities, users, func(c remote.ReconstructedCommit) error {
+		if err := writeFileContent(dirName, c.FilePath, c.Content); err != nil {
+			output.Errorf("Failed to write %s: %v", c.FilePath, err)
+			return nil
+		}
+		runGit(dirName, "add", c.FilePath)
+		if gitNothingStaged(dirName) {
+			return nil
+		}
+		gitCommitAuthored(dirName, c.Author, formatGitTimestamp(c.Timestamp), c.Message)
+		commitCount++
+		return nil
+	})
+	if err != nil {
+		output.Warningf("History reconstruction stopped early: %v", err)
+	}
+
+	// Phase 4: reconcile to the authoritative current state.
+	writeAllEntities(dirName, result.Entities, modulesFile)
+	currentPaths := entityPathSet(result.Entities)
+	for p := range seenPaths {
+		if !currentPaths[p] {
+			// Entity deleted/renamed away: keep its history, drop it from HEAD.
+			runGit(dirName, "rm", "-f", "--ignore-unmatch", p)
+		}
+	}
+	runGit(dirName, "add", "-A")
+	if !gitNothingStaged(dirName) {
+		gitCommitAuthored(dirName, "Weg <noreply@weg.io>", "",
+			fmt.Sprintf("chore(sync): reconcile to current site state\n\nSource: %s", siteURL))
+	}
+
+	output.Printf("Reconstructed %d commits from version history", commitCount)
+
+	// Success: drop the staging cache.
+	os.RemoveAll(filepath.Join(dirName, ".weg", "tmp"))
+	return nil
+}
+
+// customDoctypeSet is the set of currently-custom DocType names (custom=1).
+func customDoctypeSet(entities []remote.Entity) map[string]bool {
+	set := make(map[string]bool)
+	for _, e := range entities {
+		if e.Type == remote.EntityDocType {
+			set[e.Name] = true
+		}
+	}
+	return set
+}
+
+// entityPathSet is the set of file paths for the current entities.
+func entityPathSet(entities []remote.Entity) map[string]bool {
+	set := make(map[string]bool)
+	for _, e := range entities {
+		set[e.FilePath] = true
+	}
+	return set
+}
+
+// resetForResume preserves the .weg version cache and credentials, wiping the
+// rest so a resumed clone rebuilds cleanly from the cached (expensive) JSONL.
+func resetForResume(dir string) error {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return err
+	}
+	for _, e := range entries {
+		if e.Name() == ".weg" {
+			continue
+		}
+		if err := os.RemoveAll(filepath.Join(dir, e.Name())); err != nil {
+			return err
+		}
+	}
+	wegEntries, err := os.ReadDir(filepath.Join(dir, ".weg"))
+	if err != nil {
+		return err
+	}
+	for _, e := range wegEntries {
+		if e.Name() == "tmp" || e.Name() == "credentials.toml" {
+			continue
+		}
+		os.RemoveAll(filepath.Join(dir, ".weg", e.Name()))
+	}
+	return nil
+}
+
+func runGit(dir string, args ...string) {
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	cmd.Run()
+}
+
+// gitNothingStaged reports whether the index has no staged changes.
+func gitNothingStaged(dir string) bool {
+	cmd := exec.Command("git", "diff", "--cached", "--quiet")
+	cmd.Dir = dir
+	return cmd.Run() == nil
+}
+
+// gitCommitAuthored commits staged changes with an optional author and date.
+func gitCommitAuthored(dir, author, date, msg string) {
+	args := []string{"commit"}
+	if author != "" {
+		args = append(args, "--author", author)
+	}
+	if date != "" {
+		args = append(args, "--date", date)
+	}
+	args = append(args, "-m", msg)
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	if date != "" {
+		cmd.Env = append(os.Environ(), "GIT_COMMITTER_DATE="+date)
+	}
+	cmd.Run()
+}
+
+func gitCommitAll(dir, msg string) {
+	runGit(dir, "add", "-A")
+	gitCommitAuthored(dir, "", "", msg)
 }
 
 // initWorkspace sets up the workspace directory with gitignore and pre-commit hooks
