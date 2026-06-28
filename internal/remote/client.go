@@ -386,36 +386,6 @@ type VersionRecord struct {
 	Data       string `json:"data"` // JSON string of version data
 }
 
-// GetAllVersions retrieves all Version records for given doctypes
-func (c *Client) GetAllVersions(doctypes []string) ([]VersionRecord, error) {
-	// Build filter for multiple doctypes
-	filters := map[string]any{
-		"ref_doctype": []any{"in", doctypes},
-	}
-
-	docs, err := c.GetAll("Version", filters, []string{"name", "ref_doctype", "docname", "owner", "creation", "data"})
-	if err != nil {
-		return nil, err
-	}
-
-	var versions []VersionRecord
-	for _, doc := range docs {
-		v := VersionRecord{
-			Name:       getString(doc, "name"),
-			RefDoctype: getString(doc, "ref_doctype"),
-			Docname:    getString(doc, "docname"),
-			Owner:      getString(doc, "owner"),
-			Creation:   getString(doc, "creation"),
-			Data:       getString(doc, "data"),
-		}
-		if v.Name != "" && v.RefDoctype != "" && v.Docname != "" {
-			versions = append(versions, v)
-		}
-	}
-
-	return versions, nil
-}
-
 // UserInfo contains basic user information
 type UserInfo struct {
 	Email    string

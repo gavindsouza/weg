@@ -4,14 +4,15 @@ Copyright © 2025 Gavin <me@gavv.in>
 Forward reconstruction of entity state from Frappe Version diffs.
 
 The streaming history builder applies versions chronologically (oldest first),
-maintaining live state per entity. This is the inverse of applyVersionReverse
-and, unlike backward-from-current reconstruction, needs no current state — so it
-can rebuild deleted entities whose current doc no longer exists.
+maintaining live state per entity. Unlike backward-from-current reconstruction,
+it needs no current state — so it can rebuild deleted entities whose current
+doc no longer exists.
 */
 package remote
 
 // applyVersionForward applies a Version's diff to state, returning the state
-// AFTER this version. state is mutated in place and also returned for chaining.
+// AFTER this version (the inverse direction to backward-from-current
+// reconstruction). state is mutated in place and also returned for chaining.
 // A nil state starts a fresh entity (creation).
 func applyVersionForward(state map[string]any, versionData map[string]any) map[string]any {
 	if state == nil {
