@@ -1,0 +1,43 @@
+Create a new Frappe app with modern project structure.
+
+If path is "." or omitted, creates the app in the current directory.
+Otherwise, creates a new directory with the app.
+
+The command will:
+1. Create the app module structure (hooks.py, __init__.py)
+2. Generate pyproject.toml with [tool.weg] configuration
+3. Optionally initialize the development environment
+
+Examples:
+  weg new                      # Interactive, creates in current dir
+  weg new .                    # Create app in current directory
+  weg new my-awesome-app       # Create new directory with app
+  weg new ./apps/my-app        # Create at specific path
+  weg new my-app --version 15  # Specify Frappe version
+
+When to use which: 'weg new' creates a brand-new app; use 'weg create' for
+a new bench, 'weg init' for an existing project, and 'weg run' to try out
+an existing app.
+
+Usage:
+  weg new [path] [flags]
+
+Flags:
+      --author string     Author name
+      --database string   Database (mariadb, postgres, sqlite)
+      --email string      Author email
+  -h, --help              help for new
+      --license string    License (default "MIT")
+      --skip-init         Skip initializing .weg environment
+      --title string      App title
+      --version string    Frappe version (14, 15, 16)
+
+Global Flags:
+  -C, --chdir string              Run as if weg was started in <path>
+      --config string             Path to config file (default: auto-detect)
+      --debug-categories string   Filter debug output: all,config,state,net,git,fs,exec
+      --log-level string          Set log level: quiet, normal, verbose, debug, trace
+  -o, --output string             Output format: auto, json, table, plain, quiet (default "auto")
+  -q, --quiet                     Suppress non-essential output
+  -v, --verbose count             Increase verbosity (-v, -vv, -vvv)
+  -y, --yes                       Assume yes for all prompts

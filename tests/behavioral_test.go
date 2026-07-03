@@ -6,8 +6,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/gavindsouza/weg/cmd/app"
-	"github.com/gavindsouza/weg/cmd/site"
 	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/testutil"
 )
@@ -20,6 +18,17 @@ func captureJSON(t *testing.T) *bytes.Buffer {
 	return buf
 }
 
+// runWeg executes `weg <args...>` through the fully-wired root command,
+// discarding cobra's own output (help/usage text).
+func runWeg(t *testing.T, args ...string) error {
+	t.Helper()
+	root := rootCommand(t)
+	root.SetArgs(args)
+	root.SetOut(&bytes.Buffer{})
+	root.SetErr(&bytes.Buffer{})
+	return root.Execute()
+}
+
 // --- Site list behavioral tests ---
 
 func TestSiteList_EmptyBench(t *testing.T) {
@@ -30,14 +39,9 @@ func TestSiteList_EmptyBench(t *testing.T) {
 	os.Chdir(bench)
 	defer os.Chdir(oldWd)
 
-	// Reset the command for re-execution
-	cmd := site.SiteCmd
-	cmd.SetArgs([]string{"list"})
-	cmd.SetOut(&bytes.Buffer{}) // cobra's own output (help text)
-	cmd.SetErr(&bytes.Buffer{})
-
-	err := cmd.Execute()
-	if err != nil {
+	// -o json is required: the root command's PersistentPreRunE re-derives the
+	// output format from flags, overriding what captureJSON set.
+	if err := runWeg(t, "-o", "json", "site", "list"); err != nil {
 		t.Fatalf("site list failed: %v", err)
 	}
 
@@ -72,13 +76,7 @@ func TestSiteList_WithSites(t *testing.T) {
 	os.Chdir(bench)
 	defer os.Chdir(oldWd)
 
-	cmd := site.SiteCmd
-	cmd.SetArgs([]string{"list"})
-	cmd.SetOut(&bytes.Buffer{})
-	cmd.SetErr(&bytes.Buffer{})
-
-	err := cmd.Execute()
-	if err != nil {
+	if err := runWeg(t, "-o", "json", "site", "list"); err != nil {
 		t.Fatalf("site list failed: %v", err)
 	}
 
@@ -135,13 +133,7 @@ branch = "version-15"
 	os.Chdir(bench)
 	defer os.Chdir(oldWd)
 
-	cmd := app.AppCmd
-	cmd.SetArgs([]string{"list"})
-	cmd.SetOut(&bytes.Buffer{})
-	cmd.SetErr(&bytes.Buffer{})
-
-	err := cmd.Execute()
-	if err != nil {
+	if err := runWeg(t, "-o", "json", "app", "list"); err != nil {
 		t.Fatalf("app list failed: %v", err)
 	}
 
@@ -184,13 +176,9 @@ func TestAppList_NotWegProject(t *testing.T) {
 	os.Chdir(tmpDir)
 	defer os.Chdir(oldWd)
 
-	cmd := app.AppCmd
-	cmd.SetArgs([]string{"list"})
-	cmd.SetOut(&bytes.Buffer{})
-	cmd.SetErr(&bytes.Buffer{})
+	output.SaveForTest(t) // PersistentPreRunE mutates output globals
 
-	err := cmd.Execute()
-	if err == nil {
+	if err := runWeg(t, "app", "list"); err == nil {
 		t.Error("expected error for non-weg project")
 	}
 }

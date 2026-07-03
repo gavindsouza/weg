@@ -1,0 +1,39 @@
+Interact with Frappe Cloud for deployment and management.
+
+Authenticate with Frappe Cloud and deploy your apps directly
+from the command line.
+
+Examples:
+  weg cloud login              # Authenticate with Frappe Cloud
+  weg cloud sites              # List your sites
+  weg cloud deploy             # Deploy to a site
+  weg cloud logs               # View site logs
+  weg cloud status             # Check deployment status
+
+Usage:
+  weg cloud [command]
+
+Available Commands:
+  benches     List your Frappe Cloud benches
+  deploy      Deploy to Frappe Cloud
+  login       Authenticate with Frappe Cloud
+  logout      Log out from Frappe Cloud
+  logs        View site logs from Frappe Cloud
+  marketplace Manage your Frappe Cloud marketplace apps
+  sites       List your Frappe Cloud sites
+  status      Check cloud account, site, or job status
+
+Flags:
+  -h, --help   help for cloud
+
+Global Flags:
+  -C, --chdir string              Run as if weg was started in <path>
+      --config string             Path to config file (default: auto-detect)
+      --debug-categories string   Filter debug output: all,config,state,net,git,fs,exec
+      --log-level string          Set log level: quiet, normal, verbose, debug, trace
+  -o, --output string             Output format: auto, json, table, plain, quiet (default "auto")
+  -q, --quiet                     Suppress non-essential output
+  -v, --verbose count             Increase verbosity (-v, -vv, -vvv)
+  -y, --yes                       Assume yes for all prompts
+
+Use "weg cloud [command] --help" for more information about a command.

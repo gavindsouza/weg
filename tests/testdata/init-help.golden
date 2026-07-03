@@ -1,0 +1,37 @@
+Initialize weg configuration based on detected context.
+
+Weg init is smart - it detects what kind of directory you're in and
+takes the appropriate action:
+
+  Fresh directory     → Interactive setup (app or bench)
+  Frappe app          → Add [tool.weg] to pyproject.toml
+  Traditional bench   → Generate weg.toml from existing structure
+  Weg-managed project → Show status and suggest next steps
+
+Examples:
+  weg init              # Initialize in current directory
+  weg init ./myproject  # Initialize in specific directory
+  weg init --bench      # Force bench-style initialization
+
+When to use which: 'weg init' adopts an existing directory; use 'weg new'
+for a brand-new app, 'weg create' for a new bench, and 'weg run' to try
+out an existing app.
+
+Usage:
+  weg init [path] [flags]
+
+Flags:
+      --app                Force app-style initialization
+      --bench              Force bench-style initialization
+  -h, --help               help for init
+      --skip-dev-tooling   Skip setting up AI and pre-commit tooling
+
+Global Flags:
+  -C, --chdir string              Run as if weg was started in <path>
+      --config string             Path to config file (default: auto-detect)
+      --debug-categories string   Filter debug output: all,config,state,net,git,fs,exec
+      --log-level string          Set log level: quiet, normal, verbose, debug, trace
+  -o, --output string             Output format: auto, json, table, plain, quiet (default "auto")
+  -q, --quiet                     Suppress non-essential output
+  -v, --verbose count             Increase verbosity (-v, -vv, -vvv)
+  -y, --yes                       Assume yes for all prompts

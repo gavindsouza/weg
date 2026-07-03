@@ -1,25 +1,23 @@
-Commands for managing Frappe apps in the current project.
+Database management commands.
 
 Examples:
-  weg app list              # List installed apps
-  weg app get <url>         # Install an app
-  weg app remove <name>     # Remove an app
-  weg app switch <branch>   # Switch app branch
+  weg db migrate                    # Run migrations
+  weg db console                    # Open database shell
+  weg db backup                     # Backup database
+  weg db restore backup.sql.gz      # Restore from backup
+  weg db trim --days 30             # Trim log tables
 
 Usage:
-  weg app [command]
+  weg db [command]
 
 Available Commands:
-  exclude     Exclude an app from sync
-  get         Install an app
-  include     Include an excluded app
-  list        List apps in the project
-  reinstall   Reinstall an app (uninstall + install)
-  remove      Remove an app
-  switch      Switch an app to a different branch
+  console     Open database shell
+  migrate     Run database migrations
+  query       Run SQL query against database
+  trim        Trim log tables to reduce database size
 
 Flags:
-  -h, --help   help for app
+  -h, --help   help for db
 
 Global Flags:
   -C, --chdir string              Run as if weg was started in <path>
@@ -31,4 +29,4 @@ Global Flags:
   -v, --verbose count             Increase verbosity (-v, -vv, -vvv)
   -y, --yes                       Assume yes for all prompts
 
-Use "weg app [command] --help" for more information about a command.
+Use "weg db [command] --help" for more information about a command.

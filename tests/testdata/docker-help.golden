@@ -1,0 +1,36 @@
+Manage Docker Compose deployments for Frappe projects.
+
+Generate docker-compose.yml and manage container lifecycle
+for local development or production deployment.
+
+Examples:
+  weg docker init              # Generate docker-compose.yml
+  weg docker up                # Start containers
+  weg docker down              # Stop containers
+  weg docker logs              # View logs
+  weg docker ps                # List containers
+
+Usage:
+  weg docker [command]
+
+Available Commands:
+  down        Stop Docker containers
+  init        Generate docker-compose.yml
+  logs        View container logs
+  ps          List containers
+  up          Start Docker containers
+
+Flags:
+  -h, --help   help for docker
+
+Global Flags:
+  -C, --chdir string              Run as if weg was started in <path>
+      --config string             Path to config file (default: auto-detect)
+      --debug-categories string   Filter debug output: all,config,state,net,git,fs,exec
+      --log-level string          Set log level: quiet, normal, verbose, debug, trace
+  -o, --output string             Output format: auto, json, table, plain, quiet (default "auto")
+  -q, --quiet                     Suppress non-essential output
+  -v, --verbose count             Increase verbosity (-v, -vv, -vvv)
+  -y, --yes                       Assume yes for all prompts
+
+Use "weg docker [command] --help" for more information about a command.

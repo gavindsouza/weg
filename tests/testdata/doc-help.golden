@@ -1,0 +1,37 @@
+Create, read, update, and delete Frappe documents.
+
+Examples:
+  weg doc get User Administrator           # Get a document
+  weg doc list User --limit 10             # List documents
+  weg doc delete User test@test.com        # Delete document
+  weg doc rename User old-name new-name    # Rename document
+  weg doc export User Administrator        # Export to JSON
+  weg doc import user.json                 # Import from JSON
+  weg doc field get User Administrator email  # Get field value
+
+Usage:
+  weg doc [command]
+
+Available Commands:
+  delete      Delete a document
+  export      Export a document to JSON
+  field       Get or set document field values
+  get         Get a document
+  import      Import a document from JSON
+  list        List documents
+  rename      Rename a document
+
+Flags:
+  -h, --help   help for doc
+
+Global Flags:
+  -C, --chdir string              Run as if weg was started in <path>
+      --config string             Path to config file (default: auto-detect)
+      --debug-categories string   Filter debug output: all,config,state,net,git,fs,exec
+      --log-level string          Set log level: quiet, normal, verbose, debug, trace
+  -o, --output string             Output format: auto, json, table, plain, quiet (default "auto")
+  -q, --quiet                     Suppress non-essential output
+  -v, --verbose count             Increase verbosity (-v, -vv, -vvv)
+  -y, --yes                       Assume yes for all prompts
+
+Use "weg doc [command] --help" for more information about a command.

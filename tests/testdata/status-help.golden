@@ -1,23 +1,20 @@
-Model Context Protocol (MCP) server that exposes weg commands as
-structured tools for AI assistants like Claude Code.
+Display the current status of the weg-managed environment.
 
-Subcommands:
-  serve     Start the MCP server on stdio
-  install   Generate/update .mcp.json configuration
+Shows:
+  - Detected context (app or bench)
+  - Installed apps and their versions
+  - Configured sites
+  - Whether sync is needed
 
-Quick start:
-  weg mcp install        # Add weg to .mcp.json
-  weg mcp serve          # Start server (used by AI tools)
+Examples:
+  weg status         # Show status of current directory
+  weg status -v      # Show verbose status with more details
 
 Usage:
-  weg mcp [command]
-
-Available Commands:
-  install     Generate/update .mcp.json with weg server config
-  serve       Start the MCP server on stdio
+  weg status [flags]
 
 Flags:
-  -h, --help   help for mcp
+  -h, --help   help for status
 
 Global Flags:
   -C, --chdir string              Run as if weg was started in <path>
@@ -28,5 +25,3 @@ Global Flags:
   -q, --quiet                     Suppress non-essential output
   -v, --verbose count             Increase verbosity (-v, -vv, -vvv)
   -y, --yes                       Assume yes for all prompts
-
-Use "weg mcp [command] --help" for more information about a command.

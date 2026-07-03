@@ -1,0 +1,32 @@
+Update Frappe apps to their latest versions.
+
+By default, updates all apps. Specify app names to update specific apps.
+This pulls the latest code, updates dependencies, and rebuilds assets.
+
+Examples:
+  weg update              # Update all apps
+  weg update frappe       # Update only frappe
+  weg update --pull       # Only pull, skip dependency install
+  weg update --no-build   # Skip asset rebuild
+
+To upgrade Frappe to the next major version, see 'weg upgrade'.
+To update weg itself, see 'weg self update'.
+
+Usage:
+  weg update [app...] [flags]
+
+Flags:
+  -h, --help       help for update
+      --no-build   Skip asset rebuild after update
+      --no-deps    Skip dependency installation
+      --pull       Only pull latest code, skip dependency install
+
+Global Flags:
+  -C, --chdir string              Run as if weg was started in <path>
+      --config string             Path to config file (default: auto-detect)
+      --debug-categories string   Filter debug output: all,config,state,net,git,fs,exec
+      --log-level string          Set log level: quiet, normal, verbose, debug, trace
+  -o, --output string             Output format: auto, json, table, plain, quiet (default "auto")
+  -q, --quiet                     Suppress non-essential output
+  -v, --verbose count             Increase verbosity (-v, -vv, -vvv)
+  -y, --yes                       Assume yes for all prompts

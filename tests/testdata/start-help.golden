@@ -1,0 +1,36 @@
+Start all development services for the current project.
+
+This command starts:
+  - MariaDB (database)
+  - Redis (cache and queue)
+  - Web server (Gunicorn)
+  - Socket.io server
+  - Background workers
+  - Scheduler
+  - File watcher (for auto-rebuild)
+
+Services run in the background by default. Use 'weg stop' to stop them.
+
+Examples:
+  weg start              # Start services in background
+  weg start -f           # Start with TUI (foreground)
+  weg start --no-watch   # Start without file watcher
+
+Usage:
+  weg start [flags]
+
+Flags:
+  -f, --foreground   Run in foreground with TUI
+  -h, --help         help for start
+      --no-sync      Skip sync check before starting
+      --no-watch     Disable file watcher
+
+Global Flags:
+  -C, --chdir string              Run as if weg was started in <path>
+      --config string             Path to config file (default: auto-detect)
+      --debug-categories string   Filter debug output: all,config,state,net,git,fs,exec
+      --log-level string          Set log level: quiet, normal, verbose, debug, trace
+  -o, --output string             Output format: auto, json, table, plain, quiet (default "auto")
+  -q, --quiet                     Suppress non-essential output
+  -v, --verbose count             Increase verbosity (-v, -vv, -vvv)
+  -y, --yes                       Assume yes for all prompts

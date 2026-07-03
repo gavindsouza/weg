@@ -1,0 +1,47 @@
+Manage the weg_workspace/ directory for editing code with proper syntax highlighting.
+
+The workspace extracts code from JSON files into properly-typed source files:
+  - Server Scripts (.py)
+  - Client Scripts (.js)
+  - Reports (.py, .js, .sql)
+  - Print Formats (.html, .css)
+
+Commands:
+  expand   - Extract code from JSON files into workspace
+  collapse - Pack workspace changes back into JSON
+  status   - Show sync status between workspace and JSON
+  init     - Set up workspace with pre-commit hooks
+
+Example workflow:
+  weg workspace expand      # Extract scripts to weg_workspace/
+  # ... edit files in your IDE with syntax highlighting ...
+  weg workspace collapse    # Pack changes back to JSON
+  git commit -m "Update scripts"
+
+Usage:
+  weg workspace [command]
+
+Aliases:
+  workspace, ws
+
+Available Commands:
+  collapse    Pack workspace changes back into JSON
+  expand      Extract code from JSON files into workspace
+  init        Set up workspace with pre-commit hooks
+  status      Show sync status between workspace and JSON
+  watch       Watch workspace and auto-collapse on changes
+
+Flags:
+  -h, --help   help for workspace
+
+Global Flags:
+  -C, --chdir string              Run as if weg was started in <path>
+      --config string             Path to config file (default: auto-detect)
+      --debug-categories string   Filter debug output: all,config,state,net,git,fs,exec
+      --log-level string          Set log level: quiet, normal, verbose, debug, trace
+  -o, --output string             Output format: auto, json, table, plain, quiet (default "auto")
+  -q, --quiet                     Suppress non-essential output
+  -v, --verbose count             Increase verbosity (-v, -vv, -vvv)
+  -y, --yes                       Assume yes for all prompts
+
+Use "weg workspace [command] --help" for more information about a command.

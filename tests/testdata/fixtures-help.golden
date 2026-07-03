@@ -1,25 +1,24 @@
-Commands for managing Frappe apps in the current project.
+Export and import data fixtures for app development.
+
+Fixtures are JSON files loaded during app installation to provide
+default data like roles, workflows, print formats, etc.
 
 Examples:
-  weg app list              # List installed apps
-  weg app get <url>         # Install an app
-  weg app remove <name>     # Remove an app
-  weg app switch <branch>   # Switch app branch
+  weg fixtures export myapp              # Export all fixtures
+  weg fixtures export myapp --doctype Role
+  weg fixtures import myapp              # Import fixtures
+  weg fixtures list myapp                # List fixture files
 
 Usage:
-  weg app [command]
+  weg fixtures [command]
 
 Available Commands:
-  exclude     Exclude an app from sync
-  get         Install an app
-  include     Include an excluded app
-  list        List apps in the project
-  reinstall   Reinstall an app (uninstall + install)
-  remove      Remove an app
-  switch      Switch an app to a different branch
+  export      Export fixtures for an app
+  import      Import fixtures for an app
+  list        List fixture files for an app
 
 Flags:
-  -h, --help   help for app
+  -h, --help   help for fixtures
 
 Global Flags:
   -C, --chdir string              Run as if weg was started in <path>
@@ -31,4 +30,4 @@ Global Flags:
   -v, --verbose count             Increase verbosity (-v, -vv, -vvv)
   -y, --yes                       Assume yes for all prompts
 
-Use "weg app [command] --help" for more information about a command.
+Use "weg fixtures [command] --help" for more information about a command.

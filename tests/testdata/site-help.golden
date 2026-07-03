@@ -7,15 +7,13 @@ Examples:
   weg site use <name>        # Set default site
 
 Usage:
-  site [command]
+  weg site [command]
 
 Available Commands:
   backup      Backup a Frappe site
   browse      Open site in browser with auto-login
-  completion  Generate the autocompletion script for the specified shell
   config      Manage site configuration
   drop        Delete a site
-  help        Help about any command
   hosts       Manage /etc/hosts entries for sites
   install     Install an app on a site
   list        List all sites
@@ -28,4 +26,14 @@ Available Commands:
 Flags:
   -h, --help   help for site
 
-Use "site [command] --help" for more information about a command.
+Global Flags:
+  -C, --chdir string              Run as if weg was started in <path>
+      --config string             Path to config file (default: auto-detect)
+      --debug-categories string   Filter debug output: all,config,state,net,git,fs,exec
+      --log-level string          Set log level: quiet, normal, verbose, debug, trace
+  -o, --output string             Output format: auto, json, table, plain, quiet (default "auto")
+  -q, --quiet                     Suppress non-essential output
+  -v, --verbose count             Increase verbosity (-v, -vv, -vvv)
+  -y, --yes                       Assume yes for all prompts
+
+Use "weg site [command] --help" for more information about a command.

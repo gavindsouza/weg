@@ -1,25 +1,25 @@
-Commands for managing Frappe apps in the current project.
+View and modify weg configuration settings.
+
+Configuration can be project-local (weg.toml or pyproject.toml) or
+global (~/.weg/config.toml).
 
 Examples:
-  weg app list              # List installed apps
-  weg app get <url>         # Install an app
-  weg app remove <name>     # Remove an app
-  weg app switch <branch>   # Switch app branch
+  weg config show                  # Show current config
+  weg config get frappe.version    # Get specific value
+  weg config set frappe.version 15 # Set value
+  weg config list-apps             # List configured apps
 
 Usage:
-  weg app [command]
+  weg config [command]
 
 Available Commands:
-  exclude     Exclude an app from sync
-  get         Install an app
-  include     Include an excluded app
-  list        List apps in the project
-  reinstall   Reinstall an app (uninstall + install)
-  remove      Remove an app
-  switch      Switch an app to a different branch
+  get         Get a configuration value
+  list-apps   List configured apps
+  set         Set a configuration value
+  show        Show current configuration
 
 Flags:
-  -h, --help   help for app
+  -h, --help   help for config
 
 Global Flags:
   -C, --chdir string              Run as if weg was started in <path>
@@ -31,4 +31,4 @@ Global Flags:
   -v, --verbose count             Increase verbosity (-v, -vv, -vvv)
   -y, --yes                       Assume yes for all prompts
 
-Use "weg app [command] --help" for more information about a command.
+Use "weg config [command] --help" for more information about a command.

@@ -1,0 +1,44 @@
+Clone a Frappe app repository and run it with zero configuration.
+
+This is the magic runner - give it a git URL and it will:
+1. Clone the repository
+2. Detect if it's a Frappe app (looks for hooks.py)
+3. Read pyproject.toml [tool.weg] for compatibility info
+4. Prompt for Frappe version and database (if not specified)
+5. Create a temporary development environment
+6. Install all dependencies
+7. Create a site and install the app
+8. Start the development server
+
+Examples:
+  weg run https://github.com/frappe/erpnext
+  weg run https://github.com/frappe/hrms --version 15
+  weg run git@github.com:myorg/myapp.git --db postgres
+  weg run frappe/hrms --branch version-15
+  weg run ./local-app-directory
+
+When to use which: 'weg run' spins up a disposable environment for an
+existing app; use 'weg new' to create your own app and 'weg init' to set
+up a permanent environment for an existing checkout.
+
+Usage:
+  weg run <app-url> [flags]
+
+Flags:
+  -b, --branch string    Branch or tag to clone
+      --db string        Database to use (mariadb, postgres, sqlite)
+      --dir string       Directory to create environment in (default: temp)
+  -h, --help             help for run
+      --keep             Keep the environment after exit (don't cleanup)
+      --skip-deps        Skip dependency resolution; install only frappe and the target app
+      --version string   Frappe version to use (14, 15, 16)
+
+Global Flags:
+  -C, --chdir string              Run as if weg was started in <path>
+      --config string             Path to config file (default: auto-detect)
+      --debug-categories string   Filter debug output: all,config,state,net,git,fs,exec
+      --log-level string          Set log level: quiet, normal, verbose, debug, trace
+  -o, --output string             Output format: auto, json, table, plain, quiet (default "auto")
+  -q, --quiet                     Suppress non-essential output
+  -v, --verbose count             Increase verbosity (-v, -vv, -vvv)
+  -y, --yes                       Assume yes for all prompts

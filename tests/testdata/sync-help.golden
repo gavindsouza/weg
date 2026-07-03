@@ -1,0 +1,34 @@
+Apply configuration changes to the environment.
+
+Sync compares the current configuration (weg.toml or pyproject.toml)
+against the recorded state and applies any differences:
+
+  - Installs new apps
+  - Removes deleted apps
+  - Updates changed app versions
+  - Creates new sites
+  - Removes deleted sites
+
+By default, sync will show a preview of changes and ask for confirmation.
+
+Examples:
+  weg sync           # Interactive sync with confirmation
+  weg sync -y        # Apply changes without confirmation
+  weg sync --dry-run # Preview changes without applying
+
+Usage:
+  weg sync [flags]
+
+Flags:
+      --dry-run   Preview changes without applying
+  -h, --help      help for sync
+
+Global Flags:
+  -C, --chdir string              Run as if weg was started in <path>
+      --config string             Path to config file (default: auto-detect)
+      --debug-categories string   Filter debug output: all,config,state,net,git,fs,exec
+      --log-level string          Set log level: quiet, normal, verbose, debug, trace
+  -o, --output string             Output format: auto, json, table, plain, quiet (default "auto")
+  -q, --quiet                     Suppress non-essential output
+  -v, --verbose count             Increase verbosity (-v, -vv, -vvv)
+  -y, --yes                       Assume yes for all prompts
