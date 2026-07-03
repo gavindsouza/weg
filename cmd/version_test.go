@@ -5,8 +5,10 @@ package cmd
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/gavindsouza/weg/internal/output"
@@ -112,6 +114,74 @@ func TestRunVersionCmd_UnknownCommit(t *testing.T) {
 
 	if bytes.Contains([]byte(got), []byte("built:")) {
 		t.Errorf("should not show built when unknown, got: %s", got)
+	}
+}
+
+// `weg version` and `weg --version` must print the identical version string,
+// so scripts can rely on either form.
+func TestVersionCommand_MatchesVersionFlag(t *testing.T) {
+	t.Cleanup(func() {
+		rootCmd.SetArgs(nil)
+		rootCmd.SetOut(nil)
+		rootCmd.SetErr(nil)
+		outputFormat = "auto" // persistent flag value survives Execute
+	})
+
+	// weg --version: cobra prints via the root command's writer.
+	var flagBuf bytes.Buffer
+	rootCmd.SetOut(&flagBuf)
+	rootCmd.SetErr(&flagBuf)
+	rootCmd.SetArgs([]string{"--version"})
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatalf("weg --version failed: %v", err)
+	}
+
+	// weg version: the subcommand prints via the output package. Force plain
+	// format — "auto" resolves to JSON when stdout is not a TTY.
+	cmdBuf := output.CaptureForTest(t)
+	rootCmd.SetArgs([]string{"-o", "plain", "version"})
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatalf("weg version failed: %v", err)
+	}
+
+	flagOut := strings.TrimSpace(flagBuf.String())
+	cmdOut := strings.TrimSpace(cmdBuf.String())
+	if flagOut == "" {
+		t.Fatal("weg --version printed nothing")
+	}
+	if flagOut != cmdOut {
+		t.Errorf("outputs differ:\n  weg --version: %q\n  weg version:   %q", flagOut, cmdOut)
+	}
+	if want := "weg version " + Version; flagOut != want {
+		t.Errorf("version string = %q, want %q", flagOut, want)
+	}
+}
+
+// -o json makes `weg version` emit machine-readable output.
+func TestVersionCommand_JSON(t *testing.T) {
+	t.Cleanup(func() {
+		rootCmd.SetArgs(nil)
+		rootCmd.SetOut(nil)
+		rootCmd.SetErr(nil)
+		outputFormat = "auto" // persistent flag value survives Execute
+	})
+
+	buf := output.CaptureForTest(t)
+	rootCmd.SetOut(&bytes.Buffer{})
+	rootCmd.SetErr(&bytes.Buffer{})
+	rootCmd.SetArgs([]string{"-o", "json", "version"})
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatalf("weg -o json version failed: %v", err)
+	}
+
+	var info struct {
+		Version string `json:"version"`
+	}
+	if err := json.Unmarshal(buf.Bytes(), &info); err != nil {
+		t.Fatalf("output is not valid JSON: %v\noutput: %s", err, buf.String())
+	}
+	if info.Version != Version {
+		t.Errorf("json version = %q, want %q", info.Version, Version)
 	}
 }
 
