@@ -615,38 +615,6 @@ func pluralize(word string, count int) string {
 	return word + "s"
 }
 
-// sortStrings sorts a slice of strings in ascending order
-func sortStrings(s []string) {
-	for i := 0; i < len(s)-1; i++ {
-		for j := i + 1; j < len(s); j++ {
-			if s[i] > s[j] {
-				s[i], s[j] = s[j], s[i]
-			}
-		}
-	}
-}
-
-// sortHistoryByTimestamp sorts history entries by timestamp
-func sortHistoryByTimestamp(history []HistoryEntry) {
-	for i := 0; i < len(history)-1; i++ {
-		for j := i + 1; j < len(history); j++ {
-			if history[i].Timestamp > history[j].Timestamp {
-				history[i], history[j] = history[j], history[i]
-			}
-		}
-	}
-}
-
-// truncateTimestamp truncates a timestamp to second precision for grouping
-func truncateTimestamp(ts string) string {
-	// Frappe timestamps are in format "2025-01-21 14:31:36.892644"
-	// Truncate to "2025-01-21 14:31:36"
-	if len(ts) > 19 {
-		return ts[:19]
-	}
-	return ts
-}
-
 // formatAuthor formats an author email with full name for git commits
 func formatAuthor(email string, users map[string]UserInfo) string {
 	if email == "" {

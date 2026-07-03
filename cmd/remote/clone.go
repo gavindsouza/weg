@@ -5,6 +5,7 @@ package remote
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/url"
@@ -365,7 +366,7 @@ func runClone(cobraCmd *cobra.Command, args []string) error {
 		gitCommit.Dir = dirName
 		gitCommit.Run() // Might fail if nothing to commit, that's ok
 	} else {
-		if err := reconstructHistory(dirName, siteURL, frappeVersion, modulesFile, fetcher, result); err != nil {
+		if err := reconstructHistory(cobraCmd.Context(), dirName, siteURL, frappeVersion, modulesFile, fetcher, result); err != nil {
 			return err
 		}
 	}
@@ -401,14 +402,14 @@ func modules(entities []remote.Entity) map[string]bool {
 // reconstructHistory runs the streaming version-history pipeline: a parallel,
 // resumable fetch to an on-disk cache, forward reconstruction into per-version
 // commits (bounded memory), then a reconcile to the current site state.
-func reconstructHistory(dirName, siteURL, frappeVersion, modulesFile string, fetcher *remote.Fetcher, result *remote.FetchResult) error {
+func reconstructHistory(ctx context.Context, dirName, siteURL, frappeVersion, modulesFile string, fetcher *remote.Fetcher, result *remote.FetchResult) error {
 	tmpDir := filepath.Join(dirName, ".weg", "tmp", "versions")
 
 	// Phase 1: fetch versions to disk in parallel, resuming from any cursors.
 	output.Print("Fetching version history...")
 	var mu sync.Mutex
 	counts := map[string]int{}
-	err := fetcher.FetchVersionsToDisk(tmpDir, func(dt string, n int) {
+	err := fetcher.FetchVersionsToDisk(ctx, tmpDir, func(dt string, n int) {
 		mu.Lock()
 		counts[dt] = n
 		total := 0

@@ -10,6 +10,7 @@ package remote
 import (
 	"bufio"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 )
@@ -49,7 +50,7 @@ func (f *Fetcher) StreamHistory(
 			c.Close()
 		}
 	}()
-	for _, dt := range VersionedDoctypes() {
+	for _, dt := range f.enabledVersionedDoctypes() {
 		file, err := os.Open(versionJSONLPath(tmpDir, dt))
 		if err != nil {
 			if os.IsNotExist(err) {
@@ -87,7 +88,9 @@ func (f *Fetcher) StreamHistory(
 
 		var vdata map[string]any
 		if v.Data != "" {
-			json.Unmarshal([]byte(v.Data), &vdata)
+			if err := json.Unmarshal([]byte(v.Data), &vdata); err != nil {
+				return fmt.Errorf("version %s (%s/%s): bad data JSON: %w", v.Name, v.RefDoctype, v.Docname, err)
+			}
 		}
 		state := applyVersionForward(liveState[key], vdata)
 		liveState[key] = state

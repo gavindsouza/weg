@@ -12,6 +12,7 @@ package remote
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -19,6 +20,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/gavindsouza/weg/internal/fsutil"
 )
 
 // versionPageSize is the number of Version rows fetched per request.
@@ -27,21 +30,28 @@ const versionPageSize = 100
 // versionFetchFields are the Version columns we stage.
 var versionFetchFields = []string{"name", "ref_doctype", "docname", "owner", "creation", "data"}
 
-// FetchVersionsToDisk fetches Version history for all tracked doctypes into
-// tmpDir as JSONL, in parallel, resuming from any existing cursors. progress is
-// called (may be nil) with the running record count per doctype.
-func (f *Fetcher) FetchVersionsToDisk(tmpDir string, progress func(doctype string, total int)) error {
+// FetchVersionsToDisk fetches Version history for all config-enabled doctypes
+// into tmpDir as JSONL, in parallel, resuming from any existing cursors. The
+// first failure cancels the remaining fetchers at their next page boundary.
+// progress is called (may be nil) with the running record count per doctype.
+func (f *Fetcher) FetchVersionsToDisk(ctx context.Context, tmpDir string, progress func(doctype string, total int)) error {
 	if err := os.MkdirAll(tmpDir, 0o755); err != nil {
 		return err
 	}
 
-	doctypes := VersionedDoctypes()
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	doctypes := f.enabledVersionedDoctypes()
 	errs := make([]error, len(doctypes))
 	done := make(chan int, len(doctypes))
 
 	for i, dt := range doctypes {
 		go func(i int, dt string) {
-			errs[i] = f.fetchDoctypeVersions(tmpDir, dt, progress)
+			errs[i] = f.fetchDoctypeVersions(ctx, tmpDir, dt, progress)
+			if errs[i] != nil {
+				cancel()
+			}
 			done <- i
 		}(i, dt)
 	}
@@ -59,7 +69,7 @@ func versionCursorPath(tmpDir, doctype string) string {
 	return filepath.Join(tmpDir, slugifyDoctype(doctype)+".cursor")
 }
 
-func (f *Fetcher) fetchDoctypeVersions(tmpDir, doctype string, progress func(string, int)) error {
+func (f *Fetcher) fetchDoctypeVersions(ctx context.Context, tmpDir, doctype string, progress func(string, int)) error {
 	jsonlPath := versionJSONLPath(tmpDir, doctype)
 	cursorPath := versionCursorPath(tmpDir, doctype)
 
@@ -77,6 +87,9 @@ func (f *Fetcher) fetchDoctypeVersions(tmpDir, doctype string, progress func(str
 	defer file.Close()
 
 	for {
+		if err := ctx.Err(); err != nil {
+			return nil // another fetcher failed; its error carries the cause
+		}
 		page, err := f.getVersionPage(doctype, offset)
 		if err != nil {
 			return fmt.Errorf("%s: %w", doctype, err)
@@ -159,8 +172,10 @@ func readCursor(path string) int {
 	return n
 }
 
+// writeCursor persists the cursor atomically: a torn write would leave an empty
+// cursor, and resume would truncate the JSONL to zero and refetch everything.
 func writeCursor(path string, n int) error {
-	return os.WriteFile(path, []byte(fmt.Sprintf("%d\n", n)), 0o644)
+	return fsutil.AtomicWrite(path, []byte(fmt.Sprintf("%d\n", n)), 0o644)
 }
 
 // truncateJSONL keeps the first n complete lines of path and drops the rest.

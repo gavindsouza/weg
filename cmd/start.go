@@ -10,6 +10,7 @@ import (
 
 	"github.com/gavindsouza/weg/internal/config"
 	"github.com/gavindsouza/weg/internal/errors"
+	"github.com/gavindsouza/weg/internal/fsutil"
 	"github.com/gavindsouza/weg/internal/runtime"
 	"github.com/gavindsouza/weg/internal/services"
 	"github.com/gavindsouza/weg/internal/state"
@@ -259,5 +260,6 @@ func updateRuntimeSiteConfig(benchPath string, benchConfig *config.BenchConfig, 
 		return err
 	}
 
-	return os.WriteFile(configPath, newData, 0644)
+	// Atomic: a partial write would leave Frappe with truncated JSON.
+	return fsutil.AtomicWrite(configPath, newData, 0644)
 }
