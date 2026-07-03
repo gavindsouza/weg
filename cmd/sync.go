@@ -218,9 +218,8 @@ func syncAppWithPyproject(path string) error {
 func syncBench(path string, result *config.DetectionResult) error {
 	PrintInfo("Syncing bench environment...")
 
-	// Parse config
-	wegTomlPath := filepath.Join(path, "weg.toml")
-	benchConfig, err := config.ParseWegToml(wegTomlPath)
+	// Parse config (ParseWegToml expects the directory, not the file path)
+	benchConfig, err := config.ParseWegToml(path)
 	if err != nil {
 		return errors.Config("weg.toml", "parse", err)
 	}

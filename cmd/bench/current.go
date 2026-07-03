@@ -73,7 +73,7 @@ func runCurrent(cmd *cobra.Command, args []string) error {
 
 	// Load and display config
 	if result.Context == config.ContextWegBench {
-		cfg, err := config.ParseWegToml(configPath)
+		cfg, err := config.ParseWegToml(filepath.Dir(configPath))
 		if err == nil {
 			output.Print("")
 			output.Printf("Name:     %s", cfg.Bench.Name)
@@ -88,9 +88,8 @@ func runCurrent(cmd *cobra.Command, args []string) error {
 			}
 		}
 	} else if result.Context == config.ContextWegApp {
-		// Try weg.toml in .weg first
-		wegTomlPath := filepath.Join(benchPath, "weg.toml")
-		if cfg, err := config.ParseWegToml(wegTomlPath); err == nil {
+		// Try weg.toml in .weg first (ParseWegToml takes the directory)
+		if cfg, err := config.ParseWegToml(benchPath); err == nil {
 			output.Print("")
 			output.Printf("Name:     %s", cfg.Bench.Name)
 			output.Printf("Frappe:   %s", cfg.Frappe.Version)

@@ -42,7 +42,8 @@ var createCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(createCmd)
-	createCmd.Flags().StringVarP(&frappeVersion, "version", "v", "develop", "Frappe version to use")
+	// No shorthand: -v is taken by the global --verbose flag and would panic.
+	createCmd.Flags().StringVar(&frappeVersion, "version", "develop", "Frappe version to use")
 	createCmd.Flags().StringVar(&appsJSON, "apps", "[]", "JSON of apps to initialize bench with")
 }
 

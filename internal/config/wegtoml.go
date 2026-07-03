@@ -78,14 +78,16 @@ type WebConfig struct {
 	DeveloperMode *bool `toml:"developer_mode,omitempty"` // nil = default (true), explicit false = disabled
 }
 
-// ParseWegToml reads and parses a weg.toml file
-func ParseWegToml(path string) (*BenchConfig, error) {
-	wegPath := filepath.Join(path, "weg.toml")
+// ParseWegToml reads and parses the weg.toml inside dir. It takes the
+// containing DIRECTORY, not the file path — passing ".../weg.toml" makes it
+// look for ".../weg.toml/weg.toml", which never exists.
+func ParseWegToml(dir string) (*BenchConfig, error) {
+	wegPath := filepath.Join(dir, "weg.toml")
 
 	data, err := os.ReadFile(wegPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("weg.toml not found at %s", path)
+			return nil, fmt.Errorf("weg.toml not found in %s", dir)
 		}
 		return nil, fmt.Errorf("failed to read weg.toml: %w", err)
 	}
@@ -101,7 +103,7 @@ func ParseWegToml(path string) (*BenchConfig, error) {
 	}
 
 	// Apply defaults
-	applyBenchDefaults(&config, path)
+	applyBenchDefaults(&config, dir)
 
 	return &config, nil
 }

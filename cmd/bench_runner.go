@@ -11,18 +11,11 @@ import (
 	"github.com/gavindsouza/weg/internal/errors"
 )
 
-// getDefaultSite returns the default site from config
+// getDefaultSite returns the default site from config. benchPath already
+// points at the config directory in both contexts (.weg/ for app-centric,
+// the bench root for bench-centric).
 func getDefaultSite(benchPath string, result *config.DetectionResult) string {
-	// For app-centric projects, check .weg/weg.toml
-	var configPath string
-	if result.Context == config.ContextWegApp {
-		configPath = filepath.Join(benchPath, "weg.toml")
-	} else {
-		configPath = filepath.Join(benchPath, "weg.toml")
-	}
-
-	// Try to get from bench config
-	if cfg, err := config.ParseWegToml(filepath.Dir(configPath)); err == nil {
+	if cfg, err := config.ParseWegToml(benchPath); err == nil {
 		for _, site := range cfg.Sites {
 			if site.DefaultSite {
 				return site.Name

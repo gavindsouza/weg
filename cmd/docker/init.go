@@ -67,15 +67,15 @@ func runInit(cmd *cobra.Command, args []string) error {
 	case config.ContextWegBench:
 		benchPath = result.BenchPath
 		appName = filepath.Base(cwd)
-		// Try to get database from weg.toml
-		if cfg, err := config.ParseWegToml(filepath.Join(cwd, "weg.toml")); err == nil {
+		// Try to get database from weg.toml (ParseWegToml takes the directory)
+		if cfg, err := config.ParseWegToml(cwd); err == nil {
 			database = cfg.Frappe.Database
 		}
 	case config.ContextWegApp:
 		benchPath = filepath.Join(cwd, ".weg")
 		appName = filepath.Base(cwd)
-		// Try to get database from .weg/weg.toml
-		if cfg, err := config.ParseWegToml(filepath.Join(benchPath, "weg.toml")); err == nil {
+		// Try to get database from .weg/weg.toml (ParseWegToml takes the directory)
+		if cfg, err := config.ParseWegToml(benchPath); err == nil {
 			database = cfg.Frappe.Database
 		}
 	default:

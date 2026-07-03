@@ -32,19 +32,24 @@ This command handles the full upgrade process:
 
 Examples:
   weg upgrade            # Upgrade to next version (e.g., 15 → 16)
-  weg upgrade --hierarchyTip Shows current → next without upgrading`,
+  weg upgrade --dry-run  # Show current → next without upgrading
+
+To update apps within the current version, see 'weg update'.
+To update weg itself, see 'weg self update'.`,
 	Args:         cobra.NoArgs,
 	RunE:         runUpgrade,
 	SilenceUsage: true,
 }
 
 var (
-	noMigrate bool
+	noMigrate     bool
+	upgradeDryRun bool
 )
 
 func init() {
 	rootCmd.AddCommand(upgradeCmd)
 	upgradeCmd.Flags().BoolVar(&noMigrate, "no-migrate", false, "Skip database migrations")
+	upgradeCmd.Flags().BoolVar(&upgradeDryRun, "dry-run", false, "Show the upgrade plan without making changes")
 }
 
 // getNextVersion returns the next Frappe version in the upgrade path
@@ -153,6 +158,11 @@ func runUpgrade(cmd *cobra.Command, args []string) error {
 		output.Print("  6. Run database migrations")
 	}
 	output.Print("")
+
+	if upgradeDryRun {
+		output.Print("Dry run: no changes made.")
+		return nil
+	}
 
 	// Confirm unless -y
 	if !yes {

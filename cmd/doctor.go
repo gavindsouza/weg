@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/gavindsouza/weg/internal/config"
+	"github.com/gavindsouza/weg/internal/errors"
 	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/runtime"
 	"github.com/spf13/cobra"
@@ -27,8 +28,14 @@ Checks:
 
 Examples:
   weg doctor       # Run all checks in current project
-  weg doctor -v    # Run with verbose output`,
+  weg doctor -v    # Run with verbose output
+
+Exits non-zero if any check fails, so it can gate scripts and CI.
+For system-level compatibility checks, see 'weg self doctor'.`,
 	RunE: runDoctor,
+	// Doctor prints its own results; the returned error only sets the exit code.
+	SilenceErrors: true,
+	SilenceUsage:  true,
 }
 
 func init() {
@@ -53,7 +60,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		output.Print("[ ] Weg project")
 		output.Print("    Not a weg-managed project. Run 'weg init' first.")
-		return nil
+		return errors.NotInProject(absPath)
 	}
 
 	var benchPath string
@@ -65,7 +72,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	default:
 		output.Print("[ ] Weg project")
 		output.Print("    Not a weg-managed project. Run 'weg init' first.")
-		return nil
+		return errors.NotInProject(absPath)
 	}
 
 	output.Print("Weg Doctor")
@@ -124,11 +131,10 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	output.Print("")
 	if issues == 0 {
 		output.Print("All checks passed!")
-	} else {
-		output.Printf("%d issue(s) found.", issues)
+		return nil
 	}
-
-	return nil
+	output.Printf("%d issue(s) found.", issues)
+	return fmt.Errorf("%d issue(s) found", issues)
 }
 
 func checkDevbox(benchPath string) checkResult {

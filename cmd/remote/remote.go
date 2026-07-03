@@ -31,10 +31,10 @@ customization structure, enabling:
   - Easy migration to proper Frappe apps
 
 Example workflow:
-  weg clone https://mysite.frappe.cloud mysite
+  weg remote clone https://mysite.frappe.cloud mysite
   cd mysite
   # Edit files locally...
-  weg sync -m "Add priority field to Todo"`,
+  weg remote sync -m "Add priority field to Todo"`,
 }
 
 func init() {
