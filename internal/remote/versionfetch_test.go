@@ -54,6 +54,70 @@ func TestCursorRoundTrip(t *testing.T) {
 	}
 }
 
+// A torn cursor write (possible before writeCursor became atomic via
+// fsutil.AtomicWrite) leaves an empty or garbage cursor file. Resume semantics
+// require that such a cursor reads as 0 so the JSONL is truncated to zero and
+// the whole stream is refetched — the pipeline restarts cleanly instead of
+// trusting a corrupt offset and skipping records.
+func TestReadCursor_TornWriteResumesFromZero(t *testing.T) {
+	dir := t.TempDir()
+
+	cases := map[string]string{
+		"empty":    "",     // torn write: file created, contents never landed
+		"garbage":  "abc",  // partial/corrupt contents
+		"negative": "-5\n", // never valid
+	}
+	for name, contents := range cases {
+		t.Run(name, func(t *testing.T) {
+			cursorPath := filepath.Join(dir, name+".cursor")
+			if err := os.WriteFile(cursorPath, []byte(contents), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			if got := readCursor(cursorPath); got != 0 {
+				t.Fatalf("readCursor(%q) = %d, want 0", contents, got)
+			}
+		})
+	}
+
+	// With the cursor read as 0, resume must discard everything already
+	// staged: truncateJSONL(path, 0) empties the JSONL so the refetch
+	// starts from a clean slate (cursor never lags behind data on disk).
+	jsonlPath := filepath.Join(dir, "v.jsonl")
+	if err := os.WriteFile(jsonlPath, []byte("{\"name\":\"a\"}\n{\"name\":\"b\"}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := truncateJSONL(jsonlPath, 0); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(jsonlPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 0 {
+		t.Fatalf("JSONL not emptied on zero-cursor resume: %q", got)
+	}
+}
+
+// writeCursor must be atomic: after a successful write the cursor is never
+// observed empty, and a rewrite replaces the value completely.
+func TestWriteCursor_AtomicOverwrite(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "v.cursor")
+
+	if err := writeCursor(path, 100); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeCursor(path, 7); err != nil {
+		t.Fatal(err)
+	}
+	if got := readCursor(path); got != 7 {
+		t.Fatalf("cursor after overwrite = %d, want 7", got)
+	}
+	data, _ := os.ReadFile(path)
+	if len(data) == 0 {
+		t.Fatal("cursor file empty after write")
+	}
+}
+
 func TestSlugifyDoctype(t *testing.T) {
 	cases := map[string]string{"Custom Field": "custom_field", "DocType": "doctype", "Client Script": "client_script"}
 	for in, want := range cases {
