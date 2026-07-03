@@ -1,213 +1,170 @@
-# Weg
+# weg
 
-[![Go](https://img.shields.io/badge/Go-1.24+-00ADD8?logo=go&logoColor=white)](https://go.dev)
+[![CI](https://github.com/gavindsouza/weg/actions/workflows/ci.yml/badge.svg)](https://github.com/gavindsouza/weg/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/gavindsouza/weg?include_prereleases)](https://github.com/gavindsouza/weg/releases/latest)
+[![Go Report Card](https://goreportcard.com/badge/github.com/gavindsouza/weg)](https://goreportcard.com/report/github.com/gavindsouza/weg)
 [![License: Apache 2.0](https://img.shields.io/github/license/gavindsouza/weg)](LICENSE)
 
-The fast way to develop Frappe apps.
+**The fast way to develop Frappe apps.** *Weg* means "way" in German and "speed" (वेग) in Marathi/Sanskrit — a modern replacement for Frappe's `bench` CLI.
 
-Weg means "way" in German and "speed" in Marathi/Sanskrit — a modern replacement for Frappe's `bench` CLI with declarative configuration and faster tooling.
+<!-- TODO: VHS demo of weg new → weg start → weg site browse -->
 
-## Three Development Modes
+## Why weg
 
-Weg supports three distinct workflows for Frappe development:
+- **One TOML file, whole environment.** Declare apps, sites, and services in `weg.toml` or `pyproject.toml [tool.weg]`; `weg sync` makes reality match. No more replaying `bench` incantations from memory.
+- **Fast by construction.** A single static Go binary orchestrating [devbox](https://www.jetify.com/devbox) (reproducible system deps via Nix), [uv](https://github.com/astral-sh/uv) (fast Python), and [process-compose](https://github.com/F1bonacc1/process-compose) (service management).
+- **Your shell is a Frappe client.** `weg api get User`, `weg doc field set`, `weg db query "SELECT ..."`, `weg py "print(frappe.get_all('ToDo'))"` — direct document, API, and database access without HTTP boilerplate or console copy-paste.
+- **Remote sites with real git history.** `weg remote clone` pulls a site's customizations (Server Scripts, Client Scripts, Custom Fields, …) into a local git repo — and reconstructs the full document version history into commits, streamed and resumable. Then edit locally and `weg remote push`.
+- **Built for AI workflows.** `weg mcp install` gives Claude Code and other MCP clients 12 structured tools for driving your Frappe environment.
+- **Scriptable everywhere.** `-o json` on status/list/introspection commands, meaningful exit codes, and `weg doctor` that fails loudly enough to gate CI.
 
-### 1. App-Centric Development
+## Install
 
-Your app is the project root. The bench infrastructure is hidden in `.weg/`. Ideal for developing a single Frappe app with modern tooling.
-
-```bash
-weg new myapp
-cd myapp
-weg start
-```
-
-Configuration lives in `pyproject.toml [tool.weg]`.
-
-### 2. Bench-Centric Development
-
-Traditional bench directory structure. Use this when working with multiple apps or migrating from existing bench setups.
+**Download a release binary** (Linux/macOS):
 
 ```bash
-cd /path/to/frappe-bench
-weg init
-weg start
-```
-
-Configuration lives in `weg.toml`.
-
-### 3. Remote-Site Development
-
-Work with remote Frappe sites (like Frappe Cloud) without direct bench access. Clone customizations locally, edit with any tools, and sync changes back.
-
-```bash
-weg remote clone https://mysite.frappe.cloud mysite
-cd mysite
-# Edit Client Scripts, Server Scripts, Custom Fields locally
-weg remote push -m "Add priority field to Todo"
-```
-
-This creates a git-backed directory mirroring the site's customizations, enabling version control, team collaboration, and AI-assisted editing.
-
-## Key Features
-
-- **Declarative configuration** via `weg.toml` or `pyproject.toml`
-- **Modern tooling** - devbox (Nix), uv (fast Python), process-compose
-- **Direct API access** - `weg api` without HTTP overhead
-- **Container support** - Docker Compose generation and production image builds
-- **MCP server** - AI assistant integration via Model Context Protocol
-- **70+ commands** covering all common Frappe development workflows
-- **Works from anywhere** - run commands from any subdirectory within your project
-
-## Installation
-
-```bash
-# Download the latest binary
 curl -fsSL https://github.com/gavindsouza/weg/releases/latest/download/weg-$(uname -s)-$(uname -m) -o weg
-chmod +x weg
-mkdir -p ~/.local/bin
-mv weg ~/.local/bin/
-
-# Add to PATH if not already (add to ~/.bashrc or ~/.zshrc)
-export PATH="$HOME/.local/bin:$PATH"
-
-# Or build from source
-git clone https://github.com/gavindsouza/weg
-cd weg
-go build -o weg .
-mv weg ~/.local/bin/
+chmod +x weg && mkdir -p ~/.local/bin && mv weg ~/.local/bin/
 ```
 
-## Quick Start
+**Or with Go:**
 
-### App-Centric (new app)
+```bash
+go install github.com/gavindsouza/weg@latest
+```
+
+**Or build from source** (Go 1.24+):
+
+```bash
+git clone https://github.com/gavindsouza/weg && cd weg
+go build -o ~/.local/bin/weg .
+```
+
+Weg needs `git`; everything else (devbox, direnv, …) can be installed with `weg self install-tools`. Run `weg self doctor` to check your system.
+
+## Quickstart
+
+Weg supports three development modes. Pick the one that matches how you work.
+
+### 1. App-centric — your app is the project root
+
+The bench lives hidden in `.weg/`; config lives in `pyproject.toml [tool.weg]`. Ideal for developing a single Frappe app with modern tooling.
 
 ```bash
 weg new myapp
 cd myapp
 weg start
-weg site browse    # Open in browser (auto-login as Administrator)
+weg site browse    # Opens the site, auto-logged-in as Administrator
 ```
 
-### Bench-Centric (existing bench)
+### 2. Bench-centric — traditional bench layout
+
+`apps/` and `sites/` at the root; config lives in `weg.toml`. Use this for multi-app projects or when adopting an existing bench.
 
 ```bash
-cd /path/to/frappe-bench
+cd frappe-bench
 weg init
 weg start
 ```
 
-### Remote-Site (Frappe Cloud or any remote site)
+### 3. Remote-site — no bench at all
+
+Work on a hosted site (Frappe Cloud or any Frappe site) by cloning its customizations into a local git repo:
 
 ```bash
 weg remote clone https://mysite.frappe.cloud mysite
 cd mysite
-# Edit customizations locally...
-weg remote status  # See what changed
-weg remote push    # Push changes to remote
+# Edit Client Scripts, Server Scripts, Custom Fields... as local files
+weg remote push -n                     # Preview what would change
+weg remote sync -m "Add priority field to Todo"
 ```
 
-## Common Commands
+The clone reconstructs each document's version history into git commits, so `git log` and `git blame` work on customizations that never had version control. History fetching is streamed and resumable — interrupt a large clone and run it again to pick up where it left off (or pass `--no-history` for a fast single-commit clone).
 
-### Site Management
+Just want to try an app? `weg run https://github.com/frappe/hrms` clones it, builds a throwaway environment, creates a site, and starts the server.
+
+## Command tour
+
+Run `weg --help` for the full grouped listing; every command has detailed `--help` with examples. Highlights:
+
+### Getting started
 
 ```bash
-weg site list                    # List all sites
-weg site new mysite.localhost    # Create new site
-weg site drop mysite.localhost   # Delete site
-weg site use mysite.localhost    # Set default site
-weg site backup                  # Backup current site
-weg site restore backup.sql.gz   # Restore from backup
-weg site password                # Reset admin password
-weg site browse                  # Open site in browser
+weg new myapp                # Create a new Frappe app (app-centric)
+weg create mybench           # Create a new bench (bench-centric)
+weg init                     # Adopt an existing app or bench directory
+weg run frappe/hrms          # Disposable environment for any app
+weg scaffold ai              # Add CLAUDE.md + AI agent skills to a project
 ```
 
-### App Management
+### Daily development
 
 ```bash
-weg app list                     # List installed apps
-weg app get erpnext              # Install ERPNext
-weg app get https://github.com/user/custom-app
-weg app remove custom-app        # Remove an app
-weg site install custom-app      # Install app on site
+weg start                    # Start db, redis, web, workers, scheduler, watcher
+weg start -f                 # Same, in the foreground with a TUI
+weg stop                     # Stop everything
+weg status                   # What's installed, what's running, is sync needed
+weg doctor                   # Health checks; exits non-zero on failure
+weg build                    # Build frontend assets (weg build watch for watch mode)
+weg test                     # Run app tests (--all-versions for a version matrix)
+weg log tail web             # Tail web/worker/schedule/error logs
 ```
 
-### Development
+### Site & data
 
 ```bash
-weg start                        # Start all services
-weg stop                         # Stop all services
-weg build                        # Build frontend assets
-weg build --app myapp            # Build specific app
-weg test                         # Run tests
-weg test --module myapp.tests    # Run specific tests
-weg console                      # Open Python console
-weg db console                   # Open database console
+weg site new mysite.localhost        # Create a site
+weg site use mysite.localhost        # Set the default site
+weg site backup --with-files         # Backup to .weg/backups/
+weg site maintenance on              # Maintenance mode
+weg site hosts add                   # Add sites to /etc/hosts
+
+weg api get User -F '{"enabled":1}'  # REST-style document access, no HTTP setup
+weg api call frappe.ping             # Call any whitelisted method
+weg doc field set User Administrator enabled 0
+weg db migrate                       # Run database migrations
+weg db query "SELECT name FROM tabUser LIMIT 5"
+weg py "print(frappe.db.count('User'))"   # Python with frappe pre-connected
+weg exec -- bench migrate            # Escape hatch: any command in the bench env
 ```
 
-### Cache & Maintenance
+### Apps
 
 ```bash
-weg cache clear                  # Clear Redis + pycache
-weg scheduler status             # Check scheduler status
-weg scheduler enable             # Enable background jobs
-weg scheduler disable            # Disable background jobs
-weg scheduler jobs               # List pending jobs
+weg add frappe/erpnext version-15    # Declare an app in config...
+weg sync                             # ...and apply the config
+weg app get frappe/hrms              # Or clone + install immediately (with deps)
+weg app switch frappe version-15     # Switch an app's branch
+weg update                           # Update all apps within the current version
+weg upgrade --dry-run                # Preview a major-version upgrade (15 → 16)
 ```
 
-### API Access
+### Deployment
 
 ```bash
-# Direct API calls without HTTP overhead
-weg api call frappe.client.get_count doctype=User
-weg doc get User Administrator   # Get a document
-weg doc list User --limit 10     # List documents
-weg doctype list                 # List all doctypes
+weg docker init                      # Generate docker-compose.yml (--mode prod)
+weg image build --target web         # Multi-stage OCI images for production
+weg cloud login                      # Frappe Cloud: deploy, logs, marketplace
+weg cloud deploy mysite.frappe.cloud
 ```
 
-### Remote Site Development
+### Remote sites
 
 ```bash
-weg remote clone <url> <dir>     # Clone site customizations
-weg remote pull                  # Pull changes from remote
-weg remote push                  # Push local changes to remote
-weg remote push -m "message"     # Push with commit message
-weg remote status                # Show local vs remote diff
-weg remote sync                  # Bidirectional sync
-weg remote login <url>           # Save credentials for a site
+weg remote login https://mysite.frappe.cloud   # Save credentials (0600, global)
+weg remote clone https://mysite.frappe.cloud   # Clone with full version history
+weg remote status                              # Local vs remote diff
+weg remote sync -m "description"               # Pull, commit, push
+
+weg workspace expand                 # Extract scripts from JSON into .py/.js files
+weg workspace collapse               # Pack IDE edits back into JSON
 ```
 
-### Frappe Cloud
-
-```bash
-weg cloud login                  # Authenticate with Frappe Cloud
-weg cloud sites                  # List your sites
-weg cloud deploy mysite          # Deploy to cloud
-weg cloud logs mysite            # View site logs
-```
-
-### Docker & Containers
-
-```bash
-# Docker Compose for local development
-weg docker init                  # Generate docker-compose.yml
-weg docker init --mode prod      # Generate for production
-weg docker up                    # Start containers
-weg docker down                  # Stop containers
-weg docker logs                  # View container logs
-weg docker ps                    # List running containers
-
-# Build production images
-weg image build                  # Build container image
-weg image build --tag myapp:v1   # Custom tag
-weg image build --push           # Build and push to registry
-weg image list                   # List local images
-```
+See [docs/guide.md](docs/guide.md) for the full guide.
 
 ## Configuration
 
-Weg uses `weg.toml` for bench-centric projects or `pyproject.toml [tool.weg]` for app-centric projects.
-
-### weg.toml (bench-centric)
+### `weg.toml` (bench-centric)
 
 ```toml
 [frappe]
@@ -225,87 +182,29 @@ apps = ["frappe", "erpnext"]
 
 [services.workers]
 short = 1
-default = 2
 long = 1
 ```
 
-### pyproject.toml (app-centric)
+### `pyproject.toml [tool.weg]` (app-centric)
 
 ```toml
-[tool.weg]
-frappe_version = "15"
+[tool.weg.compatibility]
+frappe = ["15", "16"]          # Versions your app supports
+databases = ["mariadb"]
 
-[tool.weg.dependencies]
-erpnext = { url = "https://github.com/frappe/erpnext", branch = "version-15" }
+[tool.weg.dev]
+frappe = "15"                  # Version to develop against
+database = "mariadb"
 
-[tool.weg.sites]
-default = "dev.localhost"
+[[tool.weg.dependencies.apps]]
+name = "erpnext"
+url = "https://github.com/frappe/erpnext"
+branch = "version-15"
 ```
 
-## Customizing Services
+Apps can also declare extra devbox packages and processes they need under `[tool.weg.services]` — see the [guide](docs/guide.md#app-defined-services) for details, including customizing generated services with `process-compose.override.yaml`.
 
-### Process Compose (Development)
-
-Weg generates `process-compose.yaml` for running development services. You can customize it by creating `process-compose.override.yaml`:
-
-```yaml
-# process-compose.override.yaml
-processes:
-  web:
-    environment:
-      - GUNICORN_WORKERS=4
-
-  # Disable a process
-  watch:
-    disabled: true
-
-  # Add a custom process
-  mailhog:
-    command: mailhog
-    readiness_probe:
-      http_get:
-        port: 8025
-```
-
-The override file is automatically included when present (uses process-compose's native include feature).
-
-### Docker Compose (Containerized)
-
-For containerized development or production, use `weg docker init` to generate a `docker-compose.yml` with all required services (web, workers, scheduler, socketio, database, Redis).
-
-Options include `--mode prod` for production settings, `--no-db` for external databases, and `--web-port` to customize ports. Edit the generated file directly or use Docker Compose overrides for further customization.
-
-### Container Images
-
-Use `weg image build` to create OCI-compliant production images. The multi-stage Dockerfile generates specialized targets (web, worker, scheduler, socketio) optimized for deployment to Docker, Podman, or Kubernetes.
-
-## Shell Completions
-
-The easiest way to enable completions:
-
-```bash
-# Bash - add to ~/.bashrc
-eval "$(weg completion bash)"
-
-# Zsh - add to ~/.zshrc
-eval "$(weg completion zsh)"
-
-# Fish - run once
-weg completion fish | source
-# Or persist: weg completion fish > ~/.config/fish/completions/weg.fish
-```
-
-For faster shell startup (optional), you can cache the completions:
-
-```bash
-# Bash
-weg completion bash > ~/.local/share/bash-completion/completions/weg
-
-# Zsh (if using Oh My Zsh)
-weg completion zsh > ~/.oh-my-zsh/completions/_weg
-```
-
-## vs bench
+## weg vs bench
 
 | Feature | weg | bench |
 |---------|-----|-------|
@@ -314,27 +213,78 @@ weg completion zsh > ~/.oh-my-zsh/completions/_weg
 | Python management | uv (fast) | pip |
 | System dependencies | devbox/Nix (reproducible) | Manual |
 | Process management | process-compose | honcho/supervisord |
-| Container support | Built-in (Docker Compose + image builds) | frappe_docker (separate) |
+| Container support | Built-in (Compose + image builds) | frappe_docker (separate) |
 | API access | Direct (no HTTP) | Via HTTP |
-| Remote site editing | Built-in (git-backed) | Not available |
+| Remote site editing | Built-in (git-backed, with history) | Not available |
 | Cloud integration | Built-in | Separate tool |
 
-## AI Integration
+<details>
+<summary><strong>Command mapping: coming from bench?</strong></summary>
 
-Weg includes an MCP (Model Context Protocol) server that lets AI assistants manage your Frappe environment:
+| weg | bench |
+|-----|-------|
+| `weg new` | `bench new-app` |
+| `weg init` | `bench init` |
+| `weg sync` | *(declarative — no equivalent)* |
+| `weg start` / `weg stop` | `bench start` / *(Ctrl+C)* |
+| `weg build` | `bench build` |
+| `weg test` | `bench run-tests` |
+| `weg db migrate` | `bench migrate` |
+| `weg db console` | `bench mariadb` |
+| `weg site new` | `bench new-site` |
+| `weg site drop` | `bench drop-site` |
+| `weg site use` | `bench use` |
+| `weg site install` | `bench install-app` |
+| `weg site backup` / `weg site restore` | `bench backup` / `bench restore` |
+| `weg site password` | `bench set-admin-password` |
+| `weg site browse` | `bench browse` |
+| `weg site hosts add` | `bench add-to-hosts` |
+| `weg app get` | `bench get-app` |
+| `weg app remove` | `bench remove-app` |
+| `weg cache clear` | `bench clear-cache` |
+| `weg scheduler enable` / `disable` | `bench enable-scheduler` / `disable-scheduler` |
+| `weg scheduler jobs` | `bench show-pending-jobs` |
+| `weg scheduler purge` | `bench purge-jobs` |
+| `weg user create` | `bench add-user` |
+| `weg user disable` | `bench disable-user` |
+| `weg fixtures export` | `bench export-fixtures` |
+| `weg api call` | `bench execute` |
+| `weg update` | `bench update` |
+| `weg version` | `bench version` |
+| `weg convert` | *(new — switch app-centric ⇄ bench-centric layout)* |
+| `weg exec -- <cmd>` | *(new — run any command in the bench env)* |
+| `weg api` / `weg doc` / `weg doctype` / `weg py` | *(new — direct data access)* |
+| `weg remote` / `weg workspace` | *(new — remote-site development)* |
+| `weg cloud` / `weg docker` / `weg image` | *(new — deployment)* |
+| `weg mcp` | *(new — AI integration)* |
+
+Anything not covered still works via passthrough: `weg bench <any-bench-command>`.
+
+</details>
+
+## AI integration
 
 ```bash
-weg mcp install   # Configure for Claude Code / other MCP clients
+weg mcp install   # Adds weg to .mcp.json (merges with existing servers)
 ```
 
-The MCP server exposes 12 tools for running Python, calling APIs, managing sites, and more — replacing common anti-patterns like manual `bench` activation or direct `frappe` imports.
+Weg ships an MCP (Model Context Protocol) server exposing 12 structured tools — running Python against your site, calling APIs, managing sites and services — so AI assistants like Claude Code drive your environment through safe, typed operations instead of guessing at shell commands.
 
-## Contributing
+## Global flags & scripting
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, testing, and code style guidelines.
+```bash
+weg -C ~/projects/myapp status    # Run against another directory (like git -C)
+weg site list -o json | jq .      # JSON output on status/version/doctor/config
+                                  # show/site list/app list/cloud marketplace
+weg -v sync                       # Verbosity: -v, -vv, -vvv (or --log-level)
+weg -y site drop old.localhost    # Assume yes for prompts
+weg doctor || exit 1              # Non-zero exit on failed checks — CI-friendly
+```
 
-## Requirements
+Exit codes are meaningful (0 success, 2 usage, 3 config, 5 network, 6 not found, …) — the full contract lives in [docs/CLI_CONVENTIONS.md](docs/CLI_CONVENTIONS.md).
 
-- Go 1.24+ (for building from source)
-- [devbox](https://www.jetify.com/devbox) (installed automatically on first use)
-- Git
+## Status & license
+
+Weg is pre-1.0 software: used daily for real Frappe development, but interfaces may still change between releases. Design decisions are recorded in [docs/decisions/](docs/decisions/).
+
+Licensed under [Apache 2.0](LICENSE).
