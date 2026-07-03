@@ -33,6 +33,10 @@ func runShow(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to detect context: %w", err)
 	}
 
+	if output.EffectiveFormat() == output.FormatJSON {
+		return runShowJSON(result)
+	}
+
 	output.Printf("Context: %s", result.ContextDescription())
 	output.Printf("Path: %s", result.Path)
 
@@ -51,6 +55,79 @@ func runShow(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+type showFrappeInfo struct {
+	Version  string `json:"version"`
+	Database string `json:"database"`
+}
+
+type showAppInfo struct {
+	URL      string `json:"url,omitempty"`
+	Branch   string `json:"branch,omitempty"`
+	Path     string `json:"path,omitempty"`
+	Excluded bool   `json:"excluded,omitempty"`
+}
+
+type showSiteInfo struct {
+	Name    string   `json:"name"`
+	Default bool     `json:"default"`
+	Apps    []string `json:"apps,omitempty"`
+}
+
+type showDepInfo struct {
+	Name   string `json:"name"`
+	URL    string `json:"url,omitempty"`
+	Branch string `json:"branch,omitempty"`
+}
+
+type showReport struct {
+	Context      string                 `json:"context"`
+	Path         string                 `json:"path"`
+	ConfigPath   string                 `json:"config_path,omitempty"`
+	Frappe       *showFrappeInfo        `json:"frappe,omitempty"`
+	Dev          *showFrappeInfo        `json:"dev,omitempty"`
+	Apps         map[string]showAppInfo `json:"apps,omitempty"`
+	Dependencies []showDepInfo          `json:"dependencies,omitempty"`
+	Sites        []showSiteInfo         `json:"sites,omitempty"`
+}
+
+// runShowJSON emits the current configuration as machine-readable JSON.
+func runShowJSON(result *config.DetectionResult) error {
+	report := showReport{
+		Context:    result.ContextDescription(),
+		Path:       result.Path,
+		ConfigPath: result.ConfigPath,
+	}
+
+	switch result.Context {
+	case config.ContextWegBench:
+		cfg, err := config.ParseWegToml(result.BenchPath)
+		if err != nil {
+			return wegerrors.Config("config", "parse", err)
+		}
+		report.Frappe = &showFrappeInfo{Version: cfg.Frappe.Version, Database: cfg.Frappe.Database}
+		report.Apps = make(map[string]showAppInfo, len(cfg.Apps))
+		for name, app := range cfg.Apps {
+			report.Apps[name] = showAppInfo{URL: app.URL, Branch: app.Branch, Path: app.Path, Excluded: app.Excluded}
+		}
+		for _, site := range cfg.Sites {
+			report.Sites = append(report.Sites, showSiteInfo{Name: site.Name, Default: site.DefaultSite, Apps: site.Apps})
+		}
+
+	case config.ContextWegApp:
+		pyprojectPath := filepath.Join(result.Path, "pyproject.toml")
+		cfg, err := config.ParsePyproject(pyprojectPath)
+		if err != nil {
+			return wegerrors.Config("config", "parse", err)
+		}
+		report.Dev = &showFrappeInfo{Version: cfg.Dev.Frappe, Database: cfg.Dev.Database}
+		for _, app := range cfg.Dependencies.Apps {
+			report.Dependencies = append(report.Dependencies, showDepInfo{Name: app.Name, URL: app.URL, Branch: app.Branch})
+		}
+	}
+
+	return output.JSON(report)
 }
 
 func showBenchConfig(result *config.DetectionResult) error {

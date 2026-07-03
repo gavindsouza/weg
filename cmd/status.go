@@ -47,6 +47,10 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to detect context: %w", err)
 	}
 
+	if output.EffectiveFormat() == output.FormatJSON {
+		return runStatusJSON(absPath, result)
+	}
+
 	// Print header
 	output.Print("Weg Status")
 	output.Printf("==========\n")
@@ -104,6 +108,102 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+type statusAppInfo struct {
+	Name   string `json:"name"`
+	Branch string `json:"branch,omitempty"`
+	Commit string `json:"commit,omitempty"`
+}
+
+type statusSiteInfo struct {
+	Name    string   `json:"name"`
+	Default bool     `json:"default"`
+	Apps    []string `json:"apps,omitempty"`
+}
+
+type statusRuntimeInfo struct {
+	Running  bool   `json:"running"`
+	WebPort  int    `json:"web_port,omitempty"`
+	SocketIO int    `json:"socketio_port,omitempty"`
+	RunID    string `json:"run_id,omitempty"`
+}
+
+type statusReport struct {
+	Context     string             `json:"context"`
+	Path        string             `json:"path"`
+	BenchPath   string             `json:"bench_path,omitempty"`
+	ConfigPath  string             `json:"config_path,omitempty"`
+	App         string             `json:"app,omitempty"`
+	DefaultSite string             `json:"default_site,omitempty"`
+	WegManaged  bool               `json:"weg_managed"`
+	LastSync    string             `json:"last_sync,omitempty"`
+	NeedsSync   *bool              `json:"needs_sync,omitempty"`
+	Apps        []statusAppInfo    `json:"apps,omitempty"`
+	Sites       []statusSiteInfo   `json:"sites,omitempty"`
+	Runtime     *statusRuntimeInfo `json:"runtime,omitempty"`
+}
+
+// runStatusJSON emits the environment status as machine-readable JSON.
+func runStatusJSON(absPath string, result *config.DetectionResult) error {
+	report := statusReport{
+		Context:    result.ContextDescription(),
+		Path:       absPath,
+		BenchPath:  result.BenchPath,
+		ConfigPath: result.ConfigPath,
+		App:        result.AppName,
+		WegManaged: result.IsWegManaged(),
+	}
+
+	if result.IsWegManaged() {
+		report.DefaultSite = ResolveDefaultSite(absPath)
+
+		st, err := state.Load(absPath)
+		if err != nil {
+			return fmt.Errorf("failed to load state: %w", err)
+		}
+
+		if !st.LastSync.IsZero() {
+			report.LastSync = st.LastSync.Format(time.RFC3339)
+		}
+
+		for name, app := range st.Apps {
+			branch := app.Branch
+			if branch == "" {
+				branch = "local"
+			}
+			report.Apps = append(report.Apps, statusAppInfo{Name: name, Branch: branch, Commit: app.Commit})
+		}
+		sort.Slice(report.Apps, func(i, j int) bool { return report.Apps[i].Name < report.Apps[j].Name })
+
+		for name, site := range st.Sites {
+			report.Sites = append(report.Sites, statusSiteInfo{Name: name, Default: site.DefaultSite, Apps: site.Apps})
+		}
+		sort.Slice(report.Sites, func(i, j int) bool { return report.Sites[i].Name < report.Sites[j].Name })
+
+		if !st.IsEmpty() {
+			configPath := filepath.Join(absPath, "weg.toml")
+			if !config.HasWegToml(absPath) {
+				configPath = filepath.Join(absPath, "pyproject.toml")
+			}
+			if needsSync, err := st.NeedsSync(configPath); err == nil {
+				report.NeedsSync = &needsSync
+			}
+		}
+
+		runtimeInfo := statusRuntimeInfo{Running: false}
+		if rtConfig, err := runtime.LoadIfRunning(absPath); err == nil && rtConfig != nil {
+			runtimeInfo = statusRuntimeInfo{
+				Running:  true,
+				WebPort:  rtConfig.Ports.Web,
+				SocketIO: rtConfig.Ports.SocketIO,
+				RunID:    rtConfig.RunID,
+			}
+		}
+		report.Runtime = &runtimeInfo
+	}
+
+	return output.JSON(report)
 }
 
 func showAppStatus(path string, result *config.DetectionResult) error {

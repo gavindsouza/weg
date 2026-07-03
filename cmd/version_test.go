@@ -62,7 +62,7 @@ func TestRunVersionCmd_Basic(t *testing.T) {
 
 	got := buf.String()
 
-	if !bytes.Contains([]byte(got), []byte("weg 1.2.3")) {
+	if !bytes.Contains([]byte(got), []byte("weg version 1.2.3")) {
 		t.Errorf("expected output to contain version, got: %s", got)
 	}
 
@@ -101,8 +101,8 @@ func TestRunVersionCmd_UnknownCommit(t *testing.T) {
 
 	got := buf.String()
 
-	if !bytes.Contains([]byte(got), []byte("weg dev")) {
-		t.Errorf("expected output to contain 'weg dev', got: %s", got)
+	if !bytes.Contains([]byte(got), []byte("weg version dev")) {
+		t.Errorf("expected output to contain 'weg version dev', got: %s", got)
 	}
 
 	// Should not contain commit or built lines when unknown

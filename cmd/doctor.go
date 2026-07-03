@@ -48,7 +48,28 @@ type checkResult struct {
 	message string
 }
 
+// doctorJSON emits doctor results as machine-readable JSON.
+func doctorJSON(checks []checkResult, issues int) error {
+	type jsonCheck struct {
+		Name    string `json:"name"`
+		OK      bool   `json:"ok"`
+		Message string `json:"message,omitempty"`
+	}
+	type jsonReport struct {
+		Checks []jsonCheck `json:"checks"`
+		Issues int         `json:"issues"`
+	}
+
+	report := jsonReport{Checks: []jsonCheck{}, Issues: issues}
+	for _, c := range checks {
+		report.Checks = append(report.Checks, jsonCheck{Name: c.name, OK: c.ok, Message: c.message})
+	}
+	return output.JSON(report)
+}
+
 func runDoctor(cmd *cobra.Command, args []string) error {
+	jsonMode := output.EffectiveFormat() == output.FormatJSON
+
 	path := "."
 	absPath, err := filepath.Abs(path)
 	if err != nil {
@@ -58,8 +79,12 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	// Detect context
 	result, err := config.DetectProjectContext(absPath)
 	if err != nil {
-		output.Print("[ ] Weg project")
-		output.Print("    Not a weg-managed project. Run 'weg init' first.")
+		if jsonMode {
+			doctorJSON([]checkResult{{"Weg project", false, "Not a weg-managed project. Run 'weg init' first."}}, 1)
+		} else {
+			output.Print("[ ] Weg project")
+			output.Print("    Not a weg-managed project. Run 'weg init' first.")
+		}
 		return errors.NotInProject(absPath)
 	}
 
@@ -70,14 +95,20 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	case config.ContextWegBench:
 		benchPath = result.BenchPath
 	default:
-		output.Print("[ ] Weg project")
-		output.Print("    Not a weg-managed project. Run 'weg init' first.")
+		if jsonMode {
+			doctorJSON([]checkResult{{"Weg project", false, "Not a weg-managed project. Run 'weg init' first."}}, 1)
+		} else {
+			output.Print("[ ] Weg project")
+			output.Print("    Not a weg-managed project. Run 'weg init' first.")
+		}
 		return errors.NotInProject(absPath)
 	}
 
-	output.Print("Weg Doctor")
-	output.Print("==========")
-	output.Print("")
+	if !jsonMode {
+		output.Print("Weg Doctor")
+		output.Print("==========")
+		output.Print("")
+	}
 
 	checks := []checkResult{}
 
@@ -114,14 +145,30 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	// Check workers
 	checks = append(checks, checkWorkers(benchPath))
 
-	// Print results
+	// Count issues
 	issues := 0
+	for _, c := range checks {
+		if !c.ok {
+			issues++
+		}
+	}
+
+	if jsonMode {
+		if err := doctorJSON(checks, issues); err != nil {
+			return err
+		}
+		if issues == 0 {
+			return nil
+		}
+		return fmt.Errorf("%d issue(s) found", issues)
+	}
+
+	// Print results
 	for _, c := range checks {
 		if c.ok {
 			output.Printf("[x] %s", c.name)
 		} else {
 			output.Printf("[ ] %s", c.name)
-			issues++
 		}
 		if c.message != "" {
 			output.Printf("    %s", c.message)

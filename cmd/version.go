@@ -38,7 +38,27 @@ func init() {
 }
 
 func runVersionCmd(cmd *cobra.Command, args []string) error {
-	output.Printf("weg %s", Version)
+	if output.EffectiveFormat() == output.FormatJSON {
+		type versionInfo struct {
+			Version   string            `json:"version"`
+			Commit    string            `json:"commit,omitempty"`
+			BuildDate string            `json:"build_date,omitempty"`
+			Apps      map[string]string `json:"apps,omitempty"`
+		}
+		info := versionInfo{Version: Version}
+		if Commit != "unknown" {
+			info.Commit = Commit
+		}
+		if BuildDate != "unknown" {
+			info.BuildDate = BuildDate
+		}
+		if showApps {
+			info.Apps = installedAppVersions()
+		}
+		return output.JSON(info)
+	}
+
+	output.Printf("weg version %s", Version)
 	if Commit != "unknown" {
 		output.Printf("  commit: %s", Commit)
 	}
@@ -50,9 +70,24 @@ func runVersionCmd(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	// Try to show app versions
-	path := "."
-	absPath, err := filepath.Abs(path)
+	versions := installedAppVersions()
+	if len(versions) == 0 {
+		return nil
+	}
+
+	output.Print("")
+	output.Print("Installed apps:")
+	for name, version := range versions {
+		output.Printf("  %s: %s", name, version)
+	}
+
+	return nil
+}
+
+// installedAppVersions returns installed app versions keyed by app name,
+// or nil if not in a weg-managed project or no state is recorded.
+func installedAppVersions() map[string]string {
+	absPath, err := filepath.Abs(".")
 	if err != nil {
 		return nil
 	}
@@ -78,20 +113,19 @@ func runVersionCmd(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	output.Print("")
-	output.Print("Installed apps:")
+	versions := make(map[string]string, len(st.Apps))
 	for name, app := range st.Apps {
 		version := getAppVersion(benchPath, name)
-		if version != "" {
-			output.Printf("  %s: %s", name, version)
-		} else if app.Branch != "" {
-			output.Printf("  %s: %s", name, app.Branch)
-		} else {
-			output.Printf("  %s: (unknown)", name)
+		if version == "" {
+			if app.Branch != "" {
+				version = app.Branch
+			} else {
+				version = "(unknown)"
+			}
 		}
+		versions[name] = version
 	}
-
-	return nil
+	return versions
 }
 
 func getAppVersion(benchPath, appName string) string {
