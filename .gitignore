@@ -34,3 +34,7 @@ Thumbs.db
 # Gas Town beads redirect (machine-specific)
 .beads/redirect
 .beads/
+
+# Local weg state and MCP config (machine-specific)
+.weg/
+.mcp.json
