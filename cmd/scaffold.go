@@ -24,7 +24,11 @@ Available scaffolds:
 Examples:
   weg scaffold ai          # Add AI agent configuration
   weg scaffold precommit   # Add pre-commit hooks
-  weg scaffold all         # Add everything`,
+  weg scaffold all         # Add everything
+
+When to use which: 'weg scaffold' adds tooling to an existing weg project;
+it does not create projects — see 'weg new', 'weg create', or 'weg init'
+for that.`,
 	Args:              cobra.ExactArgs(1),
 	RunE:              runScaffold,
 	SilenceUsage:      true,

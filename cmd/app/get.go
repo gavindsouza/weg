@@ -24,6 +24,9 @@ var getCmd = &cobra.Command{
 Automatically resolves and installs transitive dependencies.
 Use --skip-deps to install only the specified app.
 
+Unlike 'weg add' (which only edits the configuration for a later
+'weg sync'), this clones and installs the app immediately.
+
 Examples:
   weg app get https://github.com/frappe/erpnext
   weg app get frappe/erpnext

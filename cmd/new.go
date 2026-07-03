@@ -29,7 +29,11 @@ Examples:
   weg new .                    # Create app in current directory
   weg new my-awesome-app       # Create new directory with app
   weg new ./apps/my-app        # Create at specific path
-  weg new my-app --version 15  # Specify Frappe version`,
+  weg new my-app --version 15  # Specify Frappe version
+
+When to use which: 'weg new' creates a brand-new app; use 'weg create' for
+a new bench, 'weg init' for an existing project, and 'weg run' to try out
+an existing app.`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: runNew,
 }

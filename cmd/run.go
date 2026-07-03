@@ -41,7 +41,11 @@ Examples:
   weg run https://github.com/frappe/hrms --version 15
   weg run git@github.com:myorg/myapp.git --db postgres
   weg run frappe/hrms --branch version-15
-  weg run ./local-app-directory`,
+  weg run ./local-app-directory
+
+When to use which: 'weg run' spins up a disposable environment for an
+existing app; use 'weg new' to create your own app and 'weg init' to set
+up a permanent environment for an existing checkout.`,
 	Args: cobra.ExactArgs(1),
 	RunE: runRun,
 }

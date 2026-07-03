@@ -31,7 +31,11 @@ takes the appropriate action:
 Examples:
   weg init              # Initialize in current directory
   weg init ./myproject  # Initialize in specific directory
-  weg init --bench      # Force bench-style initialization`,
+  weg init --bench      # Force bench-style initialization
+
+When to use which: 'weg init' adopts an existing directory; use 'weg new'
+for a brand-new app, 'weg create' for a new bench, and 'weg run' to try
+out an existing app.`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: runInit,
 }

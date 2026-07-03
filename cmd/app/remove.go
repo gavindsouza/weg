@@ -26,6 +26,9 @@ var removeCmd = &cobra.Command{
 
 This uninstalls the app and removes it from the configuration.
 
+Unlike 'weg remove' (which only edits the configuration for a later
+'weg sync'), this uninstalls the app immediately.
+
 Examples:
   weg app remove erpnext
   weg app rm erpnext --force`,

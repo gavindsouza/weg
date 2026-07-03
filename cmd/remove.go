@@ -19,6 +19,7 @@ var removeCmd = &cobra.Command{
 
 This removes the app from the configuration file (weg.toml or pyproject.toml).
 Run 'weg sync' afterwards to actually uninstall the app.
+To uninstall an app immediately, see 'weg app remove'.
 
 Examples:
   weg remove erpnext

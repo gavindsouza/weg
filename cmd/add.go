@@ -22,6 +22,10 @@ The app can be specified as:
   - A short name: frappe/erpnext (expands to GitHub URL)
   - An app name from Frappe Cloud marketplace (future)
 
+'weg add' only edits the configuration (weg.toml or pyproject.toml);
+run 'weg sync' afterwards to install. To clone and install an app
+immediately, see 'weg app get'.
+
 Examples:
   weg add https://github.com/frappe/erpnext
   weg add frappe/erpnext

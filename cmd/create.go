@@ -22,7 +22,19 @@ var (
 var createCmd = &cobra.Command{
 	Use:   "create [bench-name]",
 	Short: "Create a new Frappe bench with Devbox",
-	Args:  cobra.ExactArgs(1),
+	Long: `Create a new Frappe bench with a Devbox-managed environment.
+
+Sets up a traditional bench structure (apps/, sites/) and clones frappe
+plus any requested apps.
+
+Examples:
+  weg create mybench
+  weg create mybench --version version-15
+
+When to use which: 'weg create' builds a new bench; use 'weg new' for a
+brand-new app, 'weg init' for an existing project, and 'weg run' to try
+out an existing app.`,
+	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		frappe := tools.FrappeApp{
 			Name:   "frappe",

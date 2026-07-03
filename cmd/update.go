@@ -30,7 +30,10 @@ Examples:
   weg update              # Update all apps
   weg update frappe       # Update only frappe
   weg update --pull       # Only pull, skip dependency install
-  weg update --no-build   # Skip asset rebuild`,
+  weg update --no-build   # Skip asset rebuild
+
+To upgrade Frappe to the next major version, see 'weg upgrade'.
+To update weg itself, see 'weg self update'.`,
 	RunE: runUpdate,
 }
 
