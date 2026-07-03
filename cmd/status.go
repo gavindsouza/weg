@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/gavindsouza/weg/internal/config"
@@ -53,7 +54,8 @@ func runStatus(cmd *cobra.Command, args []string) error {
 
 	// Print header
 	output.Print("Weg Status")
-	output.Printf("==========\n")
+	output.Print("==========")
+	output.Print("")
 
 	// Context info
 	output.Printf("Context:  %s", result.ContextDescription())
@@ -206,14 +208,19 @@ func runStatusJSON(absPath string, result *config.DetectionResult) error {
 	return output.JSON(report)
 }
 
-func showAppStatus(path string, result *config.DetectionResult) error {
-	output.Printf("\n--- App Configuration ---\n")
+// printStatusHeading prints a section heading in the status output style.
+func printStatusHeading(title string) {
+	output.Printf("\n%s", title)
+	output.Print(strings.Repeat("-", len(title)))
+}
 
+func showAppStatus(path string, result *config.DetectionResult) error {
 	// Parse pyproject.toml
 	appConfig, err := config.ParsePyproject(path)
 	if err != nil {
 		PrintVerbose("Could not parse pyproject.toml: %v", err)
 	} else {
+		printStatusHeading("App Configuration")
 		output.Print("Compatibility:")
 		output.Printf("  Frappe:     %v", appConfig.Compatibility.Frappe)
 		output.Printf("  Databases:  %v", appConfig.Compatibility.Databases)
@@ -234,13 +241,12 @@ func showAppStatus(path string, result *config.DetectionResult) error {
 }
 
 func showBenchStatus(path string, result *config.DetectionResult) error {
-	output.Printf("\n--- Bench Configuration ---\n")
-
 	// Parse weg.toml
 	benchConfig, err := config.ParseWegToml(path)
 	if err != nil {
 		PrintVerbose("Could not parse weg.toml: %v", err)
 	} else {
+		printStatusHeading("Bench Configuration")
 		output.Printf("Bench:      %s", benchConfig.Bench.Name)
 		output.Printf("Frappe:     %s", benchConfig.Frappe.Version)
 		output.Printf("Database:   %s", benchConfig.Frappe.Database)
@@ -281,7 +287,7 @@ func showBenchStatus(path string, result *config.DetectionResult) error {
 }
 
 func showStateInfo(path string) error {
-	output.Printf("\n--- Current State ---\n")
+	printStatusHeading("Current State")
 
 	st, err := state.Load(path)
 	if err != nil {
@@ -341,6 +347,9 @@ func showStateInfo(path string) error {
 	} else {
 		output.Print("")
 		PrintInfo("Environment is in sync with configuration.")
+		if rtConfig, err := runtime.LoadIfRunning(path); err != nil || rtConfig == nil {
+			PrintInfo("Run 'weg start' to start development services.")
+		}
 	}
 
 	return nil
@@ -413,7 +422,7 @@ func showRuntimeStatus(path string) {
 		return
 	}
 
-	output.Printf("\n--- Runtime Status ---\n")
+	printStatusHeading("Runtime Status")
 	output.Print("Status:   running")
 	output.Printf("Web:      http://localhost:%d", rtConfig.Ports.Web)
 	output.Printf("SocketIO: port %d", rtConfig.Ports.SocketIO)
