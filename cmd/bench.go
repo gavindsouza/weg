@@ -26,6 +26,14 @@ Examples:
 			return
 		}
 
+		// Flag parsing is disabled so args are forwarded verbatim, but a
+		// bare 'weg bench --help' should show weg's own help rather than
+		// forwarding to the bench CLI.
+		if len(args) == 1 && (args[0] == "--help" || args[0] == "-h") {
+			cmd.Help()
+			return
+		}
+
 		// Skip "--" separator if present
 		if args[0] == "--" {
 			args = args[1:]
