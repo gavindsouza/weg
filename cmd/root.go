@@ -55,6 +55,16 @@ var (
 	originalDir string // The directory weg was invoked from
 )
 
+// Help group IDs for the root command
+const (
+	groupGettingStarted = "getting-started"
+	groupDailyDev       = "daily-dev"
+	groupSiteData       = "site-data"
+	groupApps           = "apps"
+	groupDeployment     = "deployment"
+	groupWegItself      = "weg-itself"
+)
+
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:          "weg",
@@ -147,6 +157,32 @@ func init() {
 	wegmcp.Version = Version
 	rootCmd.AddCommand(wegmcp.McpCmd)
 	rootCmd.AddCommand(workspace.WorkspaceCmd)
+
+	// Group commands in the root help output
+	rootCmd.AddGroup(
+		&cobra.Group{ID: groupGettingStarted, Title: "Getting Started:"},
+		&cobra.Group{ID: groupDailyDev, Title: "Daily Development:"},
+		&cobra.Group{ID: groupSiteData, Title: "Site & Data:"},
+		&cobra.Group{ID: groupApps, Title: "Apps:"},
+		&cobra.Group{ID: groupDeployment, Title: "Deployment:"},
+		&cobra.Group{ID: groupWegItself, Title: "Weg Itself:"},
+	)
+
+	for _, gc := range []struct {
+		id   string
+		cmds []*cobra.Command
+	}{
+		{groupGettingStarted, []*cobra.Command{newCmd, createCmd, initCmd, runCmd, scaffoldCmd}},
+		{groupDailyDev, []*cobra.Command{startCmd, stopCmd, restartCmd, statusCmd, syncCmd, testCmd, build.BuildCmd, log.LogCmd, doctorCmd}},
+		{groupSiteData, []*cobra.Command{site.SiteCmd, db.DbCmd, doc.DocCmd, doctype.DoctypeCmd, user.UserCmd, fixtures.FixturesCmd, cache.CacheCmd, scheduler.SchedulerCmd, api.ApiCmd, pyCmd, execCmd}},
+		{groupApps, []*cobra.Command{addCmd, removeCmd, app.AppCmd, updateCmd, upgradeCmd}},
+		{groupDeployment, []*cobra.Command{docker.DockerCmd, image.ImageCmd, cloud.CloudCmd, remote.RemoteCmd, benchCmd}},
+		{groupWegItself, []*cobra.Command{selfCmd, config.ConfigCmd, wegmcp.McpCmd, workspace.WorkspaceCmd, versionCmd, migrateCmd}},
+	} {
+		for _, c := range gc.cmds {
+			c.GroupID = gc.id
+		}
+	}
 }
 
 // configureOutput sets up the output package based on flags and environment.
