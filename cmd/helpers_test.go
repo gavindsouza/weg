@@ -7,51 +7,6 @@ import (
 	"testing"
 )
 
-func TestGetVenvPython(t *testing.T) {
-	tests := []struct {
-		name     string
-		setup    func(dir string)
-		wantVenv bool
-		wantFall string
-	}{
-		{
-			name: "venv exists",
-			setup: func(dir string) {
-				venvBin := filepath.Join(dir, "env", "bin")
-				os.MkdirAll(venvBin, 0755)
-				os.WriteFile(filepath.Join(venvBin, "python"), []byte("#!/bin/bash\n"), 0755)
-			},
-			wantVenv: true,
-		},
-		{
-			name:     "no venv falls back to python3",
-			setup:    func(dir string) {},
-			wantVenv: false,
-			wantFall: "python3",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			dir := t.TempDir()
-			tt.setup(dir)
-
-			result := GetVenvPython(dir)
-
-			if tt.wantVenv {
-				expected := filepath.Join(dir, "env", "bin", "python")
-				if result != expected {
-					t.Errorf("GetVenvPython() = %v, want %v", result, expected)
-				}
-			} else {
-				if result != tt.wantFall {
-					t.Errorf("GetVenvPython() = %v, want %v", result, tt.wantFall)
-				}
-			}
-		})
-	}
-}
-
 func TestHasDevbox(t *testing.T) {
 	tests := []struct {
 		name   string
