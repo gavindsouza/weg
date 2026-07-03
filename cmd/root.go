@@ -177,7 +177,7 @@ func init() {
 		{groupSiteData, []*cobra.Command{site.SiteCmd, db.DbCmd, doc.DocCmd, doctype.DoctypeCmd, user.UserCmd, fixtures.FixturesCmd, cache.CacheCmd, scheduler.SchedulerCmd, api.ApiCmd, pyCmd, execCmd}},
 		{groupApps, []*cobra.Command{addCmd, removeCmd, app.AppCmd, updateCmd, upgradeCmd}},
 		{groupDeployment, []*cobra.Command{docker.DockerCmd, image.ImageCmd, cloud.CloudCmd, remote.RemoteCmd, benchCmd}},
-		{groupWegItself, []*cobra.Command{selfCmd, config.ConfigCmd, wegmcp.McpCmd, workspace.WorkspaceCmd, versionCmd, migrateCmd}},
+		{groupWegItself, []*cobra.Command{selfCmd, config.ConfigCmd, wegmcp.McpCmd, workspace.WorkspaceCmd, versionCmd, convertCmd}},
 	} {
 		for _, c := range gc.cmds {
 			c.GroupID = gc.id

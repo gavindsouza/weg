@@ -35,6 +35,29 @@ func init() {
 	migrateCmd.Flags().BoolVar(&migrateAll, "all", false, "Migrate all sites")
 }
 
+// NewMigrateAlias returns a hidden command that behaves like 'weg db migrate',
+// for registration as a top-level 'weg migrate' alias.
+func NewMigrateAlias() *cobra.Command {
+	alias := &cobra.Command{
+		Use:    "migrate [site]",
+		Short:  "Alias for 'weg db migrate'",
+		Hidden: true,
+		Long: `Alias for 'weg db migrate'. Runs database migrations for a Frappe site.
+
+To convert project structure between app-centric and bench-centric modes
+(the old behavior of 'weg migrate'), see 'weg convert'.
+
+Examples:
+  weg migrate                    # Migrate default site
+  weg migrate test.localhost     # Migrate specific site
+  weg migrate --all              # Migrate all sites`,
+		Args: cobra.MaximumNArgs(1),
+		RunE: runMigrate,
+	}
+	alias.Flags().BoolVar(&migrateAll, "all", false, "Migrate all sites")
+	return alias
+}
+
 func runMigrate(cmd *cobra.Command, args []string) error {
 	path := "."
 	absPath, err := filepath.Abs(path)

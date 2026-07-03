@@ -358,16 +358,16 @@ weg cloud logs mysite.frappe.cloud
 weg cloud logout
 ```
 
-## Migrate Project Structure
+## Convert Project Structure
 
 Convert between app-centric and bench-centric project layouts.
 
 ```bash
 # Convert app-centric to bench-centric
-weg migrate bench
+weg convert bench
 
 # Convert bench-centric to app-centric
-weg migrate app
+weg convert app
 ```
 
 App-centric mode keeps your app at the root with the bench hidden in `.weg/`.

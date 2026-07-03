@@ -162,7 +162,7 @@ Weg is a modern CLI replacement for Frappe's `bench` tool, offering declarative 
 | `weg doctor` | Check environment health | Done |
 | `weg log` | View logs | Done |
 | `weg config` | View/modify weg config | Done |
-| `weg migrate` | Migrate between modes | Done |
+| `weg convert` | Convert between modes | Done |
 
 ---
 
