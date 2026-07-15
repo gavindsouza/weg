@@ -366,7 +366,8 @@ func runClone(cobraCmd *cobra.Command, args []string) error {
 		gitCommit.Dir = dirName
 		gitCommit.Run() // Might fail if nothing to commit, that's ok
 	} else {
-		if err := reconstructHistory(cobraCmd.Context(), dirName, siteURL, frappeVersion, modulesFile, fetcher, result); err != nil {
+		// Clone replays the entire history: zero `since` = no lower bound.
+		if err := reconstructHistory(cobraCmd.Context(), dirName, siteURL, frappeVersion, modulesFile, fetcher, result, time.Time{}); err != nil {
 			return err
 		}
 	}
@@ -402,14 +403,19 @@ func modules(entities []remote.Entity) map[string]bool {
 // reconstructHistory runs the streaming version-history pipeline: a parallel,
 // resumable fetch to an on-disk cache, forward reconstruction into per-version
 // commits (bounded memory), then a reconcile to the current site state.
-func reconstructHistory(ctx context.Context, dirName, siteURL, frappeVersion, modulesFile string, fetcher *remote.Fetcher, result *remote.FetchResult) error {
+//
+// A non-zero since fetches only Version records newer than that time — the
+// incremental path used by `weg remote pull`. The zero value replays the full
+// history (clone). The trailing reconcile commit captures any current-state
+// changes not attributable to a Version record, so nothing is dropped.
+func reconstructHistory(ctx context.Context, dirName, siteURL, frappeVersion, modulesFile string, fetcher *remote.Fetcher, result *remote.FetchResult, since time.Time) error {
 	tmpDir := filepath.Join(dirName, ".weg", "tmp", "versions")
 
 	// Phase 1: fetch versions to disk in parallel, resuming from any cursors.
 	output.Print("Fetching version history...")
 	var mu sync.Mutex
 	counts := map[string]int{}
-	err := fetcher.FetchVersionsToDisk(ctx, tmpDir, func(dt string, n int) {
+	err := fetcher.FetchVersionsToDisk(ctx, tmpDir, since, func(dt string, n int) {
 		mu.Lock()
 		counts[dt] = n
 		total := 0
@@ -421,11 +427,19 @@ func reconstructHistory(ctx context.Context, dirName, siteURL, frappeVersion, mo
 	})
 	fmt.Println()
 	if err != nil {
-		// The cache is preserved for resume; make the clone usable now.
-		output.Warningf("Version history incomplete (rerun clone to resume): %v", err)
-		writeAllEntities(dirName, result.Entities, modulesFile)
-		gitCommitAll(dirName, fmt.Sprintf("Initial clone from %s\n\nFrappe version: %s\nEntities: %d (history pending)",
-			siteURL, frappeVersion, len(result.Entities)))
+		// The cache is preserved for resume; make the working tree usable now by
+		// falling back to a single current-state snapshot commit.
+		if since.IsZero() {
+			output.Warningf("Version history incomplete (rerun clone to resume): %v", err)
+			writeAllEntities(dirName, result.Entities, modulesFile)
+			gitCommitAll(dirName, fmt.Sprintf("Initial clone from %s\n\nFrappe version: %s\nEntities: %d (history pending)",
+				siteURL, frappeVersion, len(result.Entities)))
+		} else {
+			output.Warningf("Version history incomplete (rerun pull to resume): %v", err)
+			writeAllEntities(dirName, result.Entities, modulesFile)
+			gitCommitAll(dirName, fmt.Sprintf("chore(sync): snapshot pull from %s\n\nEntities: %d (history pending)",
+				siteURL, len(result.Entities)))
+		}
 		return nil
 	}
 

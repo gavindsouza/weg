@@ -79,7 +79,7 @@ weg remote push -n                     # Preview what would change
 weg remote sync -m "Add priority field to Todo"
 ```
 
-The clone reconstructs each document's version history into git commits, so `git log` and `git blame` work on customizations that never had version control. History fetching is streamed and resumable — interrupt a large clone and run it again to pick up where it left off (or pass `--no-history` for a fast single-commit clone).
+The clone reconstructs each document's version history into git commits, so `git log` and `git blame` work on customizations that never had version control. History fetching is streamed and resumable — interrupt a large clone and run it again to pick up where it left off (or pass `--no-history` for a fast single-commit clone). `weg remote pull` keeps that history going: it replays the Version records created since the last sync as individual commits, with a trailing snapshot commit for anything not attributable to a Version. Pass `--no-history` to pull as a single snapshot commit instead.
 
 Just want to try an app? `weg run https://github.com/frappe/hrms` clones it, builds a throwaway environment, creates a site, and starts the server.
 
@@ -154,6 +154,8 @@ weg cloud deploy mysite.frappe.cloud
 weg remote login https://mysite.frappe.cloud   # Save credentials (0600, global)
 weg remote clone https://mysite.frappe.cloud   # Clone with full version history
 weg remote status                              # Local vs remote diff
+weg remote pull                                # Replay version history since last sync
+weg remote pull --no-history                   # Fast single snapshot commit
 weg remote sync -m "description"               # Pull, commit, push
 
 weg workspace expand                 # Extract scripts from JSON into .py/.js files

@@ -307,7 +307,9 @@ Day-to-day flow:
 
 ```bash
 weg remote status                             # Local vs remote diff
-weg remote pull -m "Sync remote changes"
+weg remote pull                               # Replay version history since last sync
+weg remote pull --no-history                  # Fast single snapshot commit
+weg remote pull -m "Sync remote changes"      # Snapshot commit with a custom message
 weg remote push -n                            # Dry-run preview
 weg remote push -u                            # Include uncommitted changes
 weg remote sync -m "Add priority field"       # Pull, commit, push in one step
