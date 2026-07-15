@@ -4,8 +4,10 @@ Copyright © 2025 Gavin <me@gavv.in>
 package remote
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
+	"strings"
 	"time"
 
 	wegerrors "github.com/gavindsouza/weg/internal/errors"
@@ -19,27 +21,40 @@ var pullCmd = &cobra.Command{
 	Short: "Pull changes from the remote site",
 	Long: `Fetch changes from the remote site and update local files.
 
+By default, pull reconstructs the site's version history since the last sync:
+it fetches the Version records newer than the recorded last_sync and replays
+them as individual, authored git commits (the same style as clone), so
+'git log' and 'git blame' stay meaningful. Any current-state changes that have
+no Version record land in a final snapshot commit, so nothing is dropped.
+
+Pass --no-history for the fast path: a single snapshot commit of the current
+state (the pre-history behavior).
+
 This command:
   1. Connects to the remote site
   2. Fetches all enabled entity types
-  3. Updates local files with remote changes
-  4. Creates a git commit for the changes
+  3. Replays version history since last_sync as per-document commits
+     (or a single snapshot commit with --no-history)
+  4. Updates last_sync
 
 Examples:
-  weg pull                       # Pull all changes
-  weg pull -m "Update scripts"   # Pull with custom commit message
-  weg pull --dry-run             # Preview changes without applying`,
+  weg remote pull                    # Pull, reconstructing history since last sync
+  weg remote pull --no-history       # Pull as a single snapshot commit
+  weg remote pull -m "Update scripts" # Snapshot pull with a custom message (implies --no-history)
+  weg remote pull --dry-run          # Preview changes without applying`,
 	RunE: runPull,
 }
 
 var (
-	pullDryRun  bool
-	pullMessage string
+	pullDryRun    bool
+	pullMessage   string
+	pullNoHistory bool
 )
 
 func init() {
 	pullCmd.Flags().BoolVar(&pullDryRun, "dry-run", false, "Preview changes without applying")
-	pullCmd.Flags().StringVarP(&pullMessage, "message", "m", "", "Commit message for pulled changes")
+	pullCmd.Flags().StringVarP(&pullMessage, "message", "m", "", "Commit message for a snapshot pull (implies --no-history)")
+	pullCmd.Flags().BoolVar(&pullNoHistory, "no-history", false, "Skip version history (single snapshot commit)")
 }
 
 func runPull(cobraCmd *cobra.Command, args []string) error {
@@ -83,6 +98,17 @@ func runPull(cobraCmd *cobra.Command, args []string) error {
 		return nil
 	}
 
+	// A custom commit message only makes sense for a single snapshot commit.
+	snapshotOnly := pullNoHistory || pullMessage != ""
+	if snapshotOnly {
+		return pullSnapshot(config, result)
+	}
+	return pullWithHistory(cobraCmd.Context(), config, fetcher, result)
+}
+
+// pullSnapshot writes the current entity state and records it as a single git
+// commit (the --no-history path, and the pre-history default behavior).
+func pullSnapshot(config *remote.SiteConfig, result *remote.FetchResult) error {
 	// Write entities
 	output.Infof("Updating %d entities...\n", len(result.Entities))
 	for _, entity := range result.Entities {
@@ -100,22 +126,43 @@ func runPull(cobraCmd *cobra.Command, args []string) error {
 	// Check for changes and commit
 	gitStatus := exec.Command("git", "status", "--porcelain")
 	statusOutput, _ := gitStatus.Output()
-	if len(statusOutput) > 0 {
-		gitAdd := exec.Command("git", "add", "-A")
-		gitAdd.Run()
-
-		commitMsg := pullMessage
-		if commitMsg == "" {
-			commitMsg = fmt.Sprintf("Pull from %s at %s",
-				config.Site.URL, time.Now().Format("2006-01-02 15:04"))
-		}
-		gitCommit := exec.Command("git", "commit", "-m", commitMsg)
-		gitCommit.Run()
-
-		output.Print("Changes committed")
-	} else {
+	if len(statusOutput) == 0 {
 		output.Print("Already up to date")
+		return nil
 	}
 
+	gitAdd := exec.Command("git", "add", "-A")
+	if err := gitAdd.Run(); err != nil {
+		return fmt.Errorf("failed to stage changes: %w", err)
+	}
+
+	commitMsg := pullMessage
+	if commitMsg == "" {
+		commitMsg = fmt.Sprintf("Pull from %s at %s",
+			config.Site.URL, time.Now().Format("2006-01-02 15:04"))
+	}
+	gitCommit := exec.Command("git", "commit", "-m", commitMsg)
+	if out, err := gitCommit.CombinedOutput(); err != nil {
+		return wegerrors.Operation("git commit", strings.TrimSpace(string(out)), err)
+	}
+
+	output.Print("Changes committed")
 	return nil
+}
+
+// pullWithHistory replays Version records created since last_sync as individual
+// authored commits, then reconciles the current state into a final snapshot
+// commit. last_sync is advanced only after the pipeline runs, so a failed pull
+// re-fetches the same window on the next run.
+func pullWithHistory(ctx context.Context, config *remote.SiteConfig, fetcher *remote.Fetcher, result *remote.FetchResult) error {
+	since := config.Sync.LastSync
+
+	// Advance last_sync before reconstruction so the updated site.toml is swept
+	// into the trailing reconcile commit (mirrors clone's ordering).
+	config.Sync.LastSync = time.Now()
+	if err := config.Save("."); err != nil {
+		return wegerrors.Config("site.toml", "write", err)
+	}
+
+	return reconstructHistory(ctx, ".", config.Site.URL, config.Site.Frappe.Version, "modules.txt", fetcher, result, since)
 }
