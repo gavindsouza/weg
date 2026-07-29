@@ -128,16 +128,16 @@ func runPush(cobraCmd *cobra.Command, args []string) error {
 	}
 
 	output.Infof("Pushing %d changes...\n", totalChanges)
-	pushed := 0
+	var stats pushStats
 	deleted := 0
 	failed := 0
 
 	for _, e := range entities {
-		if err := pushEntity(client, e); err != nil {
+		s, err := pushEntity(client, e, pushForce)
+		stats.add(s)
+		if err != nil {
 			output.Errorf("Failed to push %s: %v", e.name, err)
 			failed++
-		} else {
-			pushed++
 		}
 	}
 
@@ -162,7 +162,8 @@ func runPush(cobraCmd *cobra.Command, args []string) error {
 		}
 	}
 
-	output.Printf("Pushed: %d, Deleted: %d, Failed: %d", pushed, deleted, failed)
+	output.Printf("Pushed: %d, Up-to-date: %d, Deleted: %d, Failed: %d",
+		stats.created+stats.updated, stats.skipped, deleted, failed)
 
 	if failed > 0 {
 		return wegerrors.Operation("push", fmt.Sprintf("%d entities failed", failed), nil)
@@ -350,8 +351,10 @@ func getChangedFiles(baseDir string, includeUncommitted bool) ([]string, error) 
 func findDeletedEntities(baseDir string, includeUncommitted bool) ([]localEntity, error) {
 	var entities []localEntity
 
-	// Get deleted files from git
+	// Get deleted files from git, remembering the revision that still has each
+	// file so its real document name can be read back from the JSON content
 	var deletedFiles []string
+	fileRev := make(map[string]string)
 
 	if includeUncommitted {
 		// Check for deleted files in working tree
@@ -362,7 +365,9 @@ func findDeletedEntities(baseDir string, includeUncommitted bool) ([]localEntity
 			lines := strings.Split(strings.TrimSpace(string(output)), "\n")
 			for _, line := range lines {
 				if strings.HasPrefix(line, "D\t") {
-					deletedFiles = append(deletedFiles, strings.TrimPrefix(line, "D\t"))
+					file := strings.TrimPrefix(line, "D\t")
+					deletedFiles = append(deletedFiles, file)
+					fileRev[file] = "HEAD"
 				}
 			}
 		}
@@ -380,7 +385,11 @@ func findDeletedEntities(baseDir string, includeUncommitted bool) ([]localEntity
 				lines := strings.Split(strings.TrimSpace(string(output)), "\n")
 				for _, line := range lines {
 					if strings.HasPrefix(line, "D\t") {
-						deletedFiles = append(deletedFiles, strings.TrimPrefix(line, "D\t"))
+						file := strings.TrimPrefix(line, "D\t")
+						deletedFiles = append(deletedFiles, file)
+						if _, ok := fileRev[file]; !ok {
+							fileRev[file] = lastCommit
+						}
 					}
 				}
 			}
@@ -411,8 +420,14 @@ func findDeletedEntities(baseDir string, includeUncommitted bool) ([]localEntity
 			continue
 		}
 
-		// Extract name from filename
-		name := strings.TrimSuffix(filepath.Base(filePath), ".json")
+		// File names are snake_cased on disk, so the real document name (which
+		// may contain spaces, colons, uppercase) must come from the deleted
+		// file's JSON content in git history
+		name := docNameFromGit(baseDir, fileRev[filePath], filePath)
+		if name == "" {
+			// Fallback: filename without extension
+			name = strings.TrimSuffix(filepath.Base(filePath), ".json")
+		}
 
 		entities = append(entities, localEntity{
 			filePath:   filePath,
@@ -423,6 +438,25 @@ func findDeletedEntities(baseDir string, includeUncommitted bool) ([]localEntity
 	}
 
 	return entities, nil
+}
+
+// docNameFromGit reads a file's JSON content at the given revision and returns
+// its "name" field. Returns "" if the file or field can't be read.
+func docNameFromGit(baseDir, rev, filePath string) string {
+	if rev == "" {
+		return ""
+	}
+	cmd := exec.Command("git", "show", rev+":"+filePath)
+	cmd.Dir = baseDir
+	out, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	var doc map[string]any
+	if err := json.Unmarshal(out, &doc); err != nil {
+		return ""
+	}
+	return getString(doc, "name")
 }
 
 // deleteEntity deletes an entity on the remote site
@@ -545,117 +579,205 @@ func typeToDocType(typeName string) string {
 		return "Notification"
 	case "letter_head":
 		return "Letter Head"
+	case "web_template":
+		return "Web Template"
 	default:
 		return typeName
 	}
 }
 
-func pushEntity(client *remote.Client, e localEntity) error {
+// pushOutcome describes what pushing a single document did
+type pushOutcome int
+
+const (
+	outcomeCreated pushOutcome = iota
+	outcomeUpdated
+	outcomeSkipped
+)
+
+// pushStats counts push outcomes across documents
+type pushStats struct {
+	created int
+	updated int
+	skipped int
+}
+
+func (s *pushStats) add(o pushStats) {
+	s.created += o.created
+	s.updated += o.updated
+	s.skipped += o.skipped
+}
+
+func pushEntity(client *remote.Client, e localEntity, force bool) (pushStats, error) {
 	// Handle special cases
 	switch e.entityType {
 	case "custom_field":
-		return pushCustomFields(client, e)
+		return pushGrouped(client, e, "custom_fields", "Custom Field", force)
 	case "property_setter":
-		return pushPropertySetters(client, e)
+		return pushGrouped(client, e, "property_setters", "Property Setter", force)
 	default:
-		return pushDocument(client, e.doctype, e.name, e.data)
+		return pushDocument(client, e, force)
 	}
 }
 
-func pushDocument(client *remote.Client, doctype, name string, data map[string]any) error {
-	// Check if document exists and get current modified timestamp
+// pushDoc creates or updates a single document on the remote and returns the
+// saved document as the server stored it.
+//
+// Only a 404 from the existence check is treated as "create"; any other error
+// (auth, network, server) aborts instead of being masked as an insert.
+// Unchanged documents are skipped so re-pushing already-synced state doesn't
+// rewrite `modified` and pollute the site's version history. When the remote
+// changed since the local base (modified mismatch) the push is refused unless
+// force is set, instead of silently overwriting remote edits.
+func pushDoc(client *remote.Client, doctype, name string, data map[string]any, force bool) (map[string]any, pushOutcome, error) {
 	existing, err := client.GetDoc(doctype, name)
 	if err != nil {
+		if !remote.IsNotFound(err) {
+			return nil, outcomeSkipped, fmt.Errorf("failed to fetch %s %q: %w", doctype, name, err)
+		}
 		// Doesn't exist, create it
-		_, err = client.InsertDoc(doctype, data)
-		return err
+		saved, err := client.InsertDoc(doctype, data)
+		if err != nil {
+			return nil, outcomeSkipped, err
+		}
+		return saved, outcomeCreated, nil
 	}
 
-	// Copy the server's modified timestamp to avoid version conflict
-	if modified, ok := existing["modified"]; ok {
-		data["modified"] = modified
+	// Already in sync (ignoring volatile fields): nothing to do
+	if docsEqual(data, existing) {
+		return existing, outcomeSkipped, nil
 	}
 
-	// Exists, update it
-	_, err = client.UpdateDoc(doctype, name, data)
-	return err
+	// The local `modified` is the remote timestamp at last sync. If the remote
+	// has moved past it, someone changed the document on the site since then.
+	localMod := getString(data, "modified")
+	remoteMod := getString(existing, "modified")
+	if !force && localMod != "" && remoteMod != "" && localMod != remoteMod {
+		return nil, outcomeSkipped, fmt.Errorf(
+			"%s %q changed on remote since last sync (local base %s, remote %s); pull first or use --force",
+			doctype, name, localMod, remoteMod)
+	}
+
+	// Copy the server's modified timestamp so the update passes Frappe's
+	// timestamp check (check_if_latest)
+	if remoteMod != "" {
+		data["modified"] = remoteMod
+	}
+
+	saved, err := client.UpdateDoc(doctype, name, data)
+	if err != nil {
+		return nil, outcomeSkipped, err
+	}
+	return saved, outcomeUpdated, nil
 }
 
-func pushCustomFields(client *remote.Client, e localEntity) error {
-	// Custom fields are grouped by target doctype
-	fields, ok := e.data["custom_fields"].([]any)
-	if !ok {
-		return wegerrors.Validation("custom_fields", "invalid format")
+func pushDocument(client *remote.Client, e localEntity, force bool) (pushStats, error) {
+	var stats pushStats
+	saved, outcome, err := pushDoc(client, e.doctype, e.name, e.data, force)
+	if err != nil {
+		return stats, err
 	}
 
-	for _, f := range fields {
-		field, ok := f.(map[string]any)
+	switch outcome {
+	case outcomeCreated:
+		stats.created++
+	case outcomeUpdated:
+		stats.updated++
+	case outcomeSkipped:
+		stats.skipped++
+		return stats, nil
+	}
+
+	// Track the saved document (notably its new `modified`) locally, so the
+	// next push doesn't misread our own change as a remote conflict.
+	writeLocalDoc(e.filePath, saved)
+	return stats, nil
+}
+
+// pushGrouped pushes a grouped file (custom fields / property setters keyed by
+// target doctype) one row at a time.
+func pushGrouped(client *remote.Client, e localEntity, key, doctype string, force bool) (pushStats, error) {
+	var stats pushStats
+	rows, ok := e.data[key].([]any)
+	if !ok {
+		return stats, wegerrors.Validation(key, "invalid format")
+	}
+
+	changed := false
+	for i, r := range rows {
+		row, ok := r.(map[string]any)
 		if !ok {
 			continue
 		}
 
-		name := getString(field, "name")
+		name := getString(row, "name")
+		var saved map[string]any
+		var outcome pushOutcome
+		var err error
 		if name == "" {
-			// New field, insert
-			_, err := client.InsertDoc("Custom Field", field)
-			if err != nil {
-				return err
-			}
+			// New row, insert
+			saved, err = client.InsertDoc(doctype, row)
+			outcome = outcomeCreated
 		} else {
-			// Get current modified timestamp to avoid version conflict
-			existing, err := client.GetDoc("Custom Field", name)
-			if err != nil {
-				// Doesn't exist on server, insert
-				_, err := client.InsertDoc("Custom Field", field)
-				if err != nil {
-					return err
-				}
-				continue
-			}
-
-			// Copy the server's modified timestamp
-			if modified, ok := existing["modified"]; ok {
-				field["modified"] = modified
-			}
-
-			// Existing field, update
-			_, err = client.UpdateDoc("Custom Field", name, field)
-			if err != nil {
-				return err
-			}
+			saved, outcome, err = pushDoc(client, doctype, name, row, force)
 		}
-	}
+		if err != nil {
+			if changed {
+				writeLocalDoc(e.filePath, e.data)
+			}
+			return stats, err
+		}
 
-	return nil
-}
-
-func pushPropertySetters(client *remote.Client, e localEntity) error {
-	setters, ok := e.data["property_setters"].([]any)
-	if !ok {
-		return wegerrors.Validation("property_setters", "invalid format")
-	}
-
-	for _, s := range setters {
-		setter, ok := s.(map[string]any)
-		if !ok {
+		switch outcome {
+		case outcomeCreated:
+			stats.created++
+		case outcomeUpdated:
+			stats.updated++
+		case outcomeSkipped:
+			stats.skipped++
 			continue
 		}
-
-		name := getString(setter, "name")
-		if name == "" {
-			_, err := client.InsertDoc("Property Setter", setter)
-			if err != nil {
-				return err
-			}
-		} else {
-			_, err := client.UpdateDoc("Property Setter", name, setter)
-			if err != nil {
-				return err
-			}
+		if saved != nil {
+			rows[i] = saved
+			changed = true
 		}
 	}
 
-	return nil
+	if changed {
+		writeLocalDoc(e.filePath, e.data)
+	}
+	return stats, nil
+}
+
+// docsEqual reports whether two documents match, ignoring fields the server
+// rewrites on every save (modified, modified_by) and server-only "__" keys.
+func docsEqual(local, remoteDoc map[string]any) bool {
+	return string(normalizeDoc(local)) == string(normalizeDoc(remoteDoc))
+}
+
+func normalizeDoc(doc map[string]any) []byte {
+	clean := make(map[string]any, len(doc))
+	for k, v := range doc {
+		if k == "modified" || k == "modified_by" || strings.HasPrefix(k, "__") {
+			continue
+		}
+		clean[k] = v
+	}
+	data, _ := json.Marshal(clean)
+	return data
+}
+
+// writeLocalDoc rewrites a local JSON file with the document the server
+// returned, keeping the local base in step with the remote after a push.
+func writeLocalDoc(path string, doc map[string]any) {
+	if path == "" || doc == nil {
+		return
+	}
+	data, err := json.MarshalIndent(doc, "", "  ")
+	if err != nil {
+		return
+	}
+	os.WriteFile(path, data, 0644)
 }
 
 func getString(m map[string]any, key string) string {

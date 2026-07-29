@@ -72,6 +72,24 @@ type APIResponse struct {
 	ExcType string `json:"exc_type,omitempty"`
 }
 
+// APIError is an error response from the Frappe API, preserving the HTTP
+// status code so callers can distinguish "document not found" from real
+// failures (auth, validation, server errors).
+type APIError struct {
+	StatusCode int
+	Message    string
+}
+
+func (e *APIError) Error() string {
+	return fmt.Sprintf("API error (%d): %s", e.StatusCode, e.Message)
+}
+
+// IsNotFound reports whether err is a Frappe API 404 (document not found).
+func IsNotFound(err error) bool {
+	var apiErr *APIError
+	return errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusNotFound
+}
+
 // DocListResponse represents a response from get_list
 type DocListResponse struct {
 	Data []map[string]any `json:"data"`
@@ -125,11 +143,12 @@ func (c *Client) request(method, endpoint string, body any) ([]byte, error) {
 	}
 
 	if resp.StatusCode >= 400 {
+		msg := string(respBody)
 		var apiResp APIResponse
 		if json.Unmarshal(respBody, &apiResp) == nil && apiResp.Exc != "" {
-			return nil, fmt.Errorf("API error (%d): %s", resp.StatusCode, apiResp.Exc)
+			msg = apiResp.Exc
 		}
-		return nil, fmt.Errorf("API error (%d): %s", resp.StatusCode, string(respBody))
+		return nil, &APIError{StatusCode: resp.StatusCode, Message: msg}
 	}
 
 	return respBody, nil
