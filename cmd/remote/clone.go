@@ -376,6 +376,11 @@ func runClone(cobraCmd *cobra.Command, args []string) error {
 	output.Print("Initializing workspace...")
 	initWorkspace(dirName)
 
+	// Everything in HEAD came from the site, so record it as the push baseline.
+	// Without this, the first `weg remote push` diffs against the root commit
+	// and replays the entire reconstructed history back at the site.
+	saveLastPushCommit(dirName)
+
 	// Summary
 	output.Print("")
 	output.Printf("Cloned to %s/", dirName)
