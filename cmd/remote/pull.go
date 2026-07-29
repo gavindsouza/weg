@@ -117,6 +117,9 @@ func pullSnapshot(config *remote.SiteConfig, result *remote.FetchResult) error {
 		}
 	}
 
+	// Keep the workspace in step with the freshly-written JSONs
+	refreshWorkspaceAfterPull(".")
+
 	// Update config
 	config.Sync.LastSync = time.Now()
 	if err := config.Save("."); err != nil {

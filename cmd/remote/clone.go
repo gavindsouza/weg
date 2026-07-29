@@ -432,11 +432,13 @@ func reconstructHistory(ctx context.Context, dirName, siteURL, frappeVersion, mo
 		if since.IsZero() {
 			output.Warningf("Version history incomplete (rerun clone to resume): %v", err)
 			writeAllEntities(dirName, result.Entities, modulesFile)
+			refreshWorkspaceAfterPull(dirName)
 			gitCommitAll(dirName, fmt.Sprintf("Initial clone from %s\n\nFrappe version: %s\nEntities: %d (history pending)",
 				siteURL, frappeVersion, len(result.Entities)))
 		} else {
 			output.Warningf("Version history incomplete (rerun pull to resume): %v", err)
 			writeAllEntities(dirName, result.Entities, modulesFile)
+			refreshWorkspaceAfterPull(dirName)
 			gitCommitAll(dirName, fmt.Sprintf("chore(sync): snapshot pull from %s\n\nEntities: %d (history pending)",
 				siteURL, len(result.Entities)))
 		}
@@ -487,6 +489,9 @@ func reconstructHistory(ctx context.Context, dirName, siteURL, frappeVersion, mo
 			runGit(dirName, "rm", "-f", "--ignore-unmatch", p)
 		}
 	}
+	// Keep the workspace in step with the reconciled JSONs so the refreshed
+	// files land in the same reconcile commit.
+	refreshWorkspaceAfterPull(dirName)
 	runGit(dirName, "add", "-A")
 	if !gitNothingStaged(dirName) {
 		gitCommitAuthored(dirName, "Weg <noreply@weg.io>", "",

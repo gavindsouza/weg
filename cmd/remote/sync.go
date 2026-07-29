@@ -154,6 +154,9 @@ func runSync(cobraCmd *cobra.Command, args []string) error {
 			}
 		}
 
+		// Keep the workspace in step with the freshly-written JSONs
+		refreshWorkspaceAfterPull(".")
+
 		// Commit pulled changes if any
 		gitStatus = exec.Command("git", "status", "--porcelain")
 		statusOutput, _ = gitStatus.Output()
