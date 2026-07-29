@@ -431,3 +431,33 @@ func TestClientAPIError(t *testing.T) {
 		t.Error("expected error for 500 response")
 	}
 }
+
+func TestIsNotFound(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/resource/Server Script/missing" {
+			w.WriteHeader(http.StatusNotFound)
+			json.NewEncoder(w).Encode(map[string]string{"exc_type": "DoesNotExistError"})
+			return
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL, "key", "secret")
+
+	_, err := client.GetDoc("Server Script", "missing")
+	if err == nil {
+		t.Fatal("expected error for missing doc")
+	}
+	if !IsNotFound(err) {
+		t.Errorf("expected IsNotFound to be true for 404, got: %v", err)
+	}
+
+	_, err = client.GetDoc("Server Script", "boom")
+	if err == nil {
+		t.Fatal("expected error for server failure")
+	}
+	if IsNotFound(err) {
+		t.Errorf("expected IsNotFound to be false for 500, got: %v", err)
+	}
+}
