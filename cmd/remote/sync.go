@@ -127,16 +127,17 @@ func runSync(cobraCmd *cobra.Command, args []string) error {
 			return fmt.Errorf("failed to find entities: %w", err)
 		}
 
-		pushed := 0
+		var stats pushStats
 		for _, e := range entities {
-			if err := pushEntity(client, e); err != nil {
+			s, err := pushEntity(client, e, false)
+			stats.add(s)
+			if err != nil {
 				output.Errorf("Failed: %s - %v", e.name, err)
 				pushFailed++
-			} else {
-				pushed++
 			}
 		}
-		output.Printf("  Pushed: %d, Failed: %d", pushed, pushFailed)
+		output.Printf("  Pushed: %d, Up-to-date: %d, Failed: %d",
+			stats.created+stats.updated, stats.skipped, pushFailed)
 	}
 
 	// Step 3: Pull remote changes (to get any other changes from remote)
