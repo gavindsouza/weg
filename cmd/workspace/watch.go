@@ -119,9 +119,12 @@ func runWatch(cmd *cobra.Command, args []string) error {
 
 					if err != nil {
 						output.Errorf("%v", err)
-					} else if len(result.Updated) > 0 {
+					} else if len(result.Updated) > 0 || len(result.Refreshed) > 0 {
 						for _, f := range result.Updated {
 							output.Printf("  Collapsed: %s", f)
+						}
+						for _, f := range result.Refreshed {
+							output.Printf("  Refreshed from JSON: %s", f)
 						}
 					} else if len(result.Unchanged) > 0 {
 						output.Print("  (no changes to collapse)")
