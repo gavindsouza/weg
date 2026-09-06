@@ -208,7 +208,7 @@ database = "%s"
 	}
 
 	PrintInfo("\nNext steps:")
-	PrintInfo("  1. Run 'weg install' to set up the development environment")
+	PrintInfo("  1. Run 'weg sync' to set up the development environment")
 	PrintInfo("  2. Run 'weg start' to start the development server")
 	if !skipDevTooling {
 		PrintInfo("  3. Run 'pip install pre-commit && pre-commit install' for git hooks")
@@ -387,7 +387,7 @@ database = "%s"
 	}
 
 	PrintInfo("\nNext steps:")
-	PrintInfo("  1. Run 'weg install' to set up the development environment")
+	PrintInfo("  1. Run 'weg sync' to set up the development environment")
 	PrintInfo("  2. Run 'weg start' to start the development server")
 	if !skipDevTooling {
 		PrintInfo("  3. Run 'pip install pre-commit && pre-commit install' for git hooks")
