@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/gavindsouza/weg/tools"
 )
 
 // initDevboxEnvironment sets up devbox, direnv, and uv in the .weg directory
@@ -166,12 +168,20 @@ func getDevboxPackages(version string) []string {
 		"process-compose",
 	}
 
-	// Add version-specific packages
-	switch version {
-	case "16":
-		packages = append(packages, "python@3.12")
-	case "14":
+	// Add version-specific packages. Derived from the compatibility table so
+	// branch targets (e.g. develop) map to a real runtime instead of silently
+	// falling back to the v15 defaults.
+	fv, err := tools.GetFrappeVersion(tools.NormalizeFrappeVersion(version))
+	if err != nil {
+		return packages
+	}
+	switch fv.Version {
+	case "14.x.x":
 		packages = append(packages, "python@3.10")
+	case "16.x.x":
+		packages = append(packages, "python@3.12")
+	case "develop":
+		packages = append(packages, "python@3.13", "nodejs@22", "pnpm")
 	}
 
 	return packages

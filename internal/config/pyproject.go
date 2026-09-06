@@ -173,10 +173,10 @@ func CollectAppServices(appsDir string) (packages []string, processes map[string
 // ValidateAppConfig validates the app configuration
 func ValidateAppConfig(config *AppConfig) error {
 	// Validate Frappe versions
-	validVersions := map[string]bool{"14": true, "15": true, "16": true}
+	validVersions := map[string]bool{"14": true, "15": true, "16": true, "develop": true}
 	for _, v := range config.Compatibility.Frappe {
 		if !validVersions[v] {
-			return fmt.Errorf("invalid Frappe version %q: must be one of 14, 15, 16", v)
+			return fmt.Errorf("invalid Frappe version %q: must be one of 14, 15, 16, develop", v)
 		}
 	}
 

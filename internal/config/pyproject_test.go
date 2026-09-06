@@ -168,7 +168,7 @@ func TestValidateAppConfig(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "dev frappe not in compatibility",
+			name: "dev-frappe not in compatibility",
 			config: AppConfig{
 				Compatibility: CompatibilityConfig{
 					Frappe:    []string{"15"},
@@ -180,6 +180,20 @@ func TestValidateAppConfig(t *testing.T) {
 				},
 			},
 			wantErr: true,
+		},
+		{
+			name: "develop version",
+			config: AppConfig{
+				Compatibility: CompatibilityConfig{
+					Frappe:    []string{"15", "16", "develop"},
+					Databases: []string{"mariadb"},
+				},
+				Dev: DevConfig{
+					Frappe:   "develop",
+					Database: "mariadb",
+				},
+			},
+			wantErr: false,
 		},
 	}
 
