@@ -239,6 +239,9 @@ func stepAppConfig(absPath string, plan *bootstrapPlan) error {
 	}
 
 	section := buildWegSection(plan)
+	if !hasBenchDependencies(string(content)) {
+		section = section + "\n" + benchDependencySection(plan.versions)
+	}
 	existing := findWegSection(string(content))
 
 	var newContent string

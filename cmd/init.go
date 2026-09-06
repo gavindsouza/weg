@@ -184,7 +184,9 @@ databases = ["%s"]
 [tool.weg.dev]
 frappe = "%s"
 database = "%s"
-`, appName, frappeVersion, database, frappeVersion, database)
+
+%s
+`, appName, frappeVersion, database, frappeVersion, database, benchDependencySection([]string{frappeVersion}))
 
 	if err := os.MkdirAll(path, 0755); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)

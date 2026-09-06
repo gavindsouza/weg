@@ -2,8 +2,70 @@ package cmd
 
 import (
 	"fmt"
+	"math"
+	"strconv"
 	"strings"
 )
+
+// frappeDevelopMajor is the major version the develop branch currently
+// tracks. Advance it when the frappe nightlies bump majors.
+const frappeDevelopMajor = 17
+
+// frappeDependencyRange maps a set of supported Frappe versions to a
+// bounded dependency range for [tool.bench.frappe-dependencies], which
+// Frappe Cloud validates on installs and bench updates. The lower bound is
+// the lowest supported major; the upper bound is one past the highest one,
+// with develop treated as the current development major.
+func frappeDependencyRange(versions []string) string {
+	major := func(v string) int {
+		if v == "develop" {
+			return frappeDevelopMajor
+		}
+		cleaned := strings.TrimPrefix(strings.TrimPrefix(v, "version-"), "v")
+		n, err := strconv.Atoi(cleaned)
+		if err != nil {
+			return 0
+		}
+		return n
+	}
+
+	lowest, highest := math.MaxInt, 0
+	for _, v := range versions {
+		m := major(v)
+		if m > highest {
+			highest = m
+		}
+		if v != "develop" && m < lowest {
+			lowest = m
+		}
+	}
+	if lowest == math.MaxInt {
+		lowest = highest
+	}
+	if highest == 0 {
+		return ""
+	}
+	return fmt.Sprintf(">=%d.0.0,<%d.0.0", lowest, highest+1)
+}
+
+// benchDependencySection renders the [tool.bench.frappe-dependencies] table
+// that FC requires for app version constraints.
+func benchDependencySection(versions []string) string {
+	return fmt.Sprintf(`# Frappe Cloud version constraints
+[tool.bench.frappe-dependencies]
+frappe = %q`, frappeDependencyRange(versions))
+}
+
+// hasBenchDependencies reports whether pyproject.toml already declares a
+// frappe constraint, so manual overrides are never clobbered.
+func hasBenchDependencies(content string) bool {
+	for _, line := range strings.Split(content, "\n") {
+		if strings.TrimSpace(line) == "[tool.bench.frappe-dependencies]" {
+			return true
+		}
+	}
+	return false
+}
 
 // buildWegSection renders the [tool.weg] block that gets merged into
 // pyproject.toml. The block mirrors what 'weg new' and ParsePyproject produce.

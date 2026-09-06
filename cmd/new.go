@@ -289,7 +289,9 @@ database = "%s"
 # Additional apps needed for development (optional)
 # [tool.weg.dependencies]
 # erpnext = { url = "https://github.com/frappe/erpnext", branch = "version-%s" }
-`, appName, title, author, email, newAppLicense, version, database, version, database, version)
+
+%[11]s
+`, appName, title, author, email, newAppLicense, version, database, version, database, version, benchDependencySection([]string{version}))
 
 	if err := os.WriteFile(filepath.Join(targetPath, "pyproject.toml"), []byte(pyproject), 0644); err != nil {
 		return fmt.Errorf("failed to create pyproject.toml: %w", err)

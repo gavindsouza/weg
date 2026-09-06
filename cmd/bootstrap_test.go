@@ -357,3 +357,35 @@ func TestRenderWegToml(t *testing.T) {
 		}
 	}
 }
+func TestFrappeDependencyRange(t *testing.T) {
+	cases := []struct {
+		label    string
+		versions []string
+		want     string
+	}{
+		{"single stable", []string{"15"}, ">=15.0.0,<16.0.0"},
+		{"two stables", []string{"15", "16"}, ">=15.0.0,<17.0.0"},
+		{"stable with develop", []string{"15", "16", "develop"}, ">=15.0.0,<18.0.0"},
+		{"develop only", []string{"develop"}, ">=17.0.0,<18.0.0"},
+		{"wide range", []string{"13", "14", "15", "16", "develop"}, ">=13.0.0,<18.0.0"},
+		{"v prefix", []string{"v14", "15"}, ">=14.0.0,<16.0.0"},
+		{"empty", nil, ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.label, func(t *testing.T) {
+			if got := frappeDependencyRange(tc.versions); got != tc.want {
+				t.Errorf("frappeDependencyRange(%v) = %q, want %q", tc.versions, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestHasBenchDependencies(t *testing.T) {
+	content := "[project]\nname = \"x\"\n\n[tool.bench.frappe-dependencies]\nfrappe = \">=15.0.0,<18.0.0\"\n"
+	if !hasBenchDependencies(content) {
+		t.Error("expected bench dependencies to be detected")
+	}
+	if hasBenchDependencies("[tool.weg]\n[tool.weg.dev]\nfrappe = \"15\"\n") {
+		t.Error("unexpected bench dependencies detection")
+	}
+}
