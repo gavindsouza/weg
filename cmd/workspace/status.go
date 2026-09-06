@@ -19,10 +19,11 @@ var statusCmd = &cobra.Command{
 	Long: `Show the sync status of all files in the workspace.
 
 Status indicators:
-  synced   - No changes (workspace matches JSON)
-  modified - Workspace file was modified
-  conflict - Both workspace and JSON were modified
-  stale    - Source JSON was deleted`,
+  synced          - No changes (workspace matches JSON)
+  modified        - Workspace file was modified
+  source-modified - Source JSON changed, workspace has no local edits
+  conflict        - Both workspace and JSON were modified
+  stale           - Source JSON was deleted`,
 	RunE: runStatus,
 }
 
@@ -55,12 +56,14 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	}
 
 	// Group by status
-	var modified, conflicts, stale, synced []string
+	var modified, sourceModified, conflicts, stale, synced []string
 
 	for path, status := range statuses {
 		switch status {
 		case workspace.StatusModified:
 			modified = append(modified, path)
+		case workspace.StatusSourceModified:
+			sourceModified = append(sourceModified, path)
 		case workspace.StatusConflict:
 			conflicts = append(conflicts, path)
 		case workspace.StatusStale:
@@ -87,6 +90,14 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		output.Print("")
 	}
 
+	if len(sourceModified) > 0 {
+		output.Print("Outdated (source JSON changed, no local edits; collapse will refresh them):")
+		for _, f := range sourceModified {
+			output.Printf("  < %s", f)
+		}
+		output.Print("")
+	}
+
 	if len(stale) > 0 {
 		output.Print("Stale (source JSON deleted):")
 		for _, f := range stale {
@@ -100,8 +111,8 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	if len(synced) == total {
 		output.Print("Workspace is in sync with JSON files.")
 	} else {
-		output.Printf("Summary: %d synced, %d modified, %d conflicts, %d stale",
-			len(synced), len(modified), len(conflicts), len(stale))
+		output.Printf("Summary: %d synced, %d modified, %d outdated, %d conflicts, %d stale",
+			len(synced), len(modified), len(sourceModified), len(conflicts), len(stale))
 
 		if len(modified) > 0 {
 			output.Print("\nRun 'weg workspace collapse' to update JSON files.")

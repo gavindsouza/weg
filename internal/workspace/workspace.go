@@ -6,6 +6,8 @@ Workspace management for expanded code editing.
 package workspace
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -44,11 +46,19 @@ var CodeFields = []CodeField{
 
 // FileState tracks the state of an expanded file
 type FileState struct {
-	Source         string    `json:"source"`          // Path to source JSON file
-	Field          string    `json:"field"`           // Field name in JSON
-	ExpandedAt     time.Time `json:"expanded_at"`     // When the file was expanded
-	SourceMtime    time.Time `json:"source_mtime"`    // Source file mtime at expansion
-	WorkspaceMtime time.Time `json:"workspace_mtime"` // Workspace file mtime at expansion
+	Source         string    `json:"source"`              // Path to source JSON file
+	Field          string    `json:"field"`               // Field name in JSON
+	ExpandedAt     time.Time `json:"expanded_at"`         // When the file was expanded
+	SourceMtime    time.Time `json:"source_mtime"`        // Source file mtime at expansion
+	WorkspaceMtime time.Time `json:"workspace_mtime"`     // Workspace file mtime at expansion
+	BaseHash       string    `json:"base_hash,omitempty"` // Hash of the code content at the last expand/collapse sync point
+}
+
+// HashContent returns the hex-encoded SHA-256 of a code snippet. It is the
+// hash recorded in FileState.BaseHash.
+func HashContent(content string) string {
+	sum := sha256.Sum256([]byte(content))
+	return hex.EncodeToString(sum[:])
 }
 
 // WorkspaceState tracks all expanded files
@@ -105,11 +115,12 @@ func (s *WorkspaceState) Save(baseDir string) error {
 type FileStatus int
 
 const (
-	StatusSynced   FileStatus = iota // No changes
-	StatusModified                   // Workspace file modified
-	StatusConflict                   // Both source and workspace modified
-	StatusStale                      // Source JSON deleted
-	StatusNew                        // New file in workspace (no source)
+	StatusSynced         FileStatus = iota // No changes
+	StatusModified                         // Workspace file modified
+	StatusConflict                         // Both source and workspace modified
+	StatusStale                            // Source JSON deleted
+	StatusNew                              // New file in workspace (no source)
+	StatusSourceModified                   // Source JSON modified, workspace has no local edits
 )
 
 func (s FileStatus) String() string {
@@ -124,12 +135,22 @@ func (s FileStatus) String() string {
 		return "stale"
 	case StatusNew:
 		return "new"
+	case StatusSourceModified:
+		return "source-modified"
 	default:
 		return "unknown"
 	}
 }
 
-// GetFileStatus determines the sync status of a workspace file
+// GetFileStatus determines the sync status of a workspace file.
+//
+// The comparison is content-aware: mtimes and recorded state can go stale
+// (e.g. after `weg remote sync` rewrites every source JSON), so the actual
+// code content decides. Identical content is always StatusSynced regardless
+// of what the recorded hashes/mtimes claim. When the contents differ, the
+// recorded BaseHash (the content both sides agreed on at the last
+// expand/collapse) determines which side moved. Mtimes are only a fallback
+// for legacy state entries that predate BaseHash.
 func GetFileStatus(baseDir, workspacePath string, state FileState) (FileStatus, error) {
 	sourcePath := filepath.Join(baseDir, state.Source)
 	fullWorkspacePath := filepath.Join(baseDir, workspacePath)
@@ -152,18 +173,77 @@ func GetFileStatus(baseDir, workspacePath string, state FileState) (FileStatus, 
 		return StatusSynced, workspaceErr
 	}
 
-	// Check for modifications
+	// Content comparison
+	sourceCode, srcOK := readSourceField(sourcePath, state.Field)
+	workspaceCode, wsOK := readWorkspaceCode(fullWorkspacePath)
+	contentKnown := srcOK && wsOK
+
+	if contentKnown {
+		if sourceCode == workspaceCode {
+			// Byte-identical content is never a conflict, no matter how
+			// stale the recorded hashes/mtimes are.
+			return StatusSynced, nil
+		}
+		if state.BaseHash != "" {
+			workspaceClean := HashContent(workspaceCode) == state.BaseHash
+			sourceClean := HashContent(sourceCode) == state.BaseHash
+			switch {
+			case workspaceClean && !sourceClean:
+				return StatusSourceModified, nil
+			case sourceClean && !workspaceClean:
+				return StatusModified, nil
+			default:
+				// Both sides diverged from the recorded base.
+				return StatusConflict, nil
+			}
+		}
+	}
+
+	// Legacy fallback: no recorded base hash (or unreadable content), so
+	// fall back to mtime heuristics.
 	sourceModified := sourceInfo.ModTime().After(state.SourceMtime.Add(time.Second))
 	workspaceModified := workspaceInfo.ModTime().After(state.WorkspaceMtime.Add(time.Second))
 
-	if sourceModified && workspaceModified {
+	switch {
+	case sourceModified && workspaceModified:
 		return StatusConflict, nil
-	}
-	if workspaceModified {
+	case workspaceModified:
 		return StatusModified, nil
+	case sourceModified:
+		return StatusSourceModified, nil
+	case contentKnown:
+		// Contents differ but neither mtime moved: ambiguous, require an
+		// explicit choice rather than silently overwriting either side.
+		return StatusConflict, nil
+	default:
+		return StatusSynced, nil
 	}
+}
 
-	return StatusSynced, nil
+// readSourceField reads the code content of a field from a source JSON file.
+// A missing field reads as empty content; unreadable or invalid JSON returns
+// ok=false.
+func readSourceField(sourcePath, field string) (code string, ok bool) {
+	data, err := os.ReadFile(sourcePath)
+	if err != nil {
+		return "", false
+	}
+	var doc map[string]any
+	if err := json.Unmarshal(data, &doc); err != nil {
+		return "", false
+	}
+	code, _ = doc[field].(string)
+	return code, true
+}
+
+// readWorkspaceCode reads a workspace file and strips the generated header,
+// returning the bare code content.
+func readWorkspaceCode(fullWorkspacePath string) (code string, ok bool) {
+	data, err := os.ReadFile(fullWorkspacePath)
+	if err != nil {
+		return "", false
+	}
+	return stripHeader(string(data)), true
 }
 
 // GetCodeFieldForEntity returns the code field definition for an entity type and field

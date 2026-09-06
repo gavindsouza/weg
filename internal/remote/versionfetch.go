@@ -20,9 +20,13 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/gavindsouza/weg/internal/fsutil"
 )
+
+// frappeDatetimeLayout is how Frappe serializes and filters datetimes.
+const frappeDatetimeLayout = "2006-01-02 15:04:05"
 
 // versionPageSize is the number of Version rows fetched per request.
 const versionPageSize = 100
@@ -34,7 +38,10 @@ var versionFetchFields = []string{"name", "ref_doctype", "docname", "owner", "cr
 // into tmpDir as JSONL, in parallel, resuming from any existing cursors. The
 // first failure cancels the remaining fetchers at their next page boundary.
 // progress is called (may be nil) with the running record count per doctype.
-func (f *Fetcher) FetchVersionsToDisk(ctx context.Context, tmpDir string, progress func(doctype string, total int)) error {
+//
+// A non-zero since restricts the fetch to Version records created after that
+// time (incremental pull); the zero value fetches the full history (clone).
+func (f *Fetcher) FetchVersionsToDisk(ctx context.Context, tmpDir string, since time.Time, progress func(doctype string, total int)) error {
 	if err := os.MkdirAll(tmpDir, 0o755); err != nil {
 		return err
 	}
@@ -48,7 +55,7 @@ func (f *Fetcher) FetchVersionsToDisk(ctx context.Context, tmpDir string, progre
 
 	for i, dt := range doctypes {
 		go func(i int, dt string) {
-			errs[i] = f.fetchDoctypeVersions(ctx, tmpDir, dt, progress)
+			errs[i] = f.fetchDoctypeVersions(ctx, tmpDir, dt, since, progress)
 			if errs[i] != nil {
 				cancel()
 			}
@@ -69,7 +76,7 @@ func versionCursorPath(tmpDir, doctype string) string {
 	return filepath.Join(tmpDir, slugifyDoctype(doctype)+".cursor")
 }
 
-func (f *Fetcher) fetchDoctypeVersions(ctx context.Context, tmpDir, doctype string, progress func(string, int)) error {
+func (f *Fetcher) fetchDoctypeVersions(ctx context.Context, tmpDir, doctype string, since time.Time, progress func(string, int)) error {
 	jsonlPath := versionJSONLPath(tmpDir, doctype)
 	cursorPath := versionCursorPath(tmpDir, doctype)
 
@@ -90,7 +97,7 @@ func (f *Fetcher) fetchDoctypeVersions(ctx context.Context, tmpDir, doctype stri
 		if err := ctx.Err(); err != nil {
 			return nil // another fetcher failed; its error carries the cause
 		}
-		page, err := f.getVersionPage(doctype, offset)
+		page, err := f.getVersionPage(doctype, offset, since)
 		if err != nil {
 			return fmt.Errorf("%s: %w", doctype, err)
 		}
@@ -126,10 +133,21 @@ func (f *Fetcher) fetchDoctypeVersions(ctx context.Context, tmpDir, doctype stri
 	}
 }
 
+// buildVersionFilters builds the Frappe filter set for a doctype's Version rows.
+// A non-zero since adds a `creation > since` clause so only records newer than
+// the last sync are returned; the zero value returns the full history.
+func buildVersionFilters(doctype string, since time.Time) map[string]any {
+	filters := map[string]any{"ref_doctype": doctype}
+	if !since.IsZero() {
+		filters["creation"] = []any{">", since.Format(frappeDatetimeLayout)}
+	}
+	return filters
+}
+
 // getVersionPage fetches one page of Version rows for a doctype, ordered oldest
 // first so the on-disk stream is sorted for the k-way merge.
-func (f *Fetcher) getVersionPage(doctype string, offset int) ([]VersionRecord, error) {
-	filters, _ := json.Marshal(map[string]any{"ref_doctype": doctype})
+func (f *Fetcher) getVersionPage(doctype string, offset int, since time.Time) ([]VersionRecord, error) {
+	filters, _ := json.Marshal(buildVersionFilters(doctype, since))
 	fields, _ := json.Marshal(versionFetchFields)
 
 	params := url.Values{}

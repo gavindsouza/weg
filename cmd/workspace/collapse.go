@@ -28,11 +28,17 @@ var collapseCmd = &cobra.Command{
 
 This updates the canonical JSON files with your edits from the workspace.
 
+Workspace files without local edits whose source JSON changed (e.g. after
+'weg remote sync') are refreshed FROM the JSON instead of collapsed, so a
+stale workspace copy can never overwrite newer JSON content — even with
+--force. --force only resolves genuine conflicts (both sides changed), in
+favor of the workspace edit.
+
 Examples:
   weg workspace collapse              # Collapse all changes
   weg workspace collapse --dry-run    # Show what would change
   weg workspace collapse --validate   # Run linters before collapse
-  weg workspace collapse --force      # Overwrite even if conflicts`,
+  weg workspace collapse --force      # On conflicts, the workspace edit wins`,
 	RunE: runCollapse,
 }
 
@@ -86,9 +92,16 @@ func runCollapse(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(result.Updated) > 0 {
-		wegoutput.Printf("%sUpdated %d files:", prefix, len(result.Updated))
+		wegoutput.Printf("%sCollapsed %d workspace files into JSON:", prefix, len(result.Updated))
 		for _, f := range result.Updated {
 			wegoutput.Printf("  ~ %s", f)
+		}
+	}
+
+	if len(result.Refreshed) > 0 {
+		wegoutput.Printf("\n%sRefreshed %d workspace files from newer JSON (no local edits):", prefix, len(result.Refreshed))
+		for _, f := range result.Refreshed {
+			wegoutput.Printf("  < %s", f)
 		}
 	}
 
@@ -97,14 +110,13 @@ func runCollapse(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(result.Conflicts) > 0 {
-		wegoutput.Printf("\nConflicts (use --force to overwrite):")
+		wegoutput.Printf("\nConflicts (both the JSON and your workspace edit changed):")
 		for _, f := range result.Conflicts {
 			wegoutput.Printf("  ! %s", f)
 		}
-		wegoutput.Print("\nBoth the source JSON and workspace file were modified.")
-		wegoutput.Print("Options:")
-		wegoutput.Print("  weg workspace collapse --force  # Use workspace version")
-		wegoutput.Print("  weg workspace expand --force    # Use JSON version")
+		wegoutput.Print("\nOptions:")
+		wegoutput.Print("  weg workspace collapse --force  # Keep the workspace edit (overwrites the JSON change)")
+		wegoutput.Print("  weg workspace expand --force    # Keep the JSON version (overwrites your workspace edit)")
 	}
 
 	if len(result.Errors) > 0 {
@@ -114,7 +126,7 @@ func runCollapse(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	if len(result.Updated) == 0 && len(result.Conflicts) == 0 && len(result.Errors) == 0 {
+	if len(result.Updated) == 0 && len(result.Refreshed) == 0 && len(result.Conflicts) == 0 && len(result.Errors) == 0 {
 		wegoutput.Print("Nothing to collapse. Workspace is in sync.")
 	}
 

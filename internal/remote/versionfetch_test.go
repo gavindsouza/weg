@@ -4,7 +4,41 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
+
+// buildVersionFilters gates the incremental pull: a zero `since` fetches the
+// full history (clone), a non-zero `since` adds a `creation > since` clause so
+// only records newer than the last sync are replayed.
+func TestBuildVersionFilters(t *testing.T) {
+	t.Run("zero since fetches full history", func(t *testing.T) {
+		f := buildVersionFilters("Server Script", time.Time{})
+		if f["ref_doctype"] != "Server Script" {
+			t.Fatalf("ref_doctype = %v, want Server Script", f["ref_doctype"])
+		}
+		if _, ok := f["creation"]; ok {
+			t.Fatalf("zero since must not add a creation filter, got %v", f["creation"])
+		}
+	})
+
+	t.Run("non-zero since adds creation lower bound", func(t *testing.T) {
+		since := time.Date(2026, 7, 1, 9, 30, 15, 0, time.UTC)
+		f := buildVersionFilters("Client Script", since)
+		if f["ref_doctype"] != "Client Script" {
+			t.Fatalf("ref_doctype = %v, want Client Script", f["ref_doctype"])
+		}
+		clause, ok := f["creation"].([]any)
+		if !ok || len(clause) != 2 {
+			t.Fatalf("creation clause = %v, want [op, value]", f["creation"])
+		}
+		if clause[0] != ">" {
+			t.Fatalf("operator = %v, want >", clause[0])
+		}
+		if clause[1] != "2026-07-01 09:30:15" {
+			t.Fatalf("value = %v, want Frappe datetime 2026-07-01 09:30:15", clause[1])
+		}
+	})
+}
 
 func TestTruncateJSONL(t *testing.T) {
 	dir := t.TempDir()

@@ -19,20 +19,32 @@ import (
 type CollapseOptions struct {
 	BaseDir  string // Base directory of the weg clone
 	DryRun   bool   // Show what would change without modifying
-	Force    bool   // Overwrite even if conflicts
+	Force    bool   // Resolve genuine conflicts in favor of the workspace edit
 	Validate bool   // Run linters before collapse
 	Verbose  bool   // Print detailed output
 }
 
 // CollapseResult contains the results of a collapse operation
 type CollapseResult struct {
-	Updated   []string // JSON files updated
+	Updated   []string // Workspace files whose edits were packed into their source JSON
+	Refreshed []string // Workspace files refreshed FROM a newer JSON (no local edits to collapse)
 	Unchanged []string // Files with no changes
 	Conflicts []string // Files with conflicts (not updated)
 	Errors    []string // Errors encountered
 }
 
-// Collapse packs workspace files back into JSON
+// Collapse packs workspace files back into JSON.
+//
+// Direction rules:
+//   - A workspace file with local edits (and an unchanged JSON) is packed into
+//     its source JSON. This is the normal collapse direction.
+//   - A workspace file WITHOUT local edits whose source JSON changed (e.g.
+//     after `weg remote sync`) is refreshed from the JSON instead. Collapsing
+//     it would overwrite the newer JSON with stale content, so this happens
+//     even with Force.
+//   - A genuine conflict (both sides changed since the last expand) is
+//     reported. With Force the workspace edit wins and is packed into the
+//     JSON, overwriting the JSON-side change.
 func Collapse(opts CollapseOptions) (*CollapseResult, error) {
 	result := &CollapseResult{}
 
@@ -41,9 +53,12 @@ func Collapse(opts CollapseOptions) (*CollapseResult, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to load state: %w", err)
 	}
+	stateDirty := false
 
 	// Track which source files we've updated (to handle multiple fields per file)
 	updatedSources := make(map[string]map[string]any)
+	// Code content collapsed per workspace file, for recording base hashes.
+	collapsedCode := make(map[string]string)
 
 	// Process each tracked workspace file
 	for workspacePath, fileState := range state.Files {
@@ -55,13 +70,31 @@ func Collapse(opts CollapseOptions) (*CollapseResult, error) {
 			continue
 		}
 
-		// Check for conflicts
-		if !opts.Force {
-			status, _ := GetFileStatus(opts.BaseDir, workspacePath, fileState)
-			if status == StatusConflict {
+		status, _ := GetFileStatus(opts.BaseDir, workspacePath, fileState)
+		switch status {
+		case StatusConflict:
+			if !opts.Force {
 				result.Conflicts = append(result.Conflicts, workspacePath)
 				continue
 			}
+			// Force: the workspace edit wins over the JSON-side change.
+		case StatusSourceModified:
+			// The source JSON changed and the workspace copy has no local
+			// edits: collapsing would clobber the newer JSON with stale
+			// content. Refresh the workspace file from the JSON instead —
+			// deliberately even with Force.
+			if opts.DryRun {
+				result.Refreshed = append(result.Refreshed, workspacePath)
+				continue
+			}
+			if err := refreshWorkspaceFile(opts.BaseDir, workspacePath, &fileState); err != nil {
+				result.Errors = append(result.Errors, fmt.Sprintf("%s: refresh from JSON failed: %v", workspacePath, err))
+				continue
+			}
+			state.Files[workspacePath] = fileState
+			stateDirty = true
+			result.Refreshed = append(result.Refreshed, workspacePath)
+			continue
 		}
 
 		// Read workspace file
@@ -96,12 +129,18 @@ func Collapse(opts CollapseOptions) (*CollapseResult, error) {
 		existingCode, _ := doc[fileState.Field].(string)
 		if existingCode == code {
 			result.Unchanged = append(result.Unchanged, workspacePath)
+			// Auto-heal stale state (hashes/mtimes) for content-identical files.
+			if !opts.DryRun && healState(opts.BaseDir, workspacePath, &fileState) {
+				state.Files[workspacePath] = fileState
+				stateDirty = true
+			}
 			continue
 		}
 
 		// Update the field
 		doc[fileState.Field] = code
 		updatedSources[fileState.Source] = doc
+		collapsedCode[workspacePath] = code
 
 		result.Updated = append(result.Updated, workspacePath)
 	}
@@ -123,7 +162,7 @@ func Collapse(opts CollapseOptions) (*CollapseResult, error) {
 			}
 		}
 
-		// Update state with new mtimes
+		// Update state with new mtimes and base hashes
 		now := time.Now()
 		for workspacePath, fileState := range state.Files {
 			if _, exists := updatedSources[fileState.Source]; exists {
@@ -140,12 +179,20 @@ func Collapse(opts CollapseOptions) (*CollapseResult, error) {
 				if workspaceInfo != nil {
 					fileState.WorkspaceMtime = workspaceInfo.ModTime()
 				}
+				if code, ok := collapsedCode[workspacePath]; ok {
+					fileState.BaseHash = HashContent(code)
+				}
 				state.Files[workspacePath] = fileState
 			}
 		}
 
-		if err := state.Save(opts.BaseDir); err != nil {
-			return result, fmt.Errorf("failed to save state: %w", err)
+		if len(updatedSources) > 0 {
+			stateDirty = true
+		}
+		if stateDirty {
+			if err := state.Save(opts.BaseDir); err != nil {
+				return result, fmt.Errorf("failed to save state: %w", err)
+			}
 		}
 	}
 

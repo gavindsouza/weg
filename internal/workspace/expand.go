@@ -99,10 +99,11 @@ func Expand(opts ExpandOptions) (*ExpandResult, error) {
 			workspacePath := buildWorkspacePath(cf, entityName, entityFile)
 			fullWorkspacePath := filepath.Join(opts.BaseDir, workspacePath)
 
-			// Check for conflicts
+			// Check for conflicts: never overwrite local workspace edits
+			// without --force.
 			if existingState, exists := state.Files[workspacePath]; exists && !opts.Force {
 				status, _ := GetFileStatus(opts.BaseDir, workspacePath, existingState)
-				if status == StatusConflict {
+				if status == StatusConflict || status == StatusModified {
 					result.Conflicts = append(result.Conflicts, workspacePath)
 					continue
 				}
@@ -133,6 +134,7 @@ func Expand(opts ExpandOptions) (*ExpandResult, error) {
 				ExpandedAt:     time.Now(),
 				SourceMtime:    sourceInfo.ModTime(),
 				WorkspaceMtime: workspaceInfo.ModTime(),
+				BaseHash:       HashContent(code),
 			}
 
 			result.Expanded = append(result.Expanded, workspacePath)
