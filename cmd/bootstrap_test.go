@@ -27,8 +27,8 @@ jobs:
       matrix:
         include:
           - {version: "15", python-version: "3.11", node-version: 18}
-          - {version: "16", python-version: "3.12", node-version: 20, frappe-branch: "version-16"}
-          - {version: "develop", python-version: "3.13", node-version: 22}
+          - {version: "16", python-version: "3.14", node-version: 24, frappe-branch: "version-16"}
+          - {version: "develop", python-version: "3.14", node-version: 22}
 
     services:
       mariadb:
@@ -157,8 +157,8 @@ func TestBuildMatrixInclude(t *testing.T) {
 
 	for _, want := range []string{
 		`{version: "15", python-version: "3.11", node-version: "18", frappe-branch: "version-15"}`,
-		`{version: "16", python-version: "3.12", node-version: "20", frappe-branch: "version-16"}`,
-		`{version: "develop", python-version: "3.13", node-version: "22", frappe-branch: "develop"}`,
+		`{version: "16", python-version: "3.14", node-version: "24", frappe-branch: "version-16"}`,
+		`{version: "develop", python-version: "3.14", node-version: "24", frappe-branch: "develop"}`,
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("matrix include missing %s, got:\n%s", want, got)
@@ -286,7 +286,7 @@ func TestFrappeBranch(t *testing.T) {
 func TestGetDevboxPackages_Develop(t *testing.T) {
 	packages := getDevboxPackages("develop")
 	joined := strings.Join(packages, " ")
-	for _, want := range []string{"python@3.13", "nodejs@22", "pnpm"} {
+	for _, want := range []string{"python@3.14", "nodejs@24", "pnpm"} {
 		if !strings.Contains(joined, want) {
 			t.Errorf("devbox packages for develop missing %q, got %v", want, packages)
 		}
@@ -323,7 +323,7 @@ func TestRenderCIWorkflow(t *testing.T) {
 		`cron: "0 0 * * 5"`,
 		"workflow_dispatch:",
 		`{version: "15", python-version: "3.11",`,
-		`{version: "develop", python-version: "3.13",`,
+		`{version: "develop", python-version: "3.14",`,
 		"sheets_sync",
 	} {
 		if !strings.Contains(content, want) {

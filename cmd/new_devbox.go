@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/gavindsouza/weg/tools"
 )
@@ -180,13 +181,17 @@ func getDevboxPackages(version string) []string {
 	if err != nil {
 		return packages
 	}
-	switch fv.Version {
-	case "14.x.x":
-		packages = append(packages, "python@3.10")
-	case "16.x.x":
-		packages = append(packages, "python@3.12")
-	case "develop":
-		packages = append(packages, "python@3.13", "nodejs@22", "pnpm")
+
+	pythonPkg := fmt.Sprintf("python@%s", fv.PythonVersion)
+	if !strings.Contains(strings.Join(packages, " "), pythonPkg) {
+		packages = append(packages, pythonPkg)
+	}
+	nodePkg := fmt.Sprintf("nodejs@%s", fv.NodeVersion)
+	if !strings.Contains(strings.Join(packages, " "), nodePkg) {
+		packages = append(packages, nodePkg)
+	}
+	if fv.PackageManager != "yarn" {
+		packages = append(packages, fv.PackageManager)
 	}
 
 	return packages

@@ -39,6 +39,7 @@ var pythonToFrappeVersion = map[string]string{
 	"3.11": "15",
 	"3.12": "16",
 	"3.13": "develop",
+	"3.14": "16",
 }
 
 // detectCICompatibility inspects an existing .github/workflows directory for
