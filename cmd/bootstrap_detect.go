@@ -28,13 +28,14 @@ var (
 	// "15", "v15", "version-15", "15.0.1", and "develop".
 	ciVersionTokenRe = regexp.MustCompile(`(?:version-|v)?(14|15|16)(?:\.\d+)*|develop`)
 
-	validDetectableVersions = []string{"14", "15", "16", "develop"}
+	validDetectableVersions = []string{"13", "14", "15", "16", "develop"}
 )
 
 // pythonToFrappeVersion maps the default Python runtime for each Frappe version
 // back to the version itself, letting us infer compatibility from CI matrices
 // that declare python-version rows.
 var pythonToFrappeVersion = map[string]string{
+	"3.9": "13",
 	"3.10": "14",
 	"3.11": "15",
 	"3.12": "16",

@@ -30,6 +30,22 @@ type Frappe struct {
 var frappe = Frappe{
 	Versions: []FrappeVersion{
 		{
+			Version:        "13.x.x",
+			VersionPattern: `^(v?13\.|version-13(-.*)?)`,
+			SupportedDBs:   []string{"mariadb", "postgres"},
+			PythonVersion:  "3.9",
+			NodeVersion:    "14",
+			PackageManager: "yarn",
+			Dependencies: []Dependency{
+				{Name: "python", Version: "3.9"},
+				{Name: "nodejs", Version: "14"},
+				{Name: "redis", Version: "5"},
+				{Name: "mariadb", Version: "10.3"},
+				{Name: "wkhtmltopdf", Version: "0.12.6"},
+				{Name: "yarn", Version: "1.22"},
+			},
+		},
+		{
 			Version:        "14.x.x",
 			VersionPattern: `^(v?14\.|version-14(-.*)?)`,
 			SupportedDBs:   []string{"mariadb", "postgres"},
@@ -178,7 +194,7 @@ func IsDatabaseSupported(version, database string) bool {
 
 // GetSupportedVersions returns all supported Frappe version strings
 func GetSupportedVersions() []string {
-	return []string{"14", "15", "16", "develop"}
+	return []string{"13", "14", "15", "16", "develop"}
 }
 
 // GetSupportedDatabases returns all supported databases
@@ -189,6 +205,8 @@ func GetSupportedDatabases() []string {
 // NormalizeFrappeVersion converts version shortcuts to full version patterns
 func NormalizeFrappeVersion(version string) string {
 	switch version {
+	case "13":
+		return "version-13"
 	case "14":
 		return "version-14"
 	case "15":

@@ -281,6 +281,6 @@ func runVersionTest(benchPath, appName, site, version string, args []string) tes
 }
 
 func isValidVersion(version string) bool {
-	return version == "14" || version == "15" || version == "16" ||
+	return version == "13" || version == "14" || version == "15" || version == "16" ||
 		tools.NormalizeFrappeVersion(version) != ""
 }
