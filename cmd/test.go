@@ -83,10 +83,18 @@ func runTest(cmd *cobra.Command, args []string) error {
 	case config.ContextWegApp:
 		benchPath = result.BenchPath
 		appName = filepath.Base(absPath)
+		// The repo directory may be named differently than the app (pyproject
+		// name); the site and bench paths must use the canonical app name.
+		if name, err := config.ProjectName(absPath); err == nil {
+			appName = name
+		}
 	case config.ContextApp:
 		// App without weg setup
 		benchPath = result.BenchPath
 		appName = filepath.Base(absPath)
+		if name, err := config.ProjectName(absPath); err == nil {
+			appName = name
+		}
 		if _, err := os.Stat(benchPath); os.IsNotExist(err) {
 			return fmt.Errorf("no .weg environment found. Run 'weg init' first")
 		}

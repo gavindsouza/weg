@@ -101,6 +101,27 @@ func ParsePyproject(path string) (*AppConfig, error) {
 	return config, nil
 }
 
+// ProjectName reads the [project] name from pyproject.toml. It's the canonical
+// app name even when the repo directory is named differently.
+func ProjectName(path string) (string, error) {
+	data, err := os.ReadFile(filepath.Join(path, "pyproject.toml"))
+	if err != nil {
+		return "", err
+	}
+	var pf struct {
+		Project struct {
+			Name string `toml:"name"`
+		} `toml:"project"`
+	}
+	if err := toml.Unmarshal(data, &pf); err != nil {
+		return "", fmt.Errorf("failed to parse pyproject.toml: %w", err)
+	}
+	if pf.Project.Name == "" {
+		return "", fmt.Errorf("project.name not set in pyproject.toml")
+	}
+	return pf.Project.Name, nil
+}
+
 // HasWegSection checks if pyproject.toml contains a [tool.weg] section
 func HasWegSection(path string) bool {
 	pyprojectPath := filepath.Join(path, "pyproject.toml")

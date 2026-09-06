@@ -8,7 +8,7 @@ database = "{{DATABASE}}"
 
 [apps.frappe]
 url = "https://github.com/frappe/frappe"
-branch = "version-{{VERSION}}"
+branch = "{{FRAPPE_BRANCH}}"
 
 [apps.{{MODULE_NAME}}]
 path = ".."

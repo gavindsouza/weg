@@ -15,6 +15,7 @@ Usage:
   weg [command]
 
 Getting Started:
+  bootstrap   Migrate an existing project into weg management
   create      Create a new Frappe bench with Devbox
   init        Initialize weg in a directory
   new         Create a new Frappe app

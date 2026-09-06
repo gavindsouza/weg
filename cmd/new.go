@@ -369,7 +369,7 @@ weg start
 	}
 
 	// Create GitHub Actions workflows
-	if err := createGitHubWorkflows(targetPath, moduleName, version); err != nil {
+	if err := createGitHubWorkflows(targetPath, moduleName, []string{version}); err != nil {
 		PrintVerbose("Warning: failed to create GitHub workflows: %v", err)
 	}
 
@@ -398,11 +398,12 @@ weg start
 		// Create weg.toml in .weg
 		siteName := fmt.Sprintf("%s.localhost", moduleName)
 		wegToml := tmplReplace("weg.toml", map[string]string{
-			"APP_NAME":    appName,
-			"VERSION":     version,
-			"DATABASE":    database,
-			"MODULE_NAME": moduleName,
-			"SITE_NAME":   siteName,
+			"APP_NAME":       appName,
+			"VERSION":        version,
+			"DATABASE":       database,
+			"MODULE_NAME":    moduleName,
+			"SITE_NAME":      siteName,
+			"FRAPPE_BRANCH":  frappeBranch(version),
 		})
 
 		if err := os.WriteFile(filepath.Join(wegPath, "weg.toml"), []byte(wegToml), 0644); err != nil {

@@ -5,6 +5,9 @@ on:
     branches: [main, develop]
   pull_request:
     branches: [main, develop]
+  schedule:
+    - cron: "0 0 * * 5"
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -14,9 +17,15 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+{{MATRIX_INCLUDE}}
+
     services:
       mariadb:
-        image: mariadb:10.6
+        image: mariadb:10.11
         env:
           MARIADB_ROOT_PASSWORD: root
         ports:
@@ -38,28 +47,41 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python-version }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: ${{ matrix.node-version }}
 
       - name: Install Frappe bench
         run: pip install frappe-bench
 
       - name: Initialize bench
+        env:
+          BENCH_USE_UV: 'true'
         run: |
-          bench init --skip-redis-config-generation frappe-bench
+          bench init --skip-redis-config-generation --skip-assets frappe-bench --frappe-branch ${{ matrix.frappe-branch }}
+          if [ "${{ matrix.version }}" = "15" ]; then
+            frappe-bench/env/bin/pip install "setuptools<81"
+          fi
           cd frappe-bench
           bench get-app ${{ github.workspace }}
 
       - name: Create test site
         working-directory: frappe-bench
+        env:
+          CI: 'Yes'
         run: |
+          bench setup requirements --dev
           bench new-site --mariadb-root-password root --admin-password admin test.localhost
           bench --site test.localhost install-app {{MODULE_NAME}}
 
       - name: Run tests
         working-directory: frappe-bench
-        run: bench --site test.localhost run-tests --app {{MODULE_NAME}}
+        env:
+          CI: 'Yes'
+        run: |
+          cd sites && ../env/bin/gunicorn -b 127.0.0.1:8000 -w 4 -t 120 frappe.app:application --preload &
+          cd ..
+          bench --site test.localhost run-tests --app {{MODULE_NAME}}

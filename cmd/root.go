@@ -172,7 +172,7 @@ func init() {
 		id   string
 		cmds []*cobra.Command
 	}{
-		{groupGettingStarted, []*cobra.Command{newCmd, createCmd, initCmd, runCmd, scaffoldCmd}},
+		{groupGettingStarted, []*cobra.Command{newCmd, createCmd, initCmd, bootstrapCmd, runCmd, scaffoldCmd}},
 		{groupDailyDev, []*cobra.Command{startCmd, stopCmd, restartCmd, statusCmd, syncCmd, testCmd, build.BuildCmd, log.LogCmd, doctorCmd}},
 		{groupSiteData, []*cobra.Command{site.SiteCmd, db.DbCmd, doc.DocCmd, doctype.DoctypeCmd, user.UserCmd, fixtures.FixturesCmd, cache.CacheCmd, scheduler.SchedulerCmd, api.ApiCmd, pyCmd, execCmd}},
 		{groupApps, []*cobra.Command{addCmd, removeCmd, app.AppCmd, updateCmd, upgradeCmd}},
