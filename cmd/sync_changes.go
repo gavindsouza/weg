@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -486,6 +487,11 @@ func createSite(sitesDir string, cfg *config.SiteConfig, appsToInstall []string)
 		return fmt.Errorf("MariaDB socket not found at %s after 30 seconds. Try running 'devbox services stop' and then 'weg sync' again", mysqlSocket)
 	}
 
+	// Ensure the devbox MariaDB root has a known password. New installs start
+	// passwordless (socket-only, empty root); the site lives inside .weg so we
+	// can set the password with the socket root connection before creating it.
+	rootPassword := ensureMariaDBRootPassword(benchPath, mysqlSocket)
+
 	// Build command arguments safely (no shell interpolation)
 	adminPass := cfg.AdminPass
 	if adminPass == "" {
@@ -493,11 +499,11 @@ func createSite(sitesDir string, cfg *config.SiteConfig, appsToInstall []string)
 	}
 	pythonPath := filepath.Join(benchPath, "env", "bin", "python")
 	args := []string{
-		"run", "-c", benchPath, "--",
 		pythonPath, "-m", "frappe.utils.bench_helper",
 		"frappe", "new-site", cfg.Name,
 		"--admin-password=" + adminPass,
-		"--db-root-password=",
+		"--db-root-username=root",
+		"--db-root-password=" + rootPassword,
 		"--db-socket=" + mysqlSocket,
 	}
 	for _, app := range appsToInstall {
@@ -507,9 +513,12 @@ func createSite(sitesDir string, cfg *config.SiteConfig, appsToInstall []string)
 		}
 	}
 
-	// NOTE: frappe commands must run from the sites directory (where apps.txt is)
+	// NOTE: frappe commands must run from the sites directory (where apps.txt
+	// is). bench_helper resolves sites_path="." against the process cwd, so run
+	// the venv python directly instead of through `devbox run` (which always
+	// executes from the devbox project root).
 	PrintVerbose("Running new-site for %s...", cfg.Name)
-	cmd := exec.Command("devbox", args...)
+	cmd := exec.Command(pythonPath, args...)
 	cmd.Dir = sitesDir
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -521,6 +530,36 @@ func createSite(sitesDir string, cfg *config.SiteConfig, appsToInstall []string)
 	// Users should pass --site explicitly or use 'bench use <site>'
 
 	return nil
+}
+
+// ensureMariaDBRootPassword makes sure the devbox-managed MariaDB root login
+// has the bench default password ("root"). Fresh devbox installs start with an
+// empty password; bench conventions assume passwordless socket use for the app
+// so this only matters when a password is required. Returns the password to
+// pass to frappe new-site.
+func ensureMariaDBRootPassword(benchPath, mysqlSocket string) string {
+	const rootPassword = "admin"
+	// Try the known password first (idempotent).
+	if ok := tryMariaDBAuth(benchPath, mysqlSocket, rootPassword); ok {
+		return rootPassword
+	}
+	// Passwordless root (fresh devbox install): set it now.
+	stmt := "ALTER USER 'root'@'localhost' IDENTIFIED BY '" + rootPassword + "'; FLUSH PRIVILEGES;"
+	if err := runCmdInDir(benchPath, "devbox", "run", "mysql", "-S", mysqlSocket, "-uroot", "-e", stmt); err != nil {
+		PrintVerbose("Warning: could not set MariaDB root password: %v", err)
+		return rootPassword
+	}
+	return rootPassword
+}
+
+// tryMariaDBAuth reports whether the devbox MariaDB accepts the given root
+// password over the local socket.
+func tryMariaDBAuth(benchPath, mysqlSocket, password string) bool {
+	cmd := exec.Command("devbox", "run", "mysql", "-S", mysqlSocket, "-uroot", "-p"+password, "-e", "SELECT 1")
+	cmd.Dir = benchPath
+	cmd.Stdout = io.Discard
+	cmd.Stderr = io.Discard
+	return cmd.Run() == nil
 }
 
 func removeSite(sitesDir, name string) error {

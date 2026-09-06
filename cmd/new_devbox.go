@@ -135,6 +135,11 @@ func writeDevboxJSON(wegPath, version string) error {
 			// Disable Redis TCP port - forces socket-only operation
 			// The redis process-compose uses: redis-server $REDIS_CONF --port $REDIS_PORT
 			"REDIS_PORT": "0",
+			// Pin the virtualenv to $PWD/env so devbox-run shells see the same
+			// venv as direnv users. devbox's python plugin creates it on first run.
+			"VENV_DIR":     "$PWD/env",
+			"UV_VENV_PATH": "$PWD/env",
+			"VIRTUAL_ENV":  "$PWD/env",
 		},
 		"shell": map[string]any{
 			"init_hook": []string{
