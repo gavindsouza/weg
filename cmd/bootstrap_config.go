@@ -142,3 +142,45 @@ func quotedList(items []string) string {
 	}
 	return strings.Join(quoted, ", ")
 }
+
+// wegDevFrappe returns the frappe version under [tool.weg.dev] in a
+// pyproject.toml, or "" when absent. Keeps re-runs from silently swapping
+// the dev environment target when the compatibility list changes.
+func wegDevFrappe(content string) string {
+	lines := strings.Split(content, "\n")
+	inDev := false
+	for _, ln := range lines {
+		trimmed := strings.TrimSpace(ln)
+		if trimmed == "[tool.weg.dev]" {
+			inDev = true
+			continue
+		}
+		if inDev && strings.HasPrefix(trimmed, "[") {
+			return ""
+		}
+		if inDev && strings.HasPrefix(trimmed, "frappe ") {
+			return strings.Trim(strings.TrimSpace(strings.TrimPrefix(trimmed, "frappe =")), `"'`)
+		}
+	}
+	return ""
+}
+
+// setWegDevFrappe rewrites the frappe version under [tool.weg.dev] in a
+// rendered section. The section always carries the key, so this only has
+// an effect when the dev table is present.
+func setWegDevFrappe(section, version string) string {
+	lines := strings.Split(section, "\n")
+	inDev := false
+	for i, ln := range lines {
+		trimmed := strings.TrimSpace(ln)
+		if trimmed == "[tool.weg.dev]" {
+			inDev = true
+			continue
+		}
+		if inDev && strings.HasPrefix(trimmed, "frappe ") {
+			lines[i] = fmt.Sprintf(`frappe = "%s"`, version)
+			return strings.Join(lines, "\n")
+		}
+	}
+	return section
+}

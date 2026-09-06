@@ -242,6 +242,9 @@ func stepAppConfig(absPath string, plan *bootstrapPlan) error {
 	if !hasBenchDependencies(string(content)) {
 		section = section + "\n" + benchDependencySection(plan.versions)
 	}
+	if oldDev := wegDevFrappe(string(content)); oldDev != "" {
+		section = setWegDevFrappe(section, oldDev)
+	}
 	existing := findWegSection(string(content))
 
 	var newContent string
