@@ -400,12 +400,12 @@ weg start
 		// Create weg.toml in .weg
 		siteName := fmt.Sprintf("%s.localhost", moduleName)
 		wegToml := tmplReplace("weg.toml", map[string]string{
-			"APP_NAME":       appName,
-			"VERSION":        version,
-			"DATABASE":       database,
-			"MODULE_NAME":    moduleName,
-			"SITE_NAME":      siteName,
-			"FRAPPE_BRANCH":  frappeBranch(version),
+			"APP_NAME":      appName,
+			"VERSION":       version,
+			"DATABASE":      database,
+			"MODULE_NAME":   moduleName,
+			"SITE_NAME":     siteName,
+			"FRAPPE_BRANCH": frappeBranch(version),
 		})
 
 		if err := os.WriteFile(filepath.Join(wegPath, "weg.toml"), []byte(wegToml), 0644); err != nil {

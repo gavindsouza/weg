@@ -35,7 +35,7 @@ var (
 // back to the version itself, letting us infer compatibility from CI matrices
 // that declare python-version rows.
 var pythonToFrappeVersion = map[string]string{
-	"3.9": "13",
+	"3.9":  "13",
 	"3.10": "14",
 	"3.11": "15",
 	"3.12": "16",

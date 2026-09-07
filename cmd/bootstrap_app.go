@@ -487,12 +487,12 @@ func stepDevelopmentEnvironment(absPath string, plan *bootstrapPlan) error {
 
 func renderWegToml(plan *bootstrapPlan) (string, error) {
 	return tmplReplace("weg.toml", map[string]string{
-		"APP_NAME":       plan.appName,
-		"VERSION":        plan.devVersion,
-		"DATABASE":       plan.devDB,
-		"MODULE_NAME":    plan.moduleName,
-		"SITE_NAME":      plan.siteName,
-		"FRAPPE_BRANCH":  frappeBranch(plan.devVersion),
+		"APP_NAME":      plan.appName,
+		"VERSION":       plan.devVersion,
+		"DATABASE":      plan.devDB,
+		"MODULE_NAME":   plan.moduleName,
+		"SITE_NAME":     plan.siteName,
+		"FRAPPE_BRANCH": frappeBranch(plan.devVersion),
 	}), nil
 }
 
