@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/signal"
@@ -10,7 +9,7 @@ import (
 
 	"github.com/gavindsouza/weg/internal/config"
 	"github.com/gavindsouza/weg/internal/errors"
-	"github.com/gavindsouza/weg/internal/fsutil"
+	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/runtime"
 	"github.com/gavindsouza/weg/internal/services"
 	"github.com/gavindsouza/weg/internal/state"
@@ -177,7 +176,7 @@ func runStart(cmd *cobra.Command, args []string) error {
 
 	// Update common_site_config.json with runtime ports from weg.toml config
 	if err := updateRuntimeSiteConfig(benchPath, benchConfig, ports); err != nil {
-		PrintVerbose("Warning: failed to update site config with ports: %v", err)
+		output.Warningf("failed to update site config with ports: %v", err)
 	}
 
 	// Start services
@@ -254,12 +253,5 @@ func updateRuntimeSiteConfig(benchPath string, benchConfig *config.BenchConfig, 
 		}
 	}
 
-	// Write config
-	newData, err := json.MarshalIndent(cfg, "", "    ")
-	if err != nil {
-		return err
-	}
-
-	// Atomic: a partial write would leave Frappe with truncated JSON.
-	return fsutil.AtomicWrite(configPath, newData, 0644)
+	return mergeConfigJSON(configPath, cfg)
 }
