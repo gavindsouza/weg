@@ -422,7 +422,7 @@ func stepDevelopmentEnvironment(absPath string, plan *bootstrapPlan) error {
 	if _, err := os.Stat(filepath.Join(wegDir, "apps")); err == nil {
 		PrintInfo("\nDevelopment environment already exists at .weg/")
 		if prompt.ConfirmDefault(false, "Re-sync it now (reinstall apps, sites)?") {
-			if err := ensureEnvironment(wegDir, plan.devVersion); err != nil {
+			if err := ensureEnvironment(wegDir, plan.devVersion, ""); err != nil {
 				return fmt.Errorf("failed to re-initialize environment: %w", err)
 			}
 			return syncAppWithWegToml(absPath, wegDir, filepath.Join(wegDir, "weg.toml"))
@@ -461,7 +461,7 @@ func stepDevelopmentEnvironment(absPath string, plan *bootstrapPlan) error {
 	// Initialize the devbox runtime + venv before sync, so bench has a working
 	// Python environment to install apps and create the site. ensureEnvironment
 	// is idempotent (skips if devbox.json already exists).
-	if err := ensureEnvironment(wegDir, plan.devVersion); err != nil {
+	if err := ensureEnvironment(wegDir, plan.devVersion, ""); err != nil {
 		return fmt.Errorf("failed to initialize development environment: %w", err)
 	}
 
