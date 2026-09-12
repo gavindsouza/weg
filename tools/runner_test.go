@@ -1,8 +1,11 @@
 package tools
 
 import (
+	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -123,5 +126,39 @@ func TestRunnerDetectDevbox(t *testing.T) {
 				t.Errorf("UsesDevbox() = %v, want %v", r.UsesDevbox(), tt.wantDevbox)
 			}
 		})
+	}
+}
+
+func TestFrappeCmdRunsFromSites(t *testing.T) {
+	python, err := exec.LookPath("python3")
+	if err != nil {
+		t.Skip("python3 not available")
+	}
+	if strings.ContainsAny(chdirThenBenchHelper, "$\\`*?[") || strings.Contains(chdirThenBenchHelper, "  ") {
+		t.Fatal("script must survive devbox run's double-quote + unquoted eval")
+	}
+
+	// Stub frappe.utils.bench_helper that reports its cwd and argv.
+	stub := t.TempDir()
+	pkg := filepath.Join(stub, "frappe", "utils")
+	os.MkdirAll(pkg, 0755)
+	os.WriteFile(filepath.Join(stub, "frappe", "__init__.py"), nil, 0644)
+	os.WriteFile(filepath.Join(pkg, "__init__.py"), nil, 0644)
+	os.WriteFile(filepath.Join(pkg, "bench_helper.py"), []byte("import os, sys\nif __name__ == '__main__':\n    print(os.getcwd(), sys.argv[1:])\n"), 0644)
+
+	sites := filepath.Join(t.TempDir(), "sites dir")
+	os.MkdirAll(sites, 0755)
+
+	// devbox run starts in the bench root; the script must still land in sites.
+	argv, _ := json.Marshal([]string{sites, "frappe", "--admin-password=pa$$  w`x`", "build"})
+	cmd := exec.Command(python, "-c", chdirThenBenchHelper)
+	cmd.Dir = stub
+	cmd.Env = append(os.Environ(), "PYTHONPATH="+stub, frappeArgvEnv+"="+string(argv))
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("%v: %s", err, out)
+	}
+	if want := sites + " ['frappe', '--admin-password=pa$$  w`x`', 'build']"; strings.TrimSpace(string(out)) != want {
+		t.Fatalf("got %q, want %q", out, want)
 	}
 }

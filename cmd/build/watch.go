@@ -4,11 +4,11 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
-	"path/filepath"
 	"syscall"
 
 	wegerrors "github.com/gavindsouza/weg/internal/errors"
 	"github.com/gavindsouza/weg/internal/output"
+	"github.com/gavindsouza/weg/tools"
 	"github.com/spf13/cobra"
 )
 
@@ -54,13 +54,7 @@ func runWatch(cmd *cobra.Command, args []string) error {
 	output.Print("Press Ctrl+C to stop")
 
 	// Run frappe watch via bench_helper
-	sitesDir := filepath.Join(benchPath, "sites")
-	pythonPath := filepath.Join(benchPath, "env", "bin", "python")
-	devboxArgs := []string{"run", "-c", benchPath, "--", pythonPath, "-m", "frappe.utils.bench_helper", "frappe"}
-	devboxArgs = append(devboxArgs, watchArgs...)
-
-	watchCmd := exec.Command("devbox", devboxArgs...)
-	watchCmd.Dir = sitesDir
+	watchCmd := tools.FrappeCmd(benchPath, append([]string{"frappe"}, watchArgs...)...)
 	watchCmd.Stdout = os.Stdout
 	watchCmd.Stderr = os.Stderr
 

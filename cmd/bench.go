@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -44,8 +45,18 @@ Examples:
 		}
 
 		// Try to run via devbox in weg-managed project
-		if err := RunBench(args); err == nil {
+		err := RunBench(args)
+		if err == nil {
 			return
+		}
+		// It ran and failed: report that, rather than retrying with the
+		// system bench and hiding the real error behind "bench CLI not found".
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			if ws, ok := exitErr.Sys().(syscall.WaitStatus); ok && ws.Signaled() {
+				os.Exit(128 + int(ws.Signal()))
+			}
+			os.Exit(exitErr.ExitCode())
 		}
 
 		// Fallback: pass through to system bench CLI

@@ -2,11 +2,46 @@ package tools
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 )
+
+// frappeArgvEnv carries FrappeCmd's [sites dir, args...] as JSON. `devbox run`
+// double-quotes each arg and evals the result unquoted, so `$`, backticks,
+// globs and repeated spaces in args (passwords, --kwargs JSON, paths) would be
+// expanded or mangled; the environment passes through untouched.
+const frappeArgvEnv = "WEG_FRAPPE_ARGV"
+
+// chdirThenBenchHelper is a `python -c` script that reads frappeArgvEnv,
+// chdirs to its first entry and runs frappe's bench_helper with the rest. It
+// must itself contain none of the characters devbox's eval would mangle.
+const chdirThenBenchHelper = `import json, os, runpy, sys; a = json.loads(os.environ.pop("` + frappeArgvEnv + `")); os.chdir(a.pop(0)); sys.argv.extend(a); runpy.run_module("frappe.utils.bench_helper", run_name="__main__", alter_sys=True)`
+
+// FrappeCmd builds `python -m frappe.utils.bench_helper <args>` for a bench,
+// running from <bench>/sites: bench_helper reads ./apps.txt. `devbox run`
+// always starts in the devbox project root and ignores cmd.Dir, so with
+// devbox the chdir happens inside python. Callers must not replace cmd.Env.
+func FrappeCmd(benchPath string, args ...string) *exec.Cmd {
+	if abs, err := filepath.Abs(benchPath); err == nil {
+		benchPath = abs
+	}
+	sitesDir := filepath.Join(benchPath, "sites")
+	python := filepath.Join(benchPath, "env", "bin", "python")
+
+	var cmd *exec.Cmd
+	if _, err := os.Stat(filepath.Join(benchPath, "devbox.json")); err == nil {
+		argv, _ := json.Marshal(append([]string{sitesDir}, args...)) // []string always marshals
+		cmd = exec.Command("devbox", "run", "-c", benchPath, "--", python, "-c", chdirThenBenchHelper)
+		cmd.Env = append(os.Environ(), frappeArgvEnv+"="+string(argv))
+	} else {
+		cmd = exec.Command(python, append([]string{"-m", "frappe.utils.bench_helper"}, args...)...)
+	}
+	cmd.Dir = sitesDir
+	return cmd
+}
 
 // Runner executes commands with consistent environment handling.
 // It automatically detects whether to use devbox based on the working directory.
