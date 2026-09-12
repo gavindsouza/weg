@@ -1,8 +1,10 @@
 package cmd
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -157,11 +159,12 @@ func setupAssets(benchPath string) error {
 	}
 
 	for _, entry := range entries {
-		if !entry.IsDir() {
+		appName := entry.Name()
+		// Stat, not entry.IsDir(): path apps are symlinked into apps/.
+		if info, err := os.Stat(filepath.Join(appsDir, appName)); err != nil || !info.IsDir() {
 			continue
 		}
 
-		appName := entry.Name()
 		// App's public directory: apps/{app}/{app}/public/
 		publicDir := filepath.Join(appsDir, appName, appName, "public")
 
@@ -173,29 +176,32 @@ func setupAssets(benchPath string) error {
 			}
 		}
 
-		// Create symlink: sites/assets/{app} -> apps/{app}/{app}/public/
+		// Create relative symlink: sites/assets/{app} -> apps/{app}/{app}/public/
 		assetLink := filepath.Join(assetsDir, appName)
-
-		// Remove existing link/directory if it exists
-		if info, err := os.Lstat(assetLink); err == nil {
-			if info.Mode()&os.ModeSymlink != 0 {
-				// It's a symlink, check if it points to the right place
-				target, _ := os.Readlink(assetLink)
-				if target == publicDir {
-					continue // Already correct
-				}
-			}
-			os.RemoveAll(assetLink)
-		}
-
-		// Create relative symlink
 		relPath, err := filepath.Rel(assetsDir, publicDir)
 		if err != nil {
 			relPath = publicDir // Fall back to absolute
 		}
+		if target, err := os.Readlink(assetLink); err != nil || target != relPath {
+			os.RemoveAll(assetLink)
+			if err := os.Symlink(relPath, assetLink); err != nil {
+				PrintVerbose("Warning: failed to create asset symlink for %s: %v", appName, err)
+			}
+		}
 
-		if err := os.Symlink(relPath, assetLink); err != nil {
-			PrintVerbose("Warning: failed to create asset symlink for %s: %v", appName, err)
+		// frappe's build links the app's node_modules into its public dir
+		// (/assets/frappe/node_modules/... e.g. frappe-gantt); sync builds
+		// nothing, so make the same link here.
+		nodeModules := filepath.Join(appsDir, appName, "node_modules")
+		publicNodeModules := filepath.Join(publicDir, "node_modules")
+		if fsutil.DirExists(nodeModules) {
+			if _, err := os.Lstat(publicNodeModules); os.IsNotExist(err) {
+				if rel, err := filepath.Rel(publicDir, nodeModules); err == nil {
+					if err := os.Symlink(rel, publicNodeModules); err != nil {
+						PrintVerbose("Warning: failed to link node_modules for %s: %v", appName, err)
+					}
+				}
+			}
 		}
 	}
 
@@ -226,11 +232,36 @@ func ensureCommonSiteConfig(benchPath string, benchConfig *config.BenchConfig) e
 		}
 	}
 
-	// Write config atomically
-	data, err := json.MarshalIndent(cfg, "", "    ")
+	return mergeConfigJSON(configPath, cfg)
+}
+
+// mergeConfigJSON overlays the weg-managed keys onto the existing
+// common_site_config.json so keys added by the user or by frappe survive.
+// An unparseable existing file is an error rather than something to clobber.
+func mergeConfigJSON(configPath string, managed map[string]any) error {
+	cfg := map[string]any{}
+	data, err := os.ReadFile(configPath)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	if len(strings.TrimSpace(string(data))) > 0 {
+		dec := json.NewDecoder(bytes.NewReader(data))
+		dec.UseNumber() // keep large ints exact through the round-trip
+		if err := dec.Decode(&cfg); err != nil {
+			return fmt.Errorf("failed to parse %s: %w", configPath, err)
+		}
+	}
+	maps.Copy(cfg, managed)
+
+	data, err = json.MarshalIndent(cfg, "", "    ")
 	if err != nil {
 		return err
 	}
-
-	return fsutil.AtomicWrite(configPath, data, 0644)
+	// Atomic: a partial write would leave Frappe with truncated JSON. Keep the
+	// file's mode: site_config.json holds the database password.
+	mode := os.FileMode(0644)
+	if fi, err := os.Stat(configPath); err == nil {
+		mode = fi.Mode().Perm()
+	}
+	return fsutil.AtomicWrite(configPath, data, mode)
 }
