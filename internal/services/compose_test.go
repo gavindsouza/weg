@@ -77,6 +77,12 @@ func TestGenerateProcessComposeWithoutRedis(t *testing.T) {
 		t.Error("redis_queue should not exist when IncludeRedis is false")
 	}
 
+	// devbox's redis is replaced by a disabled, socket-probed override
+	if r := config.Processes["redis"]; !r.Disabled || r.ReadyProbe == nil || r.ReadyProbe.Exec == nil ||
+		!strings.Contains(r.ReadyProbe.Exec.Command, "-s \"/test/bench/.devbox/virtenv/redis/redis.sock\"") {
+		t.Errorf("redis override = %+v", r)
+	}
+
 	// Web should not depend on redis
 	web := config.Processes["web"]
 	if web.DependsOn != nil {
@@ -484,5 +490,64 @@ func TestGenerateProcessComposeIncludes(t *testing.T) {
 	}
 	if !found {
 		t.Error("Should include optional process-compose.override.yaml")
+	}
+}
+
+func TestEnsureDevboxServicesPatchesExistingFile(t *testing.T) {
+	bench := t.TempDir()
+	if err := WriteProcessCompose(bench, &ProcessComposeConfig{Version: "0.5", Processes: map[string]Process{"web": {Command: "serve"}}}); err != nil {
+		t.Fatal(err)
+	}
+	if added, err := EnsureDevboxServices(bench); err != nil || !added {
+		t.Fatalf("first call: added=%v err=%v", added, err)
+	}
+	if added, err := EnsureDevboxServices(bench); err != nil || added {
+		t.Fatalf("second call: added=%v err=%v", added, err)
+	}
+	data, _ := os.ReadFile(filepath.Join(bench, "process-compose.yaml"))
+	if !strings.Contains(string(data), "web:") || !strings.Contains(string(data), "redis:") || !strings.Contains(string(data), "mariadb:") {
+		t.Fatalf("existing processes must be kept:\n%s", data)
+	}
+}
+
+func TestEnsureDevboxServicesRefreshesStaleOverride(t *testing.T) {
+	bench := t.TempDir()
+	stale := DevboxRedis(bench)
+	stale.Availability = nil // pre-availability override
+	if err := WriteProcessCompose(bench, &ProcessComposeConfig{Version: "0.5", Processes: map[string]Process{"redis": stale}}); err != nil {
+		t.Fatal(err)
+	}
+	if added, err := EnsureDevboxServices(bench); err != nil || !added {
+		t.Fatalf("stale override not refreshed: added=%v err=%v", added, err)
+	}
+
+	tagged := DevboxRedis(bench)
+	tagged.Environment = []string{"WEG_RUNNER=x"}
+	WriteProcessCompose(bench, &ProcessComposeConfig{Version: "0.5", Processes: map[string]Process{"redis": tagged, "mariadb": DevboxMariaDB(bench)}})
+	if added, _ := EnsureDevboxServices(bench); added {
+		t.Fatal("WEG_RUNNER tag alone must not count as stale")
+	}
+}
+
+func TestArchiveSiteKeepsEarlierArchives(t *testing.T) {
+	bench := t.TempDir()
+	for i := range 2 {
+		site := filepath.Join(bench, "sites", "a.localhost")
+		if err := os.MkdirAll(filepath.Join(site, "private", "files"), 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := archiveSite(bench, site, []string{"--no-backup"}); err != nil {
+			t.Fatal(err)
+		}
+		want := filepath.Join(bench, "archived", "sites", "a.localhost"+map[int]string{0: "", 1: "1"}[i])
+		if !fileExists(filepath.Join(want, "private", "files")) || fileExists(site) {
+			t.Fatalf("archive %d: want site moved to %s", i, want)
+		}
+	}
+	site := filepath.Join(bench, "sites", "b.localhost")
+	os.MkdirAll(site, 0755)
+	dest := filepath.Join(bench, "sites", "archived")
+	if err := archiveSite(bench, site, []string{"--archived-sites-path", dest}); err != nil || !fileExists(filepath.Join(dest, "b.localhost")) {
+		t.Fatalf("--archived-sites-path not honoured: %v", err)
 	}
 }

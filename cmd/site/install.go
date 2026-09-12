@@ -3,14 +3,15 @@ package site
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 
 	"github.com/gavindsouza/weg/internal/completion"
 	"github.com/gavindsouza/weg/internal/config"
 	wegerrors "github.com/gavindsouza/weg/internal/errors"
 	"github.com/gavindsouza/weg/internal/output"
+	"github.com/gavindsouza/weg/internal/services"
 	"github.com/gavindsouza/weg/internal/state"
+	"github.com/gavindsouza/weg/tools"
 	"github.com/spf13/cobra"
 )
 
@@ -83,9 +84,10 @@ func runInstall(cmd *cobra.Command, args []string) error {
 
 	output.Infof("Installing %s on %s...", appName, siteName)
 
-	// Run bench install-app
-	benchCmd := exec.Command("bench", "--site", siteName, "install-app", appName)
-	benchCmd.Dir = benchPath
+	if _, err := services.StartDatabase(benchPath); err != nil {
+		return err
+	}
+	benchCmd := tools.FrappeCmd(benchPath, "frappe", "--site", siteName, "install-app", appName)
 	benchCmd.Stdout = os.Stdout
 	benchCmd.Stderr = os.Stderr
 

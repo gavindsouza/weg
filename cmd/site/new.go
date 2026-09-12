@@ -4,14 +4,15 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"github.com/gavindsouza/weg/internal/config"
 	wegerrors "github.com/gavindsouza/weg/internal/errors"
 	"github.com/gavindsouza/weg/internal/output"
+	"github.com/gavindsouza/weg/internal/services"
 	"github.com/gavindsouza/weg/internal/state"
+	"github.com/gavindsouza/weg/tools"
 	"github.com/spf13/cobra"
 )
 
@@ -87,16 +88,17 @@ func runNew(cmd *cobra.Command, args []string) error {
 
 	output.Infof("Creating site %s...", siteName)
 
-	// Build bench new-site command
-	cmdArgs := []string{"new-site", siteName, "--admin-password", adminPassword}
-
-	if dbRootPass != "" {
-		cmdArgs = append(cmdArgs, "--db-root-password", dbRootPass)
+	mysqlSocket, err := services.StartDatabase(benchPath)
+	if err != nil {
+		return err
 	}
+	if dbRootPass == "" {
+		dbRootPass = config.DBRootPassword(benchPath)
+	}
+	cmdArgs := []string{"frappe", "new-site", siteName, "--admin-password", adminPassword,
+		"--db-root-username", "root", "--db-root-password", dbRootPass, "--db-socket", mysqlSocket}
 
-	// Run bench new-site
-	benchCmd := exec.Command("bench", cmdArgs...)
-	benchCmd.Dir = benchPath
+	benchCmd := tools.FrappeCmd(benchPath, cmdArgs...)
 	benchCmd.Stdout = os.Stdout
 	benchCmd.Stderr = os.Stderr
 
@@ -108,8 +110,7 @@ func runNew(cmd *cobra.Command, args []string) error {
 	for _, appName := range installApps {
 		output.Infof("Installing %s on %s...", appName, siteName)
 
-		installCmd := exec.Command("bench", "--site", siteName, "install-app", appName)
-		installCmd.Dir = benchPath
+		installCmd := tools.FrappeCmd(benchPath, "frappe", "--site", siteName, "install-app", appName)
 		installCmd.Stdout = os.Stdout
 		installCmd.Stderr = os.Stderr
 

@@ -71,6 +71,19 @@ type DatabaseConfig struct {
 	RootPass string `toml:"root_password,omitempty"`
 }
 
+// DefaultDBRootPassword is the root password weg gives its devbox MariaDB
+// unless weg.toml sets [services.database] root_password.
+const DefaultDBRootPassword = "admin"
+
+// DBRootPassword returns the MariaDB root password for the bench at
+// benchPath: weg.toml's [services.database] root_password, or the default.
+func DBRootPassword(benchPath string) string {
+	if cfg, err := ParseWegToml(benchPath); err == nil && cfg.Services.Database.RootPass != "" {
+		return cfg.Services.Database.RootPass
+	}
+	return DefaultDBRootPassword
+}
+
 // WebConfig contains web server configuration
 type WebConfig struct {
 	Port          int   `toml:"port,omitempty"`
