@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/gavindsouza/weg/internal/apps"
 	"github.com/gavindsouza/weg/internal/config"
 	"github.com/gavindsouza/weg/internal/errors"
 	"github.com/gavindsouza/weg/internal/output"
@@ -335,20 +336,10 @@ func reinstallPythonDeps(benchPath string) error {
 		if !entry.IsDir() {
 			continue
 		}
-		appPath := filepath.Join(appsDir, entry.Name())
-
-		// Check if it's a Python package
-		if _, err := os.Stat(filepath.Join(appPath, "pyproject.toml")); err != nil {
-			if _, err := os.Stat(filepath.Join(appPath, "setup.py")); err != nil {
-				continue
-			}
-		}
-
 		PrintVerbose("  Installing %s...", entry.Name())
-		cmd := exec.Command("devbox", "run", "-c", benchPath, "--", "uv", "pip", "install", "-e", appPath)
-		cmd.Dir = benchPath
-		if output, err := cmd.CombinedOutput(); err != nil {
-			return fmt.Errorf("failed to install %s: %w\n%s", entry.Name(), err, output)
+		opts := apps.InstallOptions{BenchPath: benchPath, Verbose: IsVerbose()}
+		if err := apps.InstallPythonDeps(filepath.Join(appsDir, entry.Name()), opts); err != nil {
+			return fmt.Errorf("failed to install %s: %w", entry.Name(), err)
 		}
 	}
 
@@ -375,18 +366,10 @@ func reinstallNodeDeps(benchPath, packageManager string) error {
 		}
 
 		PrintVerbose("  Installing node deps for %s...", entry.Name())
-
-		var cmd *exec.Cmd
-		switch packageManager {
-		case "pnpm":
-			cmd = exec.Command("devbox", "run", "-c", benchPath, "--", "pnpm", "install")
-		case "bun":
-			cmd = exec.Command("devbox", "run", "-c", benchPath, "--", "bun", "install")
-		default: // yarn
-			cmd = exec.Command("devbox", "run", "-c", benchPath, "--", "yarn", "install")
+		opts := apps.InstallOptions{BenchPath: benchPath, Verbose: IsVerbose(), PackageManager: packageManager}
+		if err := apps.InstallNodeDeps(appPath, opts); err != nil {
+			PrintVerbose("  Warning: %v", err) // node deps stay best-effort, as before
 		}
-		cmd.Dir = appPath
-		cmd.CombinedOutput() // Ignore errors for node
 	}
 
 	return nil
@@ -408,11 +391,7 @@ func runMigrations(benchPath string, result *config.DetectionResult) error {
 		siteName := entry.Name()
 		PrintVerbose("  Migrating %s...", siteName)
 
-		pythonPath := filepath.Join(benchPath, "env", "bin", "python")
-		cmd := exec.Command("devbox", "run", "-c", benchPath, "--",
-			pythonPath, "-m", "frappe.utils.bench_helper",
-			"frappe", "--site", siteName, "migrate")
-		cmd.Dir = sitesDir
+		cmd := tools.FrappeCmd(benchPath, "frappe", "--site", siteName, "migrate")
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		if err := cmd.Run(); err != nil {
