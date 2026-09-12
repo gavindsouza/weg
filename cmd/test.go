@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -202,24 +201,29 @@ func runSingleTest(benchPath, appName, site, version string, args []string) erro
 		PrintInfo("Testing %s...", appName)
 	}
 
-	// Build bench test command
-	cmdArgs := []string{"--site", site, "run-tests", "--app", appName}
+	cmdArgs := []string{"frappe", "--site", site, "run-tests", "--app", appName}
 	cmdArgs = append(cmdArgs, args...)
 
-	testCommand := exec.Command("bench", cmdArgs...)
-	testCommand.Dir = benchPath
+	testCommand := tools.FrappeCmd(benchPath, cmdArgs...)
 	testCommand.Stdout = os.Stdout
 	testCommand.Stderr = os.Stderr
 	testCommand.Stdin = os.Stdin
 
 	// Set environment for specific version if needed
 	if version != "" {
-		env := os.Environ()
-		env = append(env, fmt.Sprintf("FRAPPE_VERSION=%s", version))
-		testCommand.Env = env
+		testCommand.Env = withEnv(testCommand.Env, fmt.Sprintf("FRAPPE_VERSION=%s", version))
 	}
 
 	return testCommand.Run()
+}
+
+// withEnv appends to a command's env without dropping the inherited one
+// (a nil cmd.Env means "inherit os.Environ()").
+func withEnv(env []string, kv ...string) []string {
+	if env == nil {
+		env = os.Environ()
+	}
+	return append(env, kv...)
 }
 
 func runVersionTest(benchPath, appName, site, version string, args []string) testResult {
@@ -251,18 +255,13 @@ func runVersionTest(benchPath, appName, site, version string, args []string) tes
 	}
 
 	// Build and run test command
-	cmdArgs := []string{"--site", site, "run-tests", "--app", appName}
+	cmdArgs := []string{"frappe", "--site", site, "run-tests", "--app", appName}
 	cmdArgs = append(cmdArgs, args...)
 
-	testCommand := exec.Command("bench", cmdArgs...)
-	testCommand.Dir = versionBenchPath
-
-	// Set environment
-	env := os.Environ()
+	testCommand := tools.FrappeCmd(versionBenchPath, cmdArgs...)
 	if version != "" {
-		env = append(env, fmt.Sprintf("FRAPPE_VERSION=%s", version))
+		testCommand.Env = withEnv(testCommand.Env, fmt.Sprintf("FRAPPE_VERSION=%s", version))
 	}
-	testCommand.Env = env
 
 	if testParallel {
 		output, err := testCommand.CombinedOutput()

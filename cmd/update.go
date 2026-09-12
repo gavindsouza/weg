@@ -15,6 +15,7 @@ import (
 	"github.com/gavindsouza/weg/internal/runtime"
 	"github.com/gavindsouza/weg/internal/services"
 	"github.com/gavindsouza/weg/internal/state"
+	"github.com/gavindsouza/weg/tools"
 	"github.com/spf13/cobra"
 )
 
@@ -332,13 +333,7 @@ func analyzeChanges(repoPath, oldCommit, newCommit string) changeAnalysis {
 
 // runMigrateForUpdate runs database migrations during update
 func runMigrateForUpdate(benchPath string) error {
-	sitesDir := filepath.Join(benchPath, "sites")
-	pythonPath := filepath.Join(benchPath, "env", "bin", "python")
-
-	cmd := exec.Command("devbox", "run", "-c", benchPath, "--",
-		pythonPath, "-m", "frappe.utils.bench_helper",
-		"frappe", "--site", "all", "migrate")
-	cmd.Dir = sitesDir
+	cmd := tools.FrappeCmd(benchPath, "frappe", "--site", "all", "migrate")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
@@ -351,13 +346,7 @@ func isServicesRunning(benchPath string) bool {
 }
 
 func runBuildAll(benchPath string) error {
-	sitesDir := filepath.Join(benchPath, "sites")
-	pythonPath := filepath.Join(benchPath, "env", "bin", "python")
-
-	buildCmd := exec.Command("devbox", "run", "-c", benchPath, "--",
-		pythonPath, "-m", "frappe.utils.bench_helper",
-		"frappe", "build")
-	buildCmd.Dir = sitesDir
+	buildCmd := tools.FrappeCmd(benchPath, "frappe", "build")
 	buildCmd.Stdout = os.Stdout
 	buildCmd.Stderr = os.Stderr
 

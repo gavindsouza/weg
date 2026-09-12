@@ -3,12 +3,12 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"github.com/gavindsouza/weg/internal/config"
 	"github.com/gavindsouza/weg/internal/errors"
+	"github.com/gavindsouza/weg/tools"
 )
 
 // getDefaultSite returns the default site from config. benchPath already
@@ -50,14 +50,17 @@ var siteCommands = map[string]bool{
 	"browse": true,
 }
 
-// Commands that should get "frappe" prefix (no site needed)
-var frappeCommands = map[string]bool{
-	"build": true, "watch": true, "version": true,
+// needsFrappeGroup reports whether a bench command must be prefixed with
+// bench_helper's "frappe" group (all frappe and app commands live under it):
+// everything except "frappe" itself and bench_helper's get-frappe-* helpers.
+func needsFrappeGroup(cmd string) bool {
+	return cmd != "frappe" && !strings.HasPrefix(cmd, "get-frappe-")
 }
 
 // RunBench runs a bench command in the appropriate context
 // For devbox projects, it runs via bench_helper from the sites directory
-// Returns error if it couldn't run, nil if it ran (even if command failed)
+// Returns nil on success, an *exec.ExitError if the command ran and failed,
+// any other error if it couldn't run in a weg project.
 func RunBench(args []string) error {
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -95,8 +98,9 @@ func RunBench(args []string) error {
 		if siteCommands[cmd] && site != "" {
 			// Site-specific commands: "frappe --site <site> <cmd>"
 			benchArgs = append([]string{"frappe", "--site", site}, args...)
-		} else if frappeCommands[cmd] {
-			// Frappe commands without site: "frappe <cmd>"
+		} else if needsFrappeGroup(cmd) {
+			// bench_helper only knows the "frappe" group (plus app groups):
+			// `bench drop-site x` is `frappe drop-site x` to it.
 			benchArgs = append([]string{"frappe"}, args...)
 		} else {
 			benchArgs = args
@@ -105,18 +109,10 @@ func RunBench(args []string) error {
 		benchArgs = args
 	}
 
-	// Run via devbox from sites directory
-	sitesDir := filepath.Join(benchPath, "sites")
-	pythonPath := filepath.Join(benchPath, "env", "bin", "python")
-	devboxArgs := []string{"run", "-c", benchPath, "--", pythonPath, "-m", "frappe.utils.bench_helper"}
-	devboxArgs = append(devboxArgs, benchArgs...)
-
-	execCmd := exec.Command("devbox", devboxArgs...)
-	execCmd.Dir = sitesDir
+	execCmd := tools.FrappeCmd(benchPath, benchArgs...)
 	execCmd.Stdout = os.Stdout
 	execCmd.Stderr = os.Stderr
 	execCmd.Stdin = os.Stdin
-	execCmd.Env = os.Environ()
 
 	return execCmd.Run()
 }

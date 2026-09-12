@@ -3,7 +3,6 @@ package build
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -11,6 +10,7 @@ import (
 	wegerrors "github.com/gavindsouza/weg/internal/errors"
 	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/state"
+	"github.com/gavindsouza/weg/tools"
 	"github.com/spf13/cobra"
 )
 
@@ -70,13 +70,7 @@ func runAssets(cmd *cobra.Command, args []string) error {
 	output.Infof("Building assets for site %s...", site)
 
 	// Run frappe build via bench_helper
-	sitesDir := filepath.Join(benchPath, "sites")
-	pythonPath := filepath.Join(benchPath, "env", "bin", "python")
-	devboxArgs := []string{"run", "-c", benchPath, "--", pythonPath, "-m", "frappe.utils.bench_helper", "frappe"}
-	devboxArgs = append(devboxArgs, buildArgs...)
-
-	buildCmd := exec.Command("devbox", devboxArgs...)
-	buildCmd.Dir = sitesDir
+	buildCmd := tools.FrappeCmd(benchPath, append([]string{"frappe"}, buildArgs...)...)
 	buildCmd.Stdout = os.Stdout
 	buildCmd.Stderr = os.Stderr
 

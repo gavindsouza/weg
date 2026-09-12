@@ -12,6 +12,7 @@ import (
 	wegerrors "github.com/gavindsouza/weg/internal/errors"
 	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/runtime"
+	"github.com/gavindsouza/weg/tools"
 	"github.com/spf13/cobra"
 )
 
@@ -78,13 +79,7 @@ func runBrowse(cmd *cobra.Command, args []string) error {
 	}
 
 	// Run frappe browse via devbox
-	sitesDir := filepath.Join(benchPath, "sites")
-	pythonPath := filepath.Join(benchPath, "env", "bin", "python")
-
-	execCmd := exec.Command("devbox", "run", "-c", benchPath, "--",
-		pythonPath, "-m", "frappe.utils.bench_helper",
-		"frappe", "--site", site, "browse", "--user", browseUser)
-	execCmd.Dir = sitesDir
+	execCmd := tools.FrappeCmd(benchPath, "frappe", "--site", site, "browse", "--user", browseUser)
 	execCmd.Stdout = os.Stdout
 	execCmd.Stderr = os.Stderr
 	execCmd.Stdin = os.Stdin
