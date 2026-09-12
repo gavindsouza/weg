@@ -180,7 +180,8 @@ func (m *Manager) StopWithTimeout(timeoutSecs int, forceKill bool) error {
 		pcCmd.Dir = m.BenchPath
 		pcCmd.CombinedOutput() // Ignore errors, may not be running
 
-		// Stop devbox services
+		// Stop devbox services (MariaDB first: devbox kills it outright)
+		ShutdownMariaDB(m.BenchPath)
 		cmd := exec.Command("devbox", "services", "stop", "-c", m.BenchPath)
 		cmd.Dir = m.BenchPath
 		cmd.CombinedOutput() // Ignore errors

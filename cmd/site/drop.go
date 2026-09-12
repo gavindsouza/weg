@@ -3,7 +3,6 @@ package site
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 
 	"github.com/gavindsouza/weg/internal/completion"
@@ -11,6 +10,7 @@ import (
 	wegerrors "github.com/gavindsouza/weg/internal/errors"
 	"github.com/gavindsouza/weg/internal/output"
 	"github.com/gavindsouza/weg/internal/prompt"
+	"github.com/gavindsouza/weg/internal/services"
 	"github.com/gavindsouza/weg/internal/state"
 	"github.com/spf13/cobra"
 )
@@ -70,9 +70,19 @@ func runDrop(cmd *cobra.Command, args []string) error {
 	sitesDir := filepath.Join(benchPath, "sites")
 	sitePath := filepath.Join(sitesDir, siteName)
 
-	// Check if site exists
+	// Check if site exists. One weg still tracks but whose directory is
+	// gone only needs forgetting.
 	if _, err := os.Stat(sitePath); os.IsNotExist(err) {
-		return wegerrors.NotFound("site", siteName)
+		st, loadErr := state.Load(absPath)
+		if loadErr != nil || !st.HasSite(siteName) {
+			return wegerrors.NotFound("site", siteName)
+		}
+		st.RemoveSite(siteName)
+		if err := st.Save(absPath); err != nil {
+			return fmt.Errorf("failed to save state: %w", err)
+		}
+		output.Infof("Site %s was already gone from disk; removed it from weg's state", siteName)
+		return nil
 	}
 
 	// Confirm
@@ -86,31 +96,15 @@ func runDrop(cmd *cobra.Command, args []string) error {
 
 	output.Infof("Dropping site %s...", siteName)
 
-	// Build bench drop-site command
-	cmdArgs := []string{"drop-site", siteName, "--force"}
-
-	if dropRootPass != "" {
-		cmdArgs = append(cmdArgs, "--db-root-password", dropRootPass)
+	if dropRootPass == "" {
+		dropRootPass = config.DBRootPassword(benchPath)
 	}
-
+	dropArgs := []string{"--no-backup"}
 	if archived {
-		cmdArgs = append(cmdArgs, "--archived-sites-path", filepath.Join(sitesDir, "archived"))
-	} else {
-		cmdArgs = append(cmdArgs, "--no-backup")
+		dropArgs = []string{"--archived-sites-path", filepath.Join(sitesDir, "archived")}
 	}
-
-	// Run bench drop-site
-	benchCmd := exec.Command("bench", cmdArgs...)
-	benchCmd.Dir = benchPath
-	benchCmd.Stdout = os.Stdout
-	benchCmd.Stderr = os.Stderr
-
-	if err := benchCmd.Run(); err != nil {
-		// Try manual removal if bench command fails
-		output.Warning("bench drop-site failed, attempting manual removal...")
-		if err := os.RemoveAll(sitePath); err != nil {
-			return fmt.Errorf("failed to remove site directory: %w", err)
-		}
+	if err := services.DropSite(benchPath, siteName, dropRootPass, dropArgs...); err != nil {
+		return err
 	}
 
 	// Update state
