@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/gavindsouza/weg/internal/fsutil"
@@ -184,4 +185,23 @@ func containsHelper(s, substr string) bool {
 		}
 	}
 	return false
+}
+
+func TestBenchDevDependencies(t *testing.T) {
+	app := t.TempDir()
+	os.WriteFile(filepath.Join(app, "pyproject.toml"), []byte(`
+[project]
+name = "x"
+
+[tool.bench.dev-dependencies]
+responses = "==0.23.1"
+coverage = "~=6.5.0"
+`), 0644)
+	got := strings.Join(benchDevDependencies(app), " ")
+	if got != "coverage~=6.5.0 responses==0.23.1" {
+		t.Fatalf("got %q", got)
+	}
+	if deps := benchDevDependencies(t.TempDir()); deps != nil {
+		t.Fatalf("no pyproject: got %v", deps)
+	}
 }

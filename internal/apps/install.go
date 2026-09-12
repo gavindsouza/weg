@@ -5,7 +5,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 
+	"github.com/BurntSushi/toml"
 	"github.com/gavindsouza/weg/internal/fsutil"
 	"github.com/gavindsouza/weg/tools"
 )
@@ -60,11 +62,46 @@ func InstallPythonDeps(appPath string, opts InstallOptions) error {
 		return nil
 	}
 
+	// Plus what `bench setup requirements --dev` adds (a weg bench is a dev
+	// bench), in the same resolution as the app's own pins.
+	specs := append([]string{"-e", appPath}, benchDevDependencies(appPath)...)
 	runner := tools.NewRunnerWithOptions(opts.BenchPath, opts.Verbose)
-	if err := runner.Run("uv", "pip", "install", "-e", appPath); err != nil {
+	if err := runner.Run("uv", uvPipInstall(opts.BenchPath, specs...)...); err != nil {
 		return fmt.Errorf("failed to install Python dependencies: %w", err)
 	}
 	return nil
+}
+
+// uvPipInstall builds `uv pip install <specs>` args. <bench>/uv-overrides.txt,
+// if present, pins transitive deps an app gets wrong, e.g. wiki's redisearch
+// requiring redis==3.5.3 against frappe's redis 4.x.
+func uvPipInstall(benchPath string, specs ...string) []string {
+	args := append([]string{"pip", "install"}, specs...)
+	if overrides, err := filepath.Abs(filepath.Join(benchPath, "uv-overrides.txt")); err == nil && fsutil.FileExists(overrides) {
+		args = append(args, "--override", overrides)
+	}
+	return args
+}
+
+// benchDevDependencies returns an app's [tool.bench.dev-dependencies] as pip
+// specs (name + version spec, as bench builds them), sorted.
+func benchDevDependencies(appPath string) []string {
+	var pyproject struct {
+		Tool struct {
+			Bench struct {
+				DevDependencies map[string]string `toml:"dev-dependencies"`
+			} `toml:"bench"`
+		} `toml:"tool"`
+	}
+	if _, err := toml.DecodeFile(filepath.Join(appPath, "pyproject.toml"), &pyproject); err != nil {
+		return nil
+	}
+	var specs []string
+	for name, spec := range pyproject.Tool.Bench.DevDependencies {
+		specs = append(specs, name+spec)
+	}
+	sort.Strings(specs)
+	return specs
 }
 
 // InstallNodeDeps installs Node.js dependencies
@@ -80,27 +117,29 @@ func InstallNodeDeps(appPath string, opts InstallOptions) error {
 		}
 	}
 
-	// Use bench path for devbox detection, run commands in app path
+	// devbox run always starts in the bench root and ignores the working
+	// directory, so point the package manager at the app explicitly.
+	absApp, err := filepath.Abs(appPath)
+	if err != nil {
+		return err
+	}
+	var install []string
+	switch pm {
+	case "pnpm":
+		install = []string{"--dir", absApp, "install"}
+	case "bun":
+		install = []string{"install", "--cwd", absApp}
+	default:
+		pm = "yarn"
+		install = []string{"--cwd", absApp, "install"}
+	}
+
 	runner := tools.NewRunnerWithOptions(opts.BenchPath, opts.Verbose)
 
 	// Try with frozen lockfile first, fall back to without
-	var err error
-	switch pm {
-	case "pnpm":
-		err = runner.RunInDir(appPath, "pnpm", "install", "--frozen-lockfile")
-		if err != nil {
-			err = runner.RunInDir(appPath, "pnpm", "install")
-		}
-	case "bun":
-		err = runner.RunInDir(appPath, "bun", "install", "--frozen-lockfile")
-		if err != nil {
-			err = runner.RunInDir(appPath, "bun", "install")
-		}
-	default: // yarn
-		err = runner.RunInDir(appPath, "yarn", "install", "--frozen-lockfile")
-		if err != nil {
-			err = runner.RunInDir(appPath, "yarn", "install")
-		}
+	err = runner.Run(pm, append(install, "--frozen-lockfile")...)
+	if err != nil {
+		err = runner.Run(pm, install...)
 	}
 
 	if err != nil {
@@ -228,13 +267,7 @@ func LinkLocalApp(name, sourcePath string, opts InstallOptions) error {
 
 // InstallAppOnSite installs an app on a Frappe site
 func InstallAppOnSite(siteName, appName string, opts InstallOptions) error {
-	sitesDir := filepath.Join(opts.BenchPath, "sites")
-	pythonPath := filepath.Join(opts.BenchPath, "env", "bin", "python")
-
-	cmd := exec.Command("devbox", "run", "-c", opts.BenchPath, "--",
-		pythonPath, "-m", "frappe.utils.bench_helper",
-		"frappe", "--site", siteName, "install-app", appName)
-	cmd.Dir = sitesDir
+	cmd := tools.FrappeCmd(opts.BenchPath, "frappe", "--site", siteName, "install-app", appName)
 	if opts.Verbose {
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
@@ -244,13 +277,7 @@ func InstallAppOnSite(siteName, appName string, opts InstallOptions) error {
 
 // UninstallAppFromSite uninstalls an app from a Frappe site
 func UninstallAppFromSite(siteName, appName string, opts InstallOptions) error {
-	sitesDir := filepath.Join(opts.BenchPath, "sites")
-	pythonPath := filepath.Join(opts.BenchPath, "env", "bin", "python")
-
-	cmd := exec.Command("devbox", "run", "-c", opts.BenchPath, "--",
-		pythonPath, "-m", "frappe.utils.bench_helper",
-		"frappe", "--site", siteName, "uninstall-app", appName, "--yes")
-	cmd.Dir = sitesDir
+	cmd := tools.FrappeCmd(opts.BenchPath, "frappe", "--site", siteName, "uninstall-app", appName, "--yes")
 	if opts.Verbose {
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
