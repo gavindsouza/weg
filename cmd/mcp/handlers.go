@@ -25,7 +25,9 @@ func runWegCommand(ctx context.Context, args ...string) (string, error) {
 		return "", fmt.Errorf("failed to find weg binary: %w", err)
 	}
 
-	cmd := exec.CommandContext(ctx, exe, args...)
+	// WithoutCancel: mcp-go cancels in-flight requests when the client goes
+	// away; killing weg mid-migrate would orphan its devbox/python children.
+	cmd := exec.CommandContext(context.WithoutCancel(ctx), exe, args...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		// Include output in error for context
