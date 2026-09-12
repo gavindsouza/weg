@@ -413,7 +413,7 @@ weg start
 		}
 
 		// Initialize devbox environment
-		if err := initDevboxEnvironment(wegPath, version); err != nil {
+		if err := initDevboxEnvironment(wegPath, version, ""); err != nil {
 			return fmt.Errorf("failed to initialize devbox environment: %w", err)
 		}
 

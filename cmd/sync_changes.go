@@ -2,16 +2,17 @@ package cmd
 
 import (
 	"fmt"
-	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/gavindsouza/weg/internal/apps"
 	"github.com/gavindsouza/weg/internal/config"
+	"github.com/gavindsouza/weg/internal/fsutil"
+	"github.com/gavindsouza/weg/internal/output"
+	"github.com/gavindsouza/weg/internal/services"
 	"github.com/gavindsouza/weg/internal/state"
+	"github.com/gavindsouza/weg/tools"
 )
 
 // applyAppChanges applies configuration changes to an app-centric project
@@ -20,7 +21,7 @@ func applyAppChanges(path string, cfg *config.AppConfig, st *state.State, diff *
 	wegDir := filepath.Join(path, ".weg")
 
 	// Ensure the environment is initialized before installing apps
-	if err := ensureEnvironment(wegDir, cfg.Dev.Frappe); err != nil {
+	if err := ensureEnvironment(wegDir, cfg.Dev.Frappe, ""); err != nil {
 		return fmt.Errorf("failed to initialize environment: %w", err)
 	}
 
@@ -47,7 +48,7 @@ func applyAppChanges(path string, cfg *config.AppConfig, st *state.State, diff *
 	// Ensure common_site_config.json exists with redis config
 	// For pyproject.toml based projects, use defaults (nil config)
 	if err := ensureCommonSiteConfig(wegDir, nil); err != nil {
-		PrintVerbose("Warning: failed to create common_site_config.json: %v", err)
+		output.Warningf("failed to write common_site_config.json: %v", err)
 	}
 
 	// Create sites
@@ -118,6 +119,7 @@ func createAppCentricSites(wegDir string, st *state.State, sitesToAdd []string) 
 
 		st.AddSite(state.SiteState{
 			Name:        siteName,
+			Apps:        appsToInstall,
 			DefaultSite: siteCfg.DefaultSite,
 		})
 	}
@@ -127,6 +129,13 @@ func createAppCentricSites(wegDir string, st *state.State, sitesToAdd []string) 
 // applyBenchChanges applies configuration changes to a bench-centric project
 func applyBenchChanges(path string, cfg *config.BenchConfig, st *state.State, diff *state.Diff) error {
 	appsDir := filepath.Join(path, "apps")
+
+	if err := ensureEnvironment(path, cfg.Frappe.Version, cfg.Services.Database.Version); err != nil {
+		return fmt.Errorf("failed to initialize environment: %w", err)
+	}
+	if err := syncDevboxEnv(path, cfg.Env); err != nil {
+		return fmt.Errorf("failed to apply [env] to devbox.json: %w", err)
+	}
 
 	// Install new apps
 	if err := installBenchApps(appsDir, path, cfg, st, diff.AppsToAdd); err != nil {
@@ -156,7 +165,7 @@ func applyBenchChanges(path string, cfg *config.BenchConfig, st *state.State, di
 
 	// Ensure common_site_config.json exists with settings from weg.toml
 	if err := ensureCommonSiteConfig(path, cfg); err != nil {
-		PrintVerbose("Warning: failed to create common_site_config.json: %v", err)
+		output.Warningf("failed to write common_site_config.json: %v", err)
 	}
 
 	// Handle sites
@@ -176,7 +185,7 @@ func applyBenchChanges(path string, cfg *config.BenchConfig, st *state.State, di
 	// Sync app-defined services (packages and processes from [tool.weg.services])
 	PrintInfo("Syncing app services...")
 	if err := syncAppServices(path); err != nil {
-		PrintVerbose("Warning: failed to sync app services: %v", err)
+		output.Warningf("failed to sync app services: %v", err)
 	}
 
 	return nil
@@ -309,8 +318,15 @@ func createBenchSites(sitesDir string, cfg *config.BenchConfig, st *state.State,
 			}
 		}
 
+		// Record the apps: without them the next sync sees every app as
+		// missing and installs them all again.
+		var apps []string
+		if siteCfg != nil {
+			apps = siteCfg.Apps
+		}
 		st.AddSite(state.SiteState{
 			Name:        siteName,
+			Apps:        apps,
 			DefaultSite: siteCfg != nil && siteCfg.DefaultSite,
 		})
 	}
@@ -322,7 +338,8 @@ func removeBenchSites(sitesDir string, st *state.State, sitesToRemove []string) 
 	for _, siteName := range sitesToRemove {
 		PrintInfo("Removing site %s...", siteName)
 		if err := removeSite(sitesDir, siteName); err != nil {
-			PrintVerbose("Warning: failed to remove site %s: %v", siteName, err)
+			output.Warningf("failed to remove site %s (kept in state, the next sync retries): %v", siteName, err)
+			continue
 		}
 		st.RemoveSite(siteName)
 	}
@@ -331,6 +348,11 @@ func removeBenchSites(sitesDir string, st *state.State, sitesToRemove []string) 
 
 // updateBenchSites updates sites by installing/uninstalling apps
 func updateBenchSites(benchPath string, st *state.State, sitesToUpdate []state.SiteUpdate) error {
+	if len(sitesToUpdate) > 0 {
+		if _, err := services.StartDatabase(benchPath); err != nil {
+			return err
+		}
+	}
 	for _, update := range sitesToUpdate {
 		// Install apps on site
 		for _, appName := range update.AppsToAdd {
@@ -457,34 +479,11 @@ func checkoutBranch(appPath, branch string) error {
 
 func createSite(sitesDir string, cfg *config.SiteConfig, appsToInstall []string) error {
 	benchPath := filepath.Dir(sitesDir)
-	mysqlSocket := filepath.Join(benchPath, ".devbox/virtenv/mariadb/run/mysql.sock")
-
-	// Start mariadb service first - stop it first if it's in a bad state
-	PrintVerbose("Starting MariaDB...")
-
-	// If socket doesn't exist but service claims to be running, restart it
-	if _, err := os.Stat(mysqlSocket); os.IsNotExist(err) {
-		PrintVerbose("MariaDB socket not found, restarting service...")
-		runCmdInDir(benchPath, "devbox", "services", "stop")
-	}
-
-	if err := runCmdInDir(benchPath, "devbox", "services", "start", "mariadb"); err != nil {
-		PrintVerbose("Warning: could not start mariadb: %v", err)
-	}
-
-	// Wait for mariadb socket to be available (up to 30 seconds)
-	PrintVerbose("Waiting for MariaDB to be ready...")
-	socketFound := false
-	for i := 0; i < 30; i++ {
-		if _, err := os.Stat(mysqlSocket); err == nil {
-			socketFound = true
-			break
-		}
-		time.Sleep(1 * time.Second)
-	}
-
-	if !socketFound {
-		return fmt.Errorf("MariaDB socket not found at %s after 30 seconds. Try running 'devbox services stop' and then 'weg sync' again", mysqlSocket)
+	// MariaDB, and redis: new-site talks to the redis queue.
+	PrintVerbose("Starting MariaDB and Redis...")
+	mysqlSocket, err := services.StartDatabase(benchPath)
+	if err != nil {
+		return err
 	}
 
 	// Ensure the devbox MariaDB root has a known password. New installs start
@@ -497,33 +496,56 @@ func createSite(sitesDir string, cfg *config.SiteConfig, appsToInstall []string)
 	if adminPass == "" {
 		adminPass = "admin"
 	}
-	pythonPath := filepath.Join(benchPath, "env", "bin", "python")
-	args := []string{
-		pythonPath, "-m", "frappe.utils.bench_helper",
-		"frappe", "new-site", cfg.Name,
-		"--admin-password=" + adminPass,
-		"--db-root-username=root",
-		"--db-root-password=" + rootPassword,
-		"--db-socket=" + mysqlSocket,
-	}
-	for _, app := range appsToInstall {
-		if app != "frappe" {
-			moduleName := strings.ReplaceAll(app, "-", "_")
-			args = append(args, "--install-app="+moduleName)
+	// new-site's database credentials are not the config's to replace;
+	// checked before anything is created.
+	for key := range cfg.Config {
+		if strings.HasPrefix(key, "db_") {
+			return fmt.Errorf("site %s: config key %q is set by new-site and can't be overridden", cfg.Name, key)
 		}
 	}
 
-	// NOTE: frappe commands must run from the sites directory (where apps.txt
-	// is). bench_helper resolves sites_path="." against the process cwd, so run
-	// the venv python directly instead of through `devbox run` (which always
-	// executes from the devbox project root).
-	PrintVerbose("Running new-site for %s...", cfg.Name)
-	cmd := exec.Command(pythonPath, args...)
-	cmd.Dir = sitesDir
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to create site: %w", err)
+	// A site left behind by a failed app install is resumed rather than
+	// re-created: new-site would refuse, and install-app skips installed apps.
+	siteConfig := filepath.Join(sitesDir, cfg.Name, "site_config.json")
+	resumed := fsutil.FileExists(siteConfig)
+	if resumed {
+		PrintVerbose("Site %s exists, resuming its config and app installs...", cfg.Name)
+	} else {
+		// Through devbox: new-site shells out to the mariadb client to load
+		// the schema, and that client only exists on devbox's PATH.
+		PrintVerbose("Running new-site for %s...", cfg.Name)
+		if err := runFrappe(benchPath, "frappe", "new-site", cfg.Name,
+			"--admin-password="+adminPass,
+			"--db-root-username=root",
+			"--db-root-password="+rootPassword,
+			"--db-socket="+mysqlSocket,
+		); err != nil {
+			return fmt.Errorf("failed to create site: %w", err)
+		}
+	}
+
+	// The site's [sites] config goes in before the apps: an app's
+	// before_install may refuse unless a flag is already set.
+	if len(cfg.Config) > 0 {
+		if err := mergeConfigJSON(siteConfig, cfg.Config); err != nil {
+			return fmt.Errorf("failed to apply config for %s: %w", cfg.Name, err)
+		}
+	}
+
+	var apps []string
+	for _, app := range appsToInstall {
+		if app != "frappe" {
+			apps = append(apps, strings.ReplaceAll(app, "-", "_"))
+		}
+	}
+	if len(apps) > 0 {
+		PrintVerbose("Installing apps on %s...", cfg.Name)
+		if err := runFrappe(benchPath, append([]string{"frappe", "--site", cfg.Name, "install-app"}, apps...)...); err != nil {
+			if resumed {
+				return fmt.Errorf("failed to install apps on existing site %s (if its database is gone, remove %s and re-run): %w", cfg.Name, filepath.Join(sitesDir, cfg.Name), err)
+			}
+			return fmt.Errorf("failed to install apps on %s: %w", cfg.Name, err)
+		}
 	}
 
 	// Note: currentsite.txt is deprecated in Frappe v15+
@@ -532,55 +554,37 @@ func createSite(sitesDir string, cfg *config.SiteConfig, appsToInstall []string)
 	return nil
 }
 
+// runFrappe runs a frappe bench_helper command with output attached.
+func runFrappe(benchPath string, args ...string) error {
+	cmd := tools.FrappeCmd(benchPath, args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
 // ensureMariaDBRootPassword makes sure the devbox-managed MariaDB root login
-// has the bench default password ("root"). Fresh devbox installs start with an
-// empty password; bench conventions assume passwordless socket use for the app
-// so this only matters when a password is required. Returns the password to
-// pass to frappe new-site.
+// has the bench's root password (config.DBRootPassword). Fresh devbox installs
+// start passwordless (socket-only, empty root). Returns the password to pass
+// to frappe new-site.
 func ensureMariaDBRootPassword(benchPath, mysqlSocket string) string {
-	const rootPassword = "admin"
+	rootPassword := config.DBRootPassword(benchPath)
 	// Try the known password first (idempotent).
-	if ok := tryMariaDBAuth(benchPath, mysqlSocket, rootPassword); ok {
+	if services.MariaDBRoot(benchPath, mysqlSocket, rootPassword, "SELECT 1") == nil {
 		return rootPassword
 	}
 	// Passwordless root (fresh devbox install): set it now.
-	stmt := "ALTER USER 'root'@'localhost' IDENTIFIED BY '" + rootPassword + "'; FLUSH PRIVILEGES;"
-	if err := runCmdInDir(benchPath, "devbox", "run", "mysql", "-S", mysqlSocket, "-uroot", "-e", stmt); err != nil {
+	escaped := strings.NewReplacer(`\`, `\\`, `'`, `\'`).Replace(rootPassword)
+	stmt := "ALTER USER 'root'@'localhost' IDENTIFIED BY '" + escaped + "'; FLUSH PRIVILEGES;"
+	if err := services.MariaDBRoot(benchPath, mysqlSocket, "", stmt); err != nil {
 		PrintVerbose("Warning: could not set MariaDB root password: %v", err)
-		return rootPassword
 	}
 	return rootPassword
 }
 
-// tryMariaDBAuth reports whether the devbox MariaDB accepts the given root
-// password over the local socket.
-func tryMariaDBAuth(benchPath, mysqlSocket, password string) bool {
-	cmd := exec.Command("devbox", "run", "mysql", "-S", mysqlSocket, "-uroot", "-p"+password, "-e", "SELECT 1")
-	cmd.Dir = benchPath
-	cmd.Stdout = io.Discard
-	cmd.Stderr = io.Discard
-	return cmd.Run() == nil
-}
-
 func removeSite(sitesDir, name string) error {
-	sitePath := filepath.Join(sitesDir, name)
 	benchPath := filepath.Dir(sitesDir)
-
-	PrintVerbose("Removing site: %s", sitePath)
-
-	// Try to drop database using bench drop-site first
-	// This properly removes the database before removing the directory
-	dropArgs := []string{"drop-site", name, "--force", "--no-backup"}
-	dropCmd := exec.Command("bench", dropArgs...)
-	dropCmd.Dir = benchPath
-
-	if err := dropCmd.Run(); err != nil {
-		// bench drop-site failed (maybe bench not available or database already gone)
-		// Fall back to just removing the directory
-		PrintVerbose("bench drop-site failed: %v, removing directory only", err)
-	}
-
-	return os.RemoveAll(sitePath)
+	PrintVerbose("Removing site: %s", filepath.Join(sitesDir, name))
+	return services.DropSite(benchPath, name, config.DBRootPassword(benchPath), "--no-backup")
 }
 
 func installAppOnSite(benchPath, siteName, appName string) error {
@@ -604,7 +608,7 @@ func uninstallAppFromSite(benchPath, siteName, appName string) error {
 }
 
 // ensureEnvironment ensures the .weg directory has devbox and venv set up
-func ensureEnvironment(wegDir, frappeVersion string) error {
+func ensureEnvironment(wegDir, frappeVersion, dbVersion string) error {
 	// Create required directories
 	dirs := []string{
 		wegDir,
@@ -619,38 +623,19 @@ func ensureEnvironment(wegDir, frappeVersion string) error {
 		}
 	}
 
-	// Check if devbox is initialized
-	devboxJSON := filepath.Join(wegDir, "devbox.json")
-	if _, err := os.Stat(devboxJSON); os.IsNotExist(err) {
+	// Same setup as 'weg new': socket-only mariadb/redis configs and a
+	// devbox.json that pins the venv to env/. An existing devbox.json is the
+	// user's and is left alone, as is a bench that already has its own env/
+	// (e.g. adopted from bench): devbox would prompt to replace that venv and
+	// point the bench at an empty database.
+	if _, err := os.Stat(filepath.Join(wegDir, "devbox.json")); os.IsNotExist(err) {
+		if fsutil.DirExists(filepath.Join(wegDir, "env")) {
+			output.Warningf("%s has env/ but no devbox.json: leaving its environment to you (weg's services and site creation expect devbox)", wegDir)
+			return nil
+		}
 		PrintInfo("Initializing development environment...")
-
-		// Create .envrc
-		envrc := `VENV_DIR=$PWD/env
-export UV_PYTHON=$PWD/.devbox/nix/profile/default/bin/python
-export UV_VENV_PATH=$VENV_DIR
-export VIRTUAL_ENV=$VENV_DIR
-eval "$(devbox generate direnv --print-envrc -e VENV_DIR=$VENV_DIR -e UV_PYTHON=$UV_PYTHON -e UV_VENV_PATH=$UV_VENV_PATH -e VIRTUAL_ENV=$VIRTUAL_ENV)"
-`
-		if err := os.WriteFile(filepath.Join(wegDir, ".envrc"), []byte(envrc), 0644); err != nil {
-			return fmt.Errorf("failed to write .envrc: %w", err)
-		}
-
-		// Initialize devbox
-		PrintVerbose("Initializing devbox...")
-		if err := runCmdInDir(wegDir, "devbox", "init"); err != nil {
-			return fmt.Errorf("devbox init failed: %w", err)
-		}
-
-		// Add required packages via devbox
-		PrintVerbose("Installing dependencies via devbox...")
-		packages := getDevboxPackages(frappeVersion)
-		args := append([]string{"add"}, packages...)
-		if err := runCmdInDir(wegDir, "devbox", args...); err != nil {
-			return fmt.Errorf("devbox add failed: %w", err)
-		}
+		return initDevboxEnvironment(wegDir, frappeVersion, dbVersion)
 	}
-
-	// Devbox's Python plugin automatically creates env, no need to create env/
 
 	return nil
 }

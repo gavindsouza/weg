@@ -91,6 +91,7 @@ excluded = false               # Set true to skip during sync
 name = "mysite.localhost"
 default = true
 apps = ["frappe", "erpnext"]
+config = { mute_emails = 1 }    # site_config.json keys, set at creation before the apps install
 
 [services.web]
 port = 8000
@@ -99,6 +100,13 @@ port = 8000
 short = 1
 default = 2
 long = 1
+
+[services.database]
+version = "10.6"               # MariaDB for a new devbox environment (default 10.11)
+root_password = "admin"        # MariaDB root password weg sets and uses (default "admin")
+
+[env]                          # Merged into devbox.json on every sync
+SLACK_SIGNING_SECRET = "dev-dummy"
 ```
 
 ### pyproject.toml [tool.weg] (app-centric)
@@ -370,6 +378,14 @@ weg self doctor     # System compatibility: OS, required tools
 
 ```bash
 weg self install-tools
+```
+
+On NixOS, or anywhere a flake provides your dev shell, add `pkgs.devbox` to the shell's packages instead.
+
+**An app pins a dependency that breaks Frappe** (e.g. wiki's `redisearch` requires `redis==3.5.3`) — put uv overrides in `uv-overrides.txt` at the bench root; every app install passes it to `uv pip install --override`:
+
+```text
+redis==4.5.5
 ```
 
 **"not a weg-managed project"** — run `weg init` in the project directory first, or use `weg new` / `weg create` to start fresh.

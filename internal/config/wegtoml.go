@@ -19,6 +19,9 @@ type BenchConfig struct {
 	Apps     map[string]AppSettings `toml:"apps"`
 	Sites    []SiteConfig           `toml:"sites"`
 	Services ServicesConfig         `toml:"services"`
+	// Env is merged into devbox.json's env on every sync, so `weg start`
+	// processes and `weg bench` commands all see it.
+	Env map[string]string `toml:"env,omitempty"`
 }
 
 // BenchSettings contains bench-level configuration
@@ -48,6 +51,9 @@ type SiteConfig struct {
 	AdminPass   string   `toml:"admin_password,omitempty"`
 	DefaultSite bool     `toml:"default,omitempty"`
 	Domains     []string `toml:"domains,omitempty"`
+	// Config is merged into the site's site_config.json after new-site and
+	// before the apps are installed (e.g. a flag an app's install checks).
+	Config map[string]any `toml:"config,omitempty"`
 }
 
 // ServicesConfig contains service configuration overrides
@@ -69,6 +75,7 @@ type DatabaseConfig struct {
 	Host     string `toml:"host,omitempty"`
 	Port     int    `toml:"port,omitempty"`
 	RootPass string `toml:"root_password,omitempty"`
+	Version  string `toml:"version,omitempty"` // MariaDB version for a new devbox environment, e.g. "10.6"
 }
 
 // DefaultDBRootPassword is the root password weg gives its devbox MariaDB
