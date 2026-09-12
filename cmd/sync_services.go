@@ -68,74 +68,46 @@ func syncAppServices(benchPath string) error {
 	return nil
 }
 
-// devboxConfig represents devbox.json structure
-type devboxConfig struct {
-	Schema   string         `json:"$schema,omitempty"`
-	Packages []string       `json:"packages"`
-	Shell    map[string]any `json:"shell,omitempty"`
-}
-
-// addDevboxPackages adds packages to devbox.json if not already present
+// addDevboxPackages adds the packages devbox.json doesn't have yet, via
+// `devbox add` so devbox keeps its own format (list or map) and the env.
 func addDevboxPackages(benchPath string, packages []string) error {
-	devboxPath := filepath.Join(benchPath, "devbox.json")
-
-	data, err := os.ReadFile(devboxPath)
+	data, err := os.ReadFile(filepath.Join(benchPath, "devbox.json"))
 	if err != nil {
 		return fmt.Errorf("failed to read devbox.json: %w", err)
 	}
-
-	var cfg devboxConfig
+	var cfg struct {
+		Packages json.RawMessage `json:"packages"`
+	}
 	if err := json.Unmarshal(data, &cfg); err != nil {
 		return fmt.Errorf("failed to parse devbox.json: %w", err)
 	}
-
-	// Build set of existing packages (without version suffix for comparison)
-	existing := make(map[string]bool)
-	for _, pkg := range cfg.Packages {
-		// Extract package name without version (e.g., "tor@latest" -> "tor")
-		name := pkg
-		if idx := strings.Index(pkg, "@"); idx > 0 {
-			name = pkg[:idx]
+	existing := map[string]bool{}
+	var list []string
+	var byName map[string]any
+	if json.Unmarshal(cfg.Packages, &list) == nil {
+		for _, pkg := range list {
+			name, _, _ := strings.Cut(pkg, "@")
+			existing[name] = true
 		}
-		existing[name] = true
+	} else if json.Unmarshal(cfg.Packages, &byName) == nil {
+		for name := range byName {
+			existing[name] = true
+		}
 	}
 
-	// Add new packages
-	added := false
+	var missing []string
 	for _, pkg := range packages {
-		name := pkg
-		if idx := strings.Index(pkg, "@"); idx > 0 {
-			name = pkg[:idx]
-		}
+		name, _, _ := strings.Cut(pkg, "@")
 		if !existing[name] {
-			cfg.Packages = append(cfg.Packages, pkg)
 			existing[name] = true
-			added = true
+			missing = append(missing, pkg)
 			PrintInfo("  Adding devbox package: %s", pkg)
 		}
 	}
-
-	if !added {
-		return nil // No changes needed
+	if len(missing) == 0 {
+		return nil
 	}
-
-	// Write updated devbox.json
-	data, err = json.MarshalIndent(cfg, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal devbox.json: %w", err)
-	}
-
-	if err := os.WriteFile(devboxPath, data, 0644); err != nil {
-		return fmt.Errorf("failed to write devbox.json: %w", err)
-	}
-
-	// Run devbox install to apply changes
-	PrintInfo("  Installing new devbox packages...")
-	if err := runCmdInDir(benchPath, "devbox", "install"); err != nil {
-		PrintVerbose("Warning: devbox install failed: %v", err)
-	}
-
-	return nil
+	return runCmdInDir(benchPath, "devbox", append([]string{"add"}, missing...)...)
 }
 
 // mergeAppProcesses adds app-defined processes to process-compose.yaml
