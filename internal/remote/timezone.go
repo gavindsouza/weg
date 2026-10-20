@@ -15,26 +15,24 @@ import (
 )
 
 // GetSystemTimeZone returns the site's time zone (an IANA name such as
-// "Europe/Berlin"), or "" when the site has none set. It reads System
-// Settings first and, when that is refused (a user without read access on
-// System Settings gets a PermissionError) or fails, the "time_zone" default
-// that System Settings writes, via frappe.client.get_time_zone, which any
-// caller may use. It errors only when neither answers.
+// "Europe/Berlin") from System Settings, or "" when the site has none set.
+//
+// There is no fallback when System Settings cannot be read. The obvious one,
+// frappe.client.get_time_zone, answers with the calling user's defaults,
+// which Frappe overlays on the global ones, and User.on_update stores a
+// user-level "time_zone" default whenever User.time_zone is set (on v14+ it
+// is filled with the system zone, or Asia/Kolkata, at save time). So for an
+// API user it returns that user's zone, not the site's, and a stale one would
+// shift the version window silently.
 func (c *Client) GetSystemTimeZone() (string, error) {
 	msg, err := c.CallMethod("frappe.client.get_single_value", map[string]any{
 		"doctype": "System Settings",
 		"field":   "time_zone",
 	})
-	if err == nil {
-		tz, _ := msg.(string)
-		return strings.TrimSpace(tz), nil
+	if err != nil {
+		return "", fmt.Errorf("reading System Settings (the API user needs read access on System Settings): %w", err)
 	}
-	msg, dErr := c.CallMethod("frappe.client.get_time_zone", nil)
-	if dErr != nil {
-		return "", fmt.Errorf("System Settings: %w; time zone default: %v", err, dErr)
-	}
-	reply, _ := msg.(map[string]any)
-	tz, _ := reply["time_zone"].(string)
+	tz, _ := msg.(string)
 	return strings.TrimSpace(tz), nil
 }
 

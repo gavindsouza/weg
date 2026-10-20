@@ -25,11 +25,11 @@ func TestResolveLocation(t *testing.T) {
 	}
 }
 
-// SiteLocation reads System Settings, then the time_zone default (which any
-// user may read) when System Settings is refused, and returns UTC with an
-// error only when neither answers.
+// SiteLocation reads System Settings only. When that is refused or fails it
+// returns UTC with an error, and never asks frappe.client.get_time_zone, which
+// answers with the API user's own zone rather than the site's.
 func TestSiteLocation(t *testing.T) {
-	const single, deflt = "/api/method/frappe.client.get_single_value", "/api/method/frappe.client.get_time_zone"
+	const single = "/api/method/frappe.client.get_single_value"
 	type reply struct {
 		status int
 		body   string
@@ -42,18 +42,8 @@ func TestSiteLocation(t *testing.T) {
 	}{
 		{"zone set", map[string]reply{single: {200, `{"message":"Europe/Berlin"}`}}, "Europe/Berlin", false},
 		{"unset", map[string]reply{single: {200, `{"message":null}`}}, "Asia/Kolkata", false},
-		{"no permission, default readable", map[string]reply{
-			single: {403, `{"exc_type":"PermissionError"}`},
-			deflt:  {200, `{"message":{"time_zone":"America/New_York"}}`}}, "America/New_York", false},
-		{"transient failure, default readable", map[string]reply{
-			single: {502, `bad gateway`},
-			deflt:  {200, `{"message":{"time_zone":"Europe/Berlin"}}`}}, "Europe/Berlin", false},
-		{"no permission, default unset", map[string]reply{
-			single: {403, `{"exc_type":"PermissionError"}`},
-			deflt:  {200, `{"message":{"time_zone":null}}`}}, "Asia/Kolkata", false},
-		{"neither readable", map[string]reply{
-			single: {403, `{"exc_type":"PermissionError"}`},
-			deflt:  {403, `{"exc_type":"PermissionError"}`}}, "UTC", true},
+		{"no permission", map[string]reply{single: {403, `{"exc_type":"PermissionError"}`}}, "UTC", true},
+		{"transient failure", map[string]reply{single: {502, `bad gateway`}}, "UTC", true},
 		{"unknown zone", map[string]reply{single: {200, `{"message":"Mars/Olympus_Mons"}`}}, "UTC", true},
 	}
 	for _, tt := range tests {

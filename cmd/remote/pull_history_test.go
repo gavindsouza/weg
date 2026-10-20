@@ -30,11 +30,14 @@ type fakeHistorySite struct {
 	versions    []remote.VersionRecord
 	users       map[string]string // email -> full name
 	failVersion bool
-	// timeZoneStatus, when set, is the status both time zone endpoints
-	// answer with (403: the API user may not read System Settings).
+	// timeZoneStatus, when set, is the status the System Settings read
+	// answers with (403: the API user may not read System Settings).
 	timeZoneStatus int
-	versionCalls   atomic.Int32 // Version requests come in parallel
-	server         *httptest.Server
+	// userTimeZone is what frappe.client.get_time_zone answers: the API
+	// user's own "time_zone" default, which shadows the site's.
+	userTimeZone string
+	versionCalls atomic.Int32 // Version requests come in parallel
+	server       *httptest.Server
 }
 
 func newFakeHistorySite(t *testing.T) *fakeHistorySite {
@@ -51,17 +54,16 @@ func (s *fakeHistorySite) handle(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 
 	switch r.URL.Path {
-	case "/api/method/frappe.client.get_single_value", "/api/method/frappe.client.get_time_zone":
+	case "/api/method/frappe.client.get_single_value":
 		if s.timeZoneStatus != 0 {
 			w.WriteHeader(s.timeZoneStatus)
 			reply(map[string]any{"exc_type": "PermissionError"})
 			return
 		}
-		if strings.HasSuffix(r.URL.Path, "get_time_zone") {
-			reply(map[string]any{"message": map[string]any{"time_zone": s.timeZone}})
-			return
-		}
 		reply(map[string]any{"message": s.timeZone})
+
+	case "/api/method/frappe.client.get_time_zone":
+		reply(map[string]any{"message": map[string]any{"time_zone": s.userTimeZone}})
 
 	case "/api/resource/Version":
 		s.versionCalls.Add(1)
@@ -377,13 +379,17 @@ func TestReconstructHistoryPullFetchFailure(t *testing.T) {
 	}
 }
 
-// When the site's time zone cannot be read, a pull stops before fetching any
-// Version: guessing UTC would place the window hours off (replaying what the
-// last pull covered, or skipping changes). Nothing is committed, the working
-// tree is untouched and last_sync stays, so the next run covers the window.
+// When System Settings cannot be read, a pull stops before fetching any
+// Version: guessing a zone would place the window hours off (replaying what
+// the last pull covered, or skipping changes). frappe.client.get_time_zone is
+// readable but answers with the API user's own zone (here Asia/Kolkata while
+// the site runs Europe/Berlin), so it must not stand in for the site's.
+// Nothing is committed, the working tree is untouched and last_sync stays, so
+// the next run covers the window.
 func TestReconstructHistoryPullUnknownTimeZone(t *testing.T) {
 	site := newFakeHistorySite(t)
 	site.timeZoneStatus = http.StatusForbidden
+	site.userTimeZone = "Asia/Kolkata"
 	script := map[string]any{"doctype": "Server Script", "name": "Calc", "script": "x = 1"}
 	path := "projects/server_script/calc.json"
 	repo := newHistoryRepo(t, site, time.Date(2026, 10, 20, 5, 0, 0, 0, time.UTC),
