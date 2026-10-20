@@ -100,13 +100,14 @@ func TestStreamHistory_ChronologicalForwardStates(t *testing.T) {
 	}
 
 	var commits []ReconstructedCommit
-	seenPaths, err := f.StreamHistory(tmpDir, map[string]bool{}, nil, users, func(c ReconstructedCommit) error {
+	res, err := f.StreamHistory(tmpDir, map[string]bool{}, nil, staticUsers(users), HistoryOptions{}, func(c ReconstructedCommit) error {
 		commits = append(commits, c)
 		return nil
 	})
 	if err != nil {
 		t.Fatalf("StreamHistory: %v", err)
 	}
+	seenPaths := res.SeenPaths
 
 	if len(commits) != 3 {
 		t.Fatalf("expected 3 commits, got %d", len(commits))
@@ -158,8 +159,9 @@ func TestStreamHistory_ChronologicalForwardStates(t *testing.T) {
 	}
 }
 
-// A Version record whose data field is not valid JSON must fail the stream
-// with an error that names the offending version for traceability.
+// A Version record whose data field is not valid JSON is dropped and named
+// in the result, and the replay carries on with the next record: the bad
+// record is permanent, so failing on it would block every later pull.
 func TestStreamHistory_MalformedVersionData(t *testing.T) {
 	f := newTestFetcher(t)
 	tmpDir := t.TempDir()
@@ -170,20 +172,30 @@ func TestStreamHistory_MalformedVersionData(t *testing.T) {
 			Owner: "a@example.com", Creation: "2024-01-01 00:00:00",
 			Data: `{"changed":[["script"`, // truncated JSON
 		},
+		VersionRecord{
+			Name: "v-good", RefDoctype: "Server Script", Docname: "Broken",
+			Owner: "a@example.com", Creation: "2024-01-02 00:00:00",
+			Data: `{"changed":[["script","","x = 1"]]}`,
+		},
 	)
 
 	var commits []ReconstructedCommit
-	_, err := f.StreamHistory(tmpDir, map[string]bool{}, nil, nil, func(c ReconstructedCommit) error {
+	res, err := f.StreamHistory(tmpDir, map[string]bool{}, nil, nil, HistoryOptions{}, func(c ReconstructedCommit) error {
 		commits = append(commits, c)
 		return nil
 	})
-	if err == nil {
-		t.Fatal("expected error for malformed version data")
+	if err != nil {
+		t.Fatalf("StreamHistory: %v", err)
 	}
-	if !strings.Contains(err.Error(), "v-bad") {
-		t.Errorf("error should name the version, got: %v", err)
+	if len(res.Dropped) != 1 || !strings.Contains(res.Dropped[0], "v-bad") {
+		t.Errorf("Dropped = %v, want one entry naming v-bad", res.Dropped)
 	}
-	if len(commits) != 0 {
-		t.Errorf("no commit should be emitted for the malformed record, got %d", len(commits))
+	if len(commits) != 1 || commits[0].VersionName != "v-good" {
+		t.Errorf("commits = %+v, want only v-good", commits)
 	}
+}
+
+// staticUsers adapts a fixed user map to StreamHistory's resolver.
+func staticUsers(users map[string]UserInfo) func([]string) map[string]UserInfo {
+	return func([]string) map[string]UserInfo { return users }
 }

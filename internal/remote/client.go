@@ -403,6 +403,11 @@ type VersionRecord struct {
 	Owner      string `json:"owner"`
 	Creation   string `json:"creation"`
 	Data       string `json:"data"` // JSON string of version data
+
+	// Synthetic marks a creation record weg derived from a document's own
+	// creation/owner fields (Frappe writes no Version on insert). Never set
+	// on records fetched from the site.
+	Synthetic bool `json:"weg_synthetic,omitempty"`
 }
 
 // UserInfo contains basic user information

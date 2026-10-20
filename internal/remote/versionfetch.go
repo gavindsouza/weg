@@ -25,8 +25,10 @@ import (
 	"github.com/gavindsouza/weg/internal/fsutil"
 )
 
-// frappeDatetimeLayout is how Frappe serializes and filters datetimes.
-const frappeDatetimeLayout = "2006-01-02 15:04:05"
+// frappeFilterLayout keeps microseconds in Version filters: Version.creation
+// carries them, so a whole-second bound would let a record from earlier in
+// the same second as the last sync through again.
+const frappeFilterLayout = "2006-01-02 15:04:05.000000"
 
 // versionPageSize is the number of Version rows fetched per request.
 const versionPageSize = 100
@@ -34,15 +36,80 @@ const versionPageSize = 100
 // versionFetchFields are the Version columns we stage.
 var versionFetchFields = []string{"name", "ref_doctype", "docname", "owner", "creation", "data"}
 
+// windowMarkerFile records which window a staged version cache was fetched
+// for, so a cache left by an interrupted pull is only resumed for that window.
+const windowMarkerFile = "window"
+
+// HistoryWindow bounds the Version records a history replay covers.
+//
+// Frappe stores Version.creation as naive wall-clock time in the site's time
+// zone (System Settings), so the bounds are converted to that zone for the
+// API filter, and replayed commits are dated in it. The hour repeated when
+// daylight saving ends is ambiguous in that form; it is read as its first
+// occurrence, as the site's own filters do.
+type HistoryWindow struct {
+	Since    time.Time      // exclusive lower bound; zero replays from the beginning (clone)
+	Until    time.Time      // inclusive upper bound; zero means no upper bound
+	Location *time.Location // the site's time zone; nil means UTC
+}
+
+func (w HistoryWindow) location() *time.Location {
+	if w.Location == nil {
+		return time.UTC
+	}
+	return w.Location
+}
+
+// ParseSiteTime parses a naive Frappe datetime as the site's local time.
+func (w HistoryWindow) ParseSiteTime(s string) (time.Time, bool) {
+	return parseFrappeTime(s, w.location())
+}
+
+// Contains reports whether t falls inside the window.
+func (w HistoryWindow) Contains(t time.Time) bool {
+	if !w.Since.IsZero() && !t.After(w.Since) {
+		return false
+	}
+	if !w.Until.IsZero() && t.After(w.Until) {
+		return false
+	}
+	return true
+}
+
+// marker identifies the window's fetch filter for the resume cache. Until is
+// left out on purpose: raising it only appends records, so a cache fetched
+// with an earlier Until is still a valid prefix.
+func (w HistoryWindow) marker() string {
+	since := "-"
+	if !w.Since.IsZero() {
+		since = w.Since.UTC().Format(time.RFC3339Nano)
+	}
+	return since + " " + w.location().String() + "\n"
+}
+
+// parseFrappeTime parses a Frappe datetime ("2025-01-21 14:31:36.892644") in loc.
+func parseFrappeTime(s string, loc *time.Location) (time.Time, bool) {
+	for _, layout := range []string{
+		"2006-01-02 15:04:05.999999999",
+		"2006-01-02T15:04:05.999999999",
+	} {
+		if t, err := time.ParseInLocation(layout, s, loc); err == nil {
+			return t, true
+		}
+	}
+	return time.Time{}, false
+}
+
 // FetchVersionsToDisk fetches Version history for all config-enabled doctypes
 // into tmpDir as JSONL, in parallel, resuming from any existing cursors. The
 // first failure cancels the remaining fetchers at their next page boundary.
 // progress is called (may be nil) with the running record count per doctype.
 //
-// A non-zero since restricts the fetch to Version records created after that
-// time (incremental pull); the zero value fetches the full history (clone).
-func (f *Fetcher) FetchVersionsToDisk(ctx context.Context, tmpDir string, since time.Time, progress func(doctype string, total int)) error {
-	if err := os.MkdirAll(tmpDir, 0o755); err != nil {
+// window restricts the fetch to Version records created inside it; the zero
+// window fetches the full history (clone). A cache staged for a different
+// lower bound or time zone is discarded rather than resumed.
+func (f *Fetcher) FetchVersionsToDisk(ctx context.Context, tmpDir string, window HistoryWindow, progress func(doctype string, total int)) error {
+	if err := prepareVersionCache(tmpDir, window); err != nil {
 		return err
 	}
 
@@ -55,7 +122,7 @@ func (f *Fetcher) FetchVersionsToDisk(ctx context.Context, tmpDir string, since 
 
 	for i, dt := range doctypes {
 		go func(i int, dt string) {
-			errs[i] = f.fetchDoctypeVersions(ctx, tmpDir, dt, since, progress)
+			errs[i] = f.fetchDoctypeVersions(ctx, tmpDir, dt, window, progress)
 			if errs[i] != nil {
 				cancel()
 			}
@@ -68,6 +135,23 @@ func (f *Fetcher) FetchVersionsToDisk(ctx context.Context, tmpDir string, since 
 	return errors.Join(errs...)
 }
 
+// prepareVersionCache creates tmpDir and makes sure any staged records in it
+// were fetched for the same window; otherwise their cursors would skip
+// records of the new window.
+func prepareVersionCache(tmpDir string, window HistoryWindow) error {
+	markerPath := filepath.Join(tmpDir, windowMarkerFile)
+	want := window.marker()
+	if got, err := os.ReadFile(markerPath); err != nil || string(got) != want {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			return fmt.Errorf("reset version cache: %w", err)
+		}
+	}
+	if err := os.MkdirAll(tmpDir, 0o755); err != nil {
+		return err
+	}
+	return fsutil.AtomicWrite(markerPath, []byte(want), 0o644)
+}
+
 // versionJSONLPath / versionCursorPath give the on-disk staging paths for a doctype.
 func versionJSONLPath(tmpDir, doctype string) string {
 	return filepath.Join(tmpDir, slugifyDoctype(doctype)+".jsonl")
@@ -76,7 +160,7 @@ func versionCursorPath(tmpDir, doctype string) string {
 	return filepath.Join(tmpDir, slugifyDoctype(doctype)+".cursor")
 }
 
-func (f *Fetcher) fetchDoctypeVersions(ctx context.Context, tmpDir, doctype string, since time.Time, progress func(string, int)) error {
+func (f *Fetcher) fetchDoctypeVersions(ctx context.Context, tmpDir, doctype string, window HistoryWindow, progress func(string, int)) error {
 	jsonlPath := versionJSONLPath(tmpDir, doctype)
 	cursorPath := versionCursorPath(tmpDir, doctype)
 
@@ -97,7 +181,7 @@ func (f *Fetcher) fetchDoctypeVersions(ctx context.Context, tmpDir, doctype stri
 		if err := ctx.Err(); err != nil {
 			return nil // another fetcher failed; its error carries the cause
 		}
-		page, err := f.getVersionPage(doctype, offset, since)
+		page, err := f.getVersionPage(doctype, offset, window)
 		if err != nil {
 			return fmt.Errorf("%s: %w", doctype, err)
 		}
@@ -133,21 +217,26 @@ func (f *Fetcher) fetchDoctypeVersions(ctx context.Context, tmpDir, doctype stri
 	}
 }
 
-// buildVersionFilters builds the Frappe filter set for a doctype's Version rows.
-// A non-zero since adds a `creation > since` clause so only records newer than
-// the last sync are returned; the zero value returns the full history.
-func buildVersionFilters(doctype string, since time.Time) map[string]any {
-	filters := map[string]any{"ref_doctype": doctype}
-	if !since.IsZero() {
-		filters["creation"] = []any{">", since.Format(frappeDatetimeLayout)}
+// buildVersionFilters builds the Frappe filter list for a doctype's Version
+// rows inside window. The bounds are converted to the site's time zone, since
+// Version.creation is naive site-local time; the zero window returns the full
+// history.
+func buildVersionFilters(doctype string, window HistoryWindow) []any {
+	filters := []any{[]any{"Version", "ref_doctype", "=", doctype}}
+	loc := window.location()
+	if !window.Since.IsZero() {
+		filters = append(filters, []any{"Version", "creation", ">", window.Since.In(loc).Format(frappeFilterLayout)})
+	}
+	if !window.Until.IsZero() {
+		filters = append(filters, []any{"Version", "creation", "<=", window.Until.In(loc).Format(frappeFilterLayout)})
 	}
 	return filters
 }
 
 // getVersionPage fetches one page of Version rows for a doctype, ordered oldest
 // first so the on-disk stream is sorted for the k-way merge.
-func (f *Fetcher) getVersionPage(doctype string, offset int, since time.Time) ([]VersionRecord, error) {
-	filters, _ := json.Marshal(buildVersionFilters(doctype, since))
+func (f *Fetcher) getVersionPage(doctype string, offset int, window HistoryWindow) ([]VersionRecord, error) {
+	filters, _ := json.Marshal(buildVersionFilters(doctype, window))
 	fields, _ := json.Marshal(versionFetchFields)
 
 	params := url.Values{}

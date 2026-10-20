@@ -25,7 +25,7 @@ func removeRowFromTable(table []any, rowToRemove map[string]any) []any {
 		return table
 	}
 
-	var newTable []any
+	newTable := make([]any, 0, len(table))
 	for _, row := range table {
 		if rowMap, ok := row.(map[string]any); ok {
 			if name, _ := rowMap["name"].(string); name != rowName {
