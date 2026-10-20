@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -29,7 +30,11 @@ type fakeHistorySite struct {
 	versions    []remote.VersionRecord
 	users       map[string]string // email -> full name
 	failVersion bool
-	server      *httptest.Server
+	// timeZoneStatus, when set, is the status both time zone endpoints
+	// answer with (403: the API user may not read System Settings).
+	timeZoneStatus int
+	versionCalls   atomic.Int32 // Version requests come in parallel
+	server         *httptest.Server
 }
 
 func newFakeHistorySite(t *testing.T) *fakeHistorySite {
@@ -46,10 +51,20 @@ func (s *fakeHistorySite) handle(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 
 	switch r.URL.Path {
-	case "/api/method/frappe.client.get_single_value":
+	case "/api/method/frappe.client.get_single_value", "/api/method/frappe.client.get_time_zone":
+		if s.timeZoneStatus != 0 {
+			w.WriteHeader(s.timeZoneStatus)
+			reply(map[string]any{"exc_type": "PermissionError"})
+			return
+		}
+		if strings.HasSuffix(r.URL.Path, "get_time_zone") {
+			reply(map[string]any{"message": map[string]any{"time_zone": s.timeZone}})
+			return
+		}
 		reply(map[string]any{"message": s.timeZone})
 
 	case "/api/resource/Version":
+		s.versionCalls.Add(1)
 		if s.failVersion {
 			w.WriteHeader(http.StatusInternalServerError)
 			reply(map[string]any{"exc": "boom"})
@@ -359,6 +374,42 @@ func TestReconstructHistoryPullFetchFailure(t *testing.T) {
 	}
 	if s := repo.show("HEAD", path); s != marshalExport(t, now[0].Data) {
 		t.Errorf("snapshot does not hold the current state:\n%s", s)
+	}
+}
+
+// When the site's time zone cannot be read, a pull stops before fetching any
+// Version: guessing UTC would place the window hours off (replaying what the
+// last pull covered, or skipping changes). Nothing is committed, the working
+// tree is untouched and last_sync stays, so the next run covers the window.
+func TestReconstructHistoryPullUnknownTimeZone(t *testing.T) {
+	site := newFakeHistorySite(t)
+	site.timeZoneStatus = http.StatusForbidden
+	script := map[string]any{"doctype": "Server Script", "name": "Calc", "script": "x = 1"}
+	path := "projects/server_script/calc.json"
+	repo := newHistoryRepo(t, site, time.Date(2026, 10, 20, 5, 0, 0, 0, time.UTC),
+		[]remote.Entity{{Type: remote.EntityServerScript, Name: "Calc", Module: "Projects", Data: script, FilePath: path}})
+	baseSHA := gitRun(t, repo.dir, "rev-parse", "HEAD")
+	siteToml, _ := os.ReadFile(filepath.Join(repo.dir, ".weg", "site.toml"))
+	site.versions = []remote.VersionRecord{{Name: "v1", RefDoctype: "Server Script", Docname: "Calc",
+		Owner: "a@example.com", Creation: "2026-10-20 06:30:00.000000", Data: `{"changed":[["script","x = 1","x = 2"]]}`}}
+
+	now := []remote.Entity{{Type: remote.EntityServerScript, Name: "Calc", Module: "Projects",
+		Data: copyDoc(script, "script", "x = 2"), FilePath: path}}
+	err := repo.pull(time.Date(2026, 10, 21, 5, 0, 0, 0, time.UTC), now)
+	if err == nil || wegerrors.ExitCode(err) == 0 || !strings.Contains(err.Error(), "time zone") {
+		t.Fatalf("pull error = %v, want a non-zero exit naming the time zone", err)
+	}
+	if n := site.versionCalls.Load(); n != 0 {
+		t.Errorf("fetched Versions %d times without knowing the site time zone", n)
+	}
+	if head := gitRun(t, repo.dir, "rev-parse", "HEAD"); head != baseSHA {
+		t.Errorf("HEAD moved to %s despite the failure", head)
+	}
+	if out := gitRun(t, repo.dir, "status", "--porcelain"); out != "" {
+		t.Errorf("working tree changed:\n%s", out)
+	}
+	if after, _ := os.ReadFile(filepath.Join(repo.dir, ".weg", "site.toml")); string(after) != string(siteToml) {
+		t.Errorf("last_sync was written despite the failure")
 	}
 }
 

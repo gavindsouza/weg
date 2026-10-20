@@ -34,7 +34,9 @@ commit, so nothing is dropped.
 
 Frappe records times as wall-clock time in the site's time zone (System
 Settings, or Asia/Kolkata when unset), so commits carry that zone's UTC offset.
-If the time zone cannot be read, pull warns and assumes UTC.
+If neither System Settings nor the site's time zone default can be read, pull
+stops before replaying anything and exits non-zero, leaving last_sync as it
+was: the version window cannot be placed without the zone.
 
 If the version history cannot be fetched, pull still commits the current state
 as a single snapshot so the working tree is usable, prints warnings tagged

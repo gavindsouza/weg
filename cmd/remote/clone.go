@@ -506,6 +506,9 @@ func reconstructHistory(ctx context.Context, run historyRun) error {
 	if err == nil || startHead == "" || errors.As(err, &fallback) {
 		return err
 	}
+	if len(touched) == 0 && gitHead(run.dir) == startHead {
+		return err // stopped before writing anything
+	}
 	if rbErr := restoreExport(run.dir, startHead, touched); rbErr != nil {
 		return fmt.Errorf("%w; restoring the export to %s also failed: %v", err, startHead, rbErr)
 	}
@@ -540,10 +543,17 @@ func replayHistory(ctx context.Context, run historyRun, touched map[string]bool)
 
 	// Version.creation is naive site-local time: resolve the site's zone so
 	// the window filter and the commit dates use the true offset.
+	// A clone replays everything, so a wrong zone only shifts commit dates.
+	// A pull's window would start hours off, replaying Versions the last pull
+	// covered (false reverts, duplicates) or skipping some: stop before
+	// fetching anything, leaving the export and last_sync untouched.
 	loc, tzErr := fetcher.SiteLocation()
-	if tzErr != nil {
-		output.Warningf("%v; treating site times as UTC, so commit dates and the version window may be off by the site's UTC offset", tzErr)
-	} else {
+	switch {
+	case tzErr != nil && !run.since.IsZero():
+		return wegerrors.Operation("pull", "cannot place last_sync in site time, so the version window is unknown; nothing was replayed and last_sync is unchanged", tzErr)
+	case tzErr != nil:
+		output.Warningf("%v; treating site times as UTC, so commit dates may be off by the site's UTC offset", tzErr)
+	default:
 		output.Printf("Site time zone: %s", loc)
 	}
 	window := remote.HistoryWindow{Since: run.since, Until: run.until, Location: loc}

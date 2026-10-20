@@ -25,28 +25,47 @@ func TestResolveLocation(t *testing.T) {
 	}
 }
 
-// SiteLocation reads System Settings and falls back to UTC (with an error
-// for the caller to warn about) when the site does not answer.
+// SiteLocation reads System Settings, then the time_zone default (which any
+// user may read) when System Settings is refused, and returns UTC with an
+// error only when neither answers.
 func TestSiteLocation(t *testing.T) {
+	const single, deflt = "/api/method/frappe.client.get_single_value", "/api/method/frappe.client.get_time_zone"
+	type reply struct {
+		status int
+		body   string
+	}
 	tests := []struct {
 		name    string
-		status  int
-		body    string
+		replies map[string]reply
 		want    string
 		wantErr bool
 	}{
-		{"zone set", 200, `{"message":"Europe/Berlin"}`, "Europe/Berlin", false},
-		{"no permission", 403, `{"exc_type":"PermissionError"}`, "UTC", true},
-		{"unset", 200, `{"message":null}`, "Asia/Kolkata", false},
+		{"zone set", map[string]reply{single: {200, `{"message":"Europe/Berlin"}`}}, "Europe/Berlin", false},
+		{"unset", map[string]reply{single: {200, `{"message":null}`}}, "Asia/Kolkata", false},
+		{"no permission, default readable", map[string]reply{
+			single: {403, `{"exc_type":"PermissionError"}`},
+			deflt:  {200, `{"message":{"time_zone":"America/New_York"}}`}}, "America/New_York", false},
+		{"transient failure, default readable", map[string]reply{
+			single: {502, `bad gateway`},
+			deflt:  {200, `{"message":{"time_zone":"Europe/Berlin"}}`}}, "Europe/Berlin", false},
+		{"no permission, default unset", map[string]reply{
+			single: {403, `{"exc_type":"PermissionError"}`},
+			deflt:  {200, `{"message":{"time_zone":null}}`}}, "Asia/Kolkata", false},
+		{"neither readable", map[string]reply{
+			single: {403, `{"exc_type":"PermissionError"}`},
+			deflt:  {403, `{"exc_type":"PermissionError"}`}}, "UTC", true},
+		{"unknown zone", map[string]reply{single: {200, `{"message":"Mars/Olympus_Mons"}`}}, "UTC", true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if r.URL.Path != "/api/method/frappe.client.get_single_value" {
+				rep, ok := tt.replies[r.URL.Path]
+				if !ok {
 					t.Errorf("unexpected request %s", r.URL.Path)
+					rep = reply{404, `{}`}
 				}
-				w.WriteHeader(tt.status)
-				w.Write([]byte(tt.body))
+				w.WriteHeader(rep.status)
+				w.Write([]byte(rep.body))
 			}))
 			defer srv.Close()
 			f := &Fetcher{Client: NewClient(srv.URL, "k", "s")}
