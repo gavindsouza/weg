@@ -24,8 +24,25 @@ var pullCmd = &cobra.Command{
 By default, pull reconstructs the site's version history since the last sync:
 it fetches the Version records newer than the recorded last_sync and replays
 them as individual, authored git commits (the same style as clone), so
-'git log' and 'git blame' stay meaningful. Any current-state changes that have
-no Version record land in a final snapshot commit, so nothing is dropped.
+'git log' and 'git blame' stay meaningful. Each replayed commit holds the whole
+document: replay starts from the committed file, and a document's last change
+in the window is committed as the site has it now. Custom Field and Property
+Setter changes update their row in the per-DocType file, and a document
+created in the window is added in a commit by its creator. Any current-state
+changes that have no Version record land in a final "chore(sync): reconcile"
+commit, so nothing is dropped.
+
+Frappe records times as wall-clock time in the site's time zone (System
+Settings, or Asia/Kolkata when unset), so commits carry that zone's UTC offset.
+If the time zone cannot be read, pull warns and assumes UTC.
+
+If the version history cannot be fetched, pull still commits the current state
+as a single snapshot so the working tree is usable, prints warnings tagged
+"history-fallback:" and exits non-zero, so scheduled jobs notice that the
+window was recorded without per-change history. If the replay fails or is
+interrupted (Ctrl-C), pull restores the export to the commit it started from,
+keeping no replayed commits and leaving last_sync as it was, so a rerun
+replays the same window cleanly.
 
 Pass --no-history for the fast path: a single snapshot commit of the current
 state (the pre-history behavior).
@@ -82,8 +99,11 @@ func runPull(cobraCmd *cobra.Command, args []string) error {
 	}
 	output.Print("Connected")
 
-	// Fetch entities
+	// Fetch entities. The sync time is taken before the fetch, so a site
+	// change made while it runs is picked up again by the next pull rather
+	// than missed; Versions newer than it are left to the next pull too.
 	output.Print("Fetching customizations...")
+	syncedAt := time.Now()
 	fetcher := remote.NewFetcher(client, config)
 	result, err := fetcher.FetchAll()
 	if err != nil {
@@ -101,14 +121,14 @@ func runPull(cobraCmd *cobra.Command, args []string) error {
 	// A custom commit message only makes sense for a single snapshot commit.
 	snapshotOnly := pullNoHistory || pullMessage != ""
 	if snapshotOnly {
-		return pullSnapshot(config, result)
+		return pullSnapshot(config, result, syncedAt)
 	}
-	return pullWithHistory(cobraCmd.Context(), config, fetcher, result)
+	return pullWithHistory(cobraCmd.Context(), config, fetcher, result, syncedAt)
 }
 
 // pullSnapshot writes the current entity state and records it as a single git
 // commit (the --no-history path, and the pre-history default behavior).
-func pullSnapshot(config *remote.SiteConfig, result *remote.FetchResult) error {
+func pullSnapshot(config *remote.SiteConfig, result *remote.FetchResult, syncedAt time.Time) error {
 	// Write entities
 	output.Infof("Updating %d entities...\n", len(result.Entities))
 	for _, entity := range result.Entities {
@@ -121,7 +141,7 @@ func pullSnapshot(config *remote.SiteConfig, result *remote.FetchResult) error {
 	refreshWorkspaceAfterPull(".")
 
 	// Update config
-	config.Sync.LastSync = time.Now()
+	config.Sync.LastSync = syncedAt
 	if err := config.Save("."); err != nil {
 		return wegerrors.Config("site.toml", "write", err)
 	}
@@ -154,18 +174,34 @@ func pullSnapshot(config *remote.SiteConfig, result *remote.FetchResult) error {
 }
 
 // pullWithHistory replays Version records created since last_sync as individual
-// authored commits, then reconciles the current state into a final snapshot
-// commit. last_sync is advanced only after the pipeline runs, so a failed pull
+// authored commits, starting each document from its committed file, then
+// reconciles the current state into a final snapshot commit. last_sync is
+// written only right before that commit (and lands in it), so a failed pull
 // re-fetches the same window on the next run.
-func pullWithHistory(ctx context.Context, config *remote.SiteConfig, fetcher *remote.Fetcher, result *remote.FetchResult) error {
-	since := config.Sync.LastSync
-
-	// Advance last_sync before reconstruction so the updated site.toml is swept
-	// into the trailing reconcile commit (mirrors clone's ordering).
-	config.Sync.LastSync = time.Now()
-	if err := config.Save("."); err != nil {
-		return wegerrors.Config("site.toml", "write", err)
-	}
-
-	return reconstructHistory(ctx, ".", config.Site.URL, config.Site.Frappe.Version, "modules.txt", fetcher, result, since)
+func pullWithHistory(ctx context.Context, config *remote.SiteConfig, fetcher *remote.Fetcher, result *remote.FetchResult, syncedAt time.Time) error {
+	return reconstructHistory(ctx, historyRun{
+		dir:           ".",
+		siteURL:       config.Site.URL,
+		frappeVersion: config.Site.Frappe.Version,
+		modulesFile:   "modules.txt",
+		fetcher:       fetcher,
+		result:        result,
+		since:         config.Sync.LastSync,
+		until:         syncedAt,
+		fromCommitted: true,
+		recordSync: func() (func(), error) {
+			prev := config.Sync.LastSync
+			config.Sync.LastSync = syncedAt
+			if err := config.Save("."); err != nil {
+				config.Sync.LastSync = prev
+				return nil, wegerrors.Config("site.toml", "write", err)
+			}
+			return func() {
+				config.Sync.LastSync = prev
+				if err := config.Save("."); err != nil {
+					output.Warningf("Could not restore last_sync in site.toml: %v", err)
+				}
+			}, nil
+		},
+	})
 }

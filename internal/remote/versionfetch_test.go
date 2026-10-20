@@ -3,41 +3,167 @@ package remote
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
 )
 
-// buildVersionFilters gates the incremental pull: a zero `since` fetches the
-// full history (clone), a non-zero `since` adds a `creation > since` clause so
-// only records newer than the last sync are replayed.
+// buildVersionFilters gates the incremental pull: a zero window fetches the
+// full history (clone); bounds are sent in the site's time zone, because
+// Version.creation is naive site-local time, and keep microseconds so a
+// record from earlier in the last sync's second is not fetched again.
 func TestBuildVersionFilters(t *testing.T) {
-	t.Run("zero since fetches full history", func(t *testing.T) {
-		f := buildVersionFilters("Server Script", time.Time{})
-		if f["ref_doctype"] != "Server Script" {
-			t.Fatalf("ref_doctype = %v, want Server Script", f["ref_doctype"])
-		}
-		if _, ok := f["creation"]; ok {
-			t.Fatalf("zero since must not add a creation filter, got %v", f["creation"])
-		}
-	})
+	berlin, err := time.LoadLocation("Europe/Berlin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	since := time.Date(2026, 10, 20, 5, 30, 35, 288949976, time.UTC)
+	until := time.Date(2026, 10, 21, 5, 17, 30, 0, time.UTC)
+	winter := time.Date(2026, 11, 2, 5, 30, 0, 0, time.UTC)
 
-	t.Run("non-zero since adds creation lower bound", func(t *testing.T) {
-		since := time.Date(2026, 7, 1, 9, 30, 15, 0, time.UTC)
-		f := buildVersionFilters("Client Script", since)
-		if f["ref_doctype"] != "Client Script" {
-			t.Fatalf("ref_doctype = %v, want Client Script", f["ref_doctype"])
-		}
-		clause, ok := f["creation"].([]any)
-		if !ok || len(clause) != 2 {
-			t.Fatalf("creation clause = %v, want [op, value]", f["creation"])
-		}
-		if clause[0] != ">" {
-			t.Fatalf("operator = %v, want >", clause[0])
-		}
-		if clause[1] != "2026-07-01 09:30:15" {
-			t.Fatalf("value = %v, want Frappe datetime 2026-07-01 09:30:15", clause[1])
-		}
-	})
+	tests := []struct {
+		name   string
+		window HistoryWindow
+		want   []any
+	}{
+		{
+			name:   "zero window fetches full history",
+			window: HistoryWindow{},
+			want:   []any{[]any{"Version", "ref_doctype", "=", "Server Script"}},
+		},
+		{
+			name:   "no location means UTC",
+			window: HistoryWindow{Since: since},
+			want: []any{
+				[]any{"Version", "ref_doctype", "=", "Server Script"},
+				[]any{"Version", "creation", ">", "2026-10-20 05:30:35.288949"},
+			},
+		},
+		{
+			name:   "summer time bounds in site time",
+			window: HistoryWindow{Since: since, Until: until, Location: berlin},
+			want: []any{
+				[]any{"Version", "ref_doctype", "=", "Server Script"},
+				[]any{"Version", "creation", ">", "2026-10-20 07:30:35.288949"},
+				[]any{"Version", "creation", "<=", "2026-10-21 07:17:30.000000"},
+			},
+		},
+		{
+			name:   "winter time offset",
+			window: HistoryWindow{Since: winter, Location: berlin},
+			want: []any{
+				[]any{"Version", "ref_doctype", "=", "Server Script"},
+				[]any{"Version", "creation", ">", "2026-11-02 06:30:00.000000"},
+			},
+		},
+		{
+			name:   "clone bounded above only",
+			window: HistoryWindow{Until: until, Location: berlin},
+			want: []any{
+				[]any{"Version", "ref_doctype", "=", "Server Script"},
+				[]any{"Version", "creation", "<=", "2026-10-21 07:17:30.000000"},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := buildVersionFilters("Server Script", tt.window)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Fatalf("filters =\n  %v\nwant\n  %v", got, tt.want)
+			}
+		})
+	}
+}
+
+// The window parses naive Frappe datetimes as site time and excludes what
+// the previous pull already covered (at or before since) and what the next
+// one will cover (after until).
+func TestHistoryWindow_ParseAndContains(t *testing.T) {
+	berlin, _ := time.LoadLocation("Europe/Berlin")
+	w := HistoryWindow{
+		Since:    time.Date(2026, 10, 20, 5, 30, 35, 288949976, time.UTC),
+		Until:    time.Date(2026, 10, 21, 5, 17, 30, 0, time.UTC),
+		Location: berlin,
+	}
+	tests := []struct {
+		creation string
+		want     bool
+		offset   string
+	}{
+		{"2026-10-20 07:30:35.100000", false, "+02:00"}, // same second, before since
+		{"2026-10-20 07:30:35.288949", false, "+02:00"}, // equal (truncated to µs) -> covered
+		{"2026-10-20 07:30:35.288950", true, "+02:00"},
+		{"2026-10-20 06:50:00", false, "+02:00"}, // the hour weg used to replay again
+		{"2026-10-21 07:17:30", true, "+02:00"},  // until is inclusive
+		{"2026-10-21 07:17:30.000001", false, "+02:00"},
+		{"2026-10-20T12:00:00", true, "+02:00"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.creation, func(t *testing.T) {
+			at, ok := w.ParseSiteTime(tt.creation)
+			if !ok {
+				t.Fatalf("ParseSiteTime(%q) failed", tt.creation)
+			}
+			if got := at.Format("-07:00"); got != tt.offset {
+				t.Errorf("offset = %s, want %s", got, tt.offset)
+			}
+			if got := w.Contains(at); got != tt.want {
+				t.Errorf("Contains(%s) = %v, want %v", at, got, tt.want)
+			}
+		})
+	}
+	if _, ok := w.ParseSiteTime("not a time"); ok {
+		t.Error("ParseSiteTime accepted garbage")
+	}
+}
+
+// A staged cache is resumed only for the window it was fetched for: a cache
+// left by a failed pull with another last_sync would otherwise make the
+// cursors skip records of the new window.
+func TestPrepareVersionCache(t *testing.T) {
+	berlin, _ := time.LoadLocation("Europe/Berlin")
+	since := time.Date(2026, 10, 20, 5, 30, 35, 0, time.UTC)
+	w := HistoryWindow{Since: since, Until: since.Add(24 * time.Hour), Location: berlin}
+
+	tests := []struct {
+		name     string
+		next     HistoryWindow
+		wantKept bool
+	}{
+		{"same window resumes", w, true},
+		{"later until still resumes", HistoryWindow{Since: since, Until: since.Add(48 * time.Hour), Location: berlin}, true},
+		{"other since resets", HistoryWindow{Since: since.Add(time.Hour), Location: berlin}, false},
+		{"other zone resets", HistoryWindow{Since: since}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := filepath.Join(t.TempDir(), "versions")
+			if err := prepareVersionCache(dir, w); err != nil {
+				t.Fatal(err)
+			}
+			staged := filepath.Join(dir, "server_script.jsonl")
+			os.WriteFile(staged, []byte("{}\n"), 0o644)
+
+			if err := prepareVersionCache(dir, tt.next); err != nil {
+				t.Fatal(err)
+			}
+			_, err := os.Stat(staged)
+			if kept := err == nil; kept != tt.wantKept {
+				t.Fatalf("staged records kept = %v, want %v", kept, tt.wantKept)
+			}
+		})
+	}
+
+	// A cache without a marker (older weg) is never resumed.
+	dir := filepath.Join(t.TempDir(), "versions")
+	os.MkdirAll(dir, 0o755)
+	os.WriteFile(filepath.Join(dir, "x.jsonl"), []byte("{}\n"), 0o644)
+	if err := prepareVersionCache(dir, w); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "x.jsonl")); err == nil {
+		t.Fatal("unmarked cache was resumed")
+	}
 }
 
 func TestTruncateJSONL(t *testing.T) {
