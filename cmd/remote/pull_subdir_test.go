@@ -90,10 +90,14 @@ func TestReconstructHistoryPullInSubdirectory(t *testing.T) {
 		t.Errorf("%s still in the working tree after reconcile (err %v)", gonePath, err)
 	}
 
-	// Every commit stays inside the export.
-	for _, f := range strings.Fields(gitRun(t, repo.root, "diff", "--name-only", baseSHA, "HEAD")) {
-		if !strings.HasPrefix(f, "catalog/") || strings.HasPrefix(f, "catalog/_/") {
-			t.Errorf("pull committed %s", f)
+	// Every commit stays inside the export: checked per commit, so a path
+	// one commit adds and a later one removes cannot hide in the net diff.
+	for _, sha := range strings.Fields(gitRun(t, repo.root, "rev-list", baseSHA+"..HEAD")) {
+		files := gitRun(t, repo.root, "diff-tree", "-r", "--no-commit-id", "--name-only", sha+"^", sha)
+		for _, f := range strings.Fields(files) {
+			if !strings.HasPrefix(f, "catalog/") || strings.HasPrefix(f, "catalog/_/") {
+				t.Errorf("commit %.8s committed %s", sha, f)
+			}
 		}
 	}
 	// gitRun trims the leading space of " M README.md".
@@ -181,5 +185,50 @@ func TestWriteFileContentRefusesEscapingPath(t *testing.T) {
 	}
 	if entries, _ := os.ReadDir(root); len(entries) != 0 {
 		t.Errorf("wrote %v", entries)
+	}
+}
+
+// restoreExport undoes a failed replay at the repository root and in a
+// subdirectory export (weg -C catalog): a file the replay added is removed
+// from the index and the working tree, an edited file gets its committed
+// content back, and nothing is left staged.
+func TestRestoreExportRemovesReplayedFiles(t *testing.T) {
+	for _, sub := range []string{"", "catalog"} {
+		t.Run("sub="+sub, func(t *testing.T) {
+			root := t.TempDir()
+			dir := filepath.Join(root, sub)
+			write := func(p, s string) {
+				os.MkdirAll(filepath.Dir(filepath.Join(dir, p)), 0o755)
+				os.WriteFile(filepath.Join(dir, p), []byte(s), 0o644)
+			}
+			gitRun(t, root, "init", "-q")
+			write("m/server_script/old.json", "{}\n")
+			gitRun(t, root, "add", "-A")
+			gitRun(t, root, "commit", "-q", "-m", "base")
+			startHead := gitRun(t, root, "rev-parse", "HEAD")
+
+			// A replayed commit adds a file and edits another.
+			write("m/server_script/new.json", "{\"a\": 1}\n")
+			write("m/server_script/old.json", "{\"b\": 2}\n")
+			gitRun(t, root, "add", "-A")
+			gitRun(t, root, "commit", "-q", "-m", "replayed")
+
+			touched := map[string]bool{"m/server_script/new.json": true, "m/server_script/old.json": true}
+			if err := restoreExport(dir, startHead, touched); err != nil {
+				t.Fatalf("restoreExport: %v", err)
+			}
+			if head := gitRun(t, root, "rev-parse", "HEAD"); head != startHead {
+				t.Errorf("HEAD = %s, want %s", head, startHead)
+			}
+			if _, err := os.Stat(filepath.Join(dir, "m/server_script/new.json")); !os.IsNotExist(err) {
+				t.Errorf("new.json still on disk (err %v)", err)
+			}
+			if b, _ := os.ReadFile(filepath.Join(dir, "m/server_script/old.json")); string(b) != "{}\n" {
+				t.Errorf("old.json = %q, want the committed content", b)
+			}
+			if out := gitRun(t, root, "status", "--porcelain"); out != "" {
+				t.Errorf("repository not clean after restore:\n%s", out)
+			}
+		})
 	}
 }

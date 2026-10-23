@@ -837,12 +837,29 @@ func runGit(dir string, args ...string) error {
 	return nil
 }
 
-// runGitPaths runs a git command that takes the given paths as pathspecs,
-// passed on stdin so any number of them fits.
+// runGitPaths runs a git command that takes the given paths (relative to
+// dir) as pathspecs, passed on stdin so any number of them fits. It runs
+// from the top of the work tree with dir's prefix on each path: in a
+// subdirectory, some commands (git rm) add the current directory as a
+// pathspec of their own and then refuse --pathspec-from-file.
 func runGitPaths(dir string, paths []string, args ...string) error {
+	out, err := gitCmd(dir, "rev-parse", "--show-toplevel", "--show-prefix").Output()
+	if err != nil {
+		return wegerrors.Operation("git rev-parse", "could not locate the work tree of "+dir, err)
+	}
+	// --show-prefix prints an empty line at the top of the work tree.
+	lines := strings.SplitN(strings.TrimRight(string(out), "\n"), "\n", 2)
+	top, prefix := lines[0], ""
+	if len(lines) == 2 {
+		prefix = lines[1]
+	}
+	full := make([]string, len(paths))
+	for i, p := range paths {
+		full[i] = prefix + filepath.ToSlash(p)
+	}
 	args = append(args, "--pathspec-from-file=-", "--pathspec-file-nul")
-	cmd := gitCmd(dir, args...)
-	cmd.Stdin = strings.NewReader(strings.Join(paths, "\x00"))
+	cmd := gitCmd(top, args...)
+	cmd.Stdin = strings.NewReader(strings.Join(full, "\x00"))
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return wegerrors.Operation("git "+args[0], strings.TrimSpace(string(out)), err)
 	}
