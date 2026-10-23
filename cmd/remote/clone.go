@@ -7,7 +7,6 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -535,7 +534,10 @@ func replayHistory(ctx context.Context, run historyRun, touched map[string]bool)
 	tmpDir := filepath.Join(dirName, ".weg", "tmp", "versions")
 	touchExport := func() {
 		for _, e := range result.Entities {
-			touched[e.FilePath] = true
+			// A refused path is never written, so there is nothing to restore.
+			if remote.CheckExportPath(e.FilePath) == nil {
+				touched[e.FilePath] = true
+			}
 		}
 		if rel, err := filepath.Rel(dirName, run.modulesFile); err == nil {
 			touched[filepath.ToSlash(rel)] = true
@@ -616,6 +618,9 @@ func replayHistory(ctx context.Context, run historyRun, touched map[string]bool)
 		if err := ctx.Err(); err != nil {
 			return fmt.Errorf("interrupted: %w", err)
 		}
+		if err := remote.CheckExportPath(c.FilePath); err != nil {
+			return err
+		}
 		touched[c.FilePath] = true
 		if err := writeFileContent(dirName, c.FilePath, c.Content); err != nil {
 			return err
@@ -663,8 +668,11 @@ func replayHistory(ctx context.Context, run historyRun, touched map[string]bool)
 	currentPaths := entityPathSet(result.Entities)
 	for p := range hist.SeenPaths {
 		if !currentPaths[p] {
-			touched[p] = true
 			// Entity deleted/renamed away: keep its history, drop it from HEAD.
+			if err := remote.CheckExportPath(p); err != nil {
+				return err
+			}
+			touched[p] = true
 			if err := runGit(dirName, "rm", "-q", "-f", "--ignore-unmatch", "--", p); err != nil {
 				return err
 			}
@@ -734,6 +742,9 @@ func restoreExport(dir, startHead string, touched map[string]bool) error {
 	}
 	var restore, remove []string
 	for p := range touched {
+		if !filepath.IsLocal(p) {
+			continue // never written: paths are checked before they are touched
+		}
 		if inHead[p] {
 			restore = append(restore, p)
 		} else {
@@ -1059,29 +1070,11 @@ func writeAllEntities(dirName string, entities []remote.Entity, modulesFile stri
 	return nil
 }
 
-// writeFileContent writes JSON content to a file path, formatted exactly like
-// remote.WriteEntity so a replayed file matches the exported one byte for byte.
+// writeFileContent writes JSON content to a file path through
+// remote.WriteEntity, so a replayed file matches the exported one byte for
+// byte and passes the same path check.
 func writeFileContent(baseDir, filePath string, content map[string]any) error {
-	fullPath := filepath.Join(baseDir, filePath)
-
-	// Create directory
-	dir := filepath.Dir(fullPath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return fmt.Errorf("failed to create directory %s: %w", dir, err)
-	}
-
-	// Marshal to JSON with indentation
-	data, err := json.MarshalIndent(content, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal content: %w", err)
-	}
-
-	// Write file
-	if err := os.WriteFile(fullPath, data, 0644); err != nil {
-		return fmt.Errorf("failed to write file %s: %w", fullPath, err)
-	}
-
-	return nil
+	return remote.WriteEntity(baseDir, remote.Entity{FilePath: filePath, Data: content})
 }
 
 // formatGitDate formats a replayed commit's time for git --date, keeping

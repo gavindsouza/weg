@@ -5,10 +5,6 @@ History fetching for tracking entity version history from Frappe sites.
 */
 package remote
 
-import (
-	"path/filepath"
-)
-
 // HistoryEntry represents a single change in the version history
 type HistoryEntry struct {
 	Timestamp   string // Creation timestamp from Version
@@ -78,20 +74,4 @@ func (f *Fetcher) enabledVersionedDoctypes() []string {
 		}
 	}
 	return result
-}
-
-// buildFilePath constructs the file path for an entity
-func buildFilePath(entityType EntityType, name, module string) string {
-	switch entityType {
-	case EntityDocType:
-		return filepath.Join(toSnakeCase(module), "doctype", toSnakeCase(name), toSnakeCase(name)+".json")
-	case EntityCustomField:
-		return filepath.Join(toSnakeCase(module), "custom_field", toSnakeCase(name)+".json")
-	case EntityPropertySetter:
-		return filepath.Join(toSnakeCase(module), "property_setter", toSnakeCase(name)+".json")
-	case EntityReport:
-		return filepath.Join(toSnakeCase(module), "report", toSnakeCase(name), toSnakeCase(name)+".json")
-	default:
-		return filepath.Join(toSnakeCase(module), string(entityType), toSnakeCase(name)+".json")
-	}
 }

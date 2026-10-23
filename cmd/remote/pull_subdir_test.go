@@ -103,6 +103,50 @@ func TestReconstructHistoryPullInSubdirectory(t *testing.T) {
 	}
 }
 
+// An entity path that climbs out of the export is refused: the pull fails,
+// nothing is written outside the export, and the rollback does not touch the
+// file the path points at either.
+func TestReconstructHistoryPullRefusesEscapingPath(t *testing.T) {
+	site := newFakeHistorySite(t)
+	calc := map[string]any{"doctype": "Server Script", "name": "Calc", "script": "x = 1"}
+	calcPath := "projects/server_script/calc.json"
+	lastSync := time.Date(2026, 10, 20, 5, 0, 0, 0, time.UTC)
+	repo := newHistoryRepoIn(t, site, lastSync,
+		[]remote.Entity{{Type: remote.EntityServerScript, Name: "Calc", Module: "Projects", Data: calc, FilePath: calcPath}},
+		"catalog")
+	victim := filepath.Join(repo.root, "victim.json")
+	os.WriteFile(victim, []byte("keep\n"), 0o644)
+	gitRun(t, repo.root, "add", "victim.json")
+	gitRun(t, repo.root, "commit", "-q", "-m", "victim")
+	baseSHA := gitRun(t, repo.root, "rev-parse", "HEAD")
+
+	evil := map[string]any{"doctype": "Server Script", "name": "../victim", "script": "pwned"}
+	now := []remote.Entity{
+		{Type: remote.EntityServerScript, Name: "Calc", Module: "Projects", Data: copyDoc(calc, "script", "x = 2"), FilePath: calcPath},
+		{Type: remote.EntityServerScript, Name: "../victim", Module: "Projects", Data: evil, FilePath: "../victim.json"},
+	}
+	site.versions = []remote.VersionRecord{
+		{Name: "v1", RefDoctype: "Server Script", Docname: "Calc", Owner: "a@example.com",
+			Creation: "2026-10-20 09:00:00.000000", Data: `{"changed":[["script","x = 1","x = 2"]]}`},
+		{Name: "v2", RefDoctype: "Server Script", Docname: "../victim", Owner: "a@example.com",
+			Creation: "2026-10-20 10:00:00.000000", Data: `{"changed":[["script","x","pwned"]]}`},
+	}
+
+	err := repo.pull(time.Date(2026, 10, 21, 5, 0, 0, 0, time.UTC), now)
+	if err == nil || !strings.Contains(err.Error(), "refusing export path") {
+		t.Fatalf("pull error = %v, want the escaping path refused", err)
+	}
+	if b, _ := os.ReadFile(victim); string(b) != "keep\n" {
+		t.Errorf("file outside the export changed: %q", b)
+	}
+	if head := gitRun(t, repo.root, "rev-parse", "HEAD"); head != baseSHA {
+		t.Errorf("HEAD moved to %s despite the refusal", head)
+	}
+	if out := gitRun(t, repo.root, "status", "--porcelain", "--untracked-files=no"); out != "" {
+		t.Errorf("repository not restored after the refusal:\n%s", out)
+	}
+}
+
 // readCommittedFiles lists the export relative to its own directory when
 // it is a subdirectory of the repository, and nothing outside it.
 func TestReadCommittedFilesInSubdirectory(t *testing.T) {
@@ -124,5 +168,18 @@ func TestReadCommittedFilesInSubdirectory(t *testing.T) {
 	}
 	if len(files) != 1 || files["projects/server_script/a.json"] == nil {
 		t.Errorf("files = %v, want only projects/server_script/a.json", files)
+	}
+}
+
+func TestWriteFileContentRefusesEscapingPath(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "catalog")
+	for _, p := range []string{"../x.json", "/tmp/x.json", "a/../../x.json", ".git/x.json", ""} {
+		if err := writeFileContent(dir, p, map[string]any{"a": 1}); err == nil {
+			t.Errorf("writeFileContent(%q) succeeded", p)
+		}
+	}
+	if entries, _ := os.ReadDir(root); len(entries) != 0 {
+		t.Errorf("wrote %v", entries)
 	}
 }
