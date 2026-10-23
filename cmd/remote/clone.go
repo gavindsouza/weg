@@ -7,7 +7,6 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -448,9 +447,11 @@ type historyRun struct {
 	recordSync func() (restore func(), err error)
 }
 
-// commitFinal writes the new sync state, stages everything and commits it
-// with the given author and message. If staging or the commit fails, the sync
-// state is restored, so the next run covers the same window again.
+// commitFinal writes the new sync state, stages everything under run.dir and
+// commits it with the given author and message. Only run.dir is staged and
+// committed: when the export is a subdirectory of a larger repository, the
+// rest of that repository is left as it was. If staging or the commit fails,
+// the sync state is restored, so the next run covers the same window again.
 func commitFinal(run historyRun, author, msg string) error {
 	restore := func() {}
 	if run.recordSync != nil {
@@ -461,14 +462,14 @@ func commitFinal(run historyRun, author, msg string) error {
 		restore = r
 	}
 	err := func() error {
-		if err := runGit(run.dir, "add", "-A"); err != nil {
+		if err := runGit(run.dir, "add", "-A", "--", "."); err != nil {
 			return err
 		}
-		staged, err := gitHasStaged(run.dir)
+		staged, err := gitHasStaged(run.dir, ".")
 		if err != nil || !staged {
 			return err
 		}
-		return gitCommitAuthored(run.dir, author, "", msg)
+		return gitCommitAuthored(run.dir, author, "", msg, ".")
 	}()
 	if err != nil {
 		restore()
@@ -533,7 +534,10 @@ func replayHistory(ctx context.Context, run historyRun, touched map[string]bool)
 	tmpDir := filepath.Join(dirName, ".weg", "tmp", "versions")
 	touchExport := func() {
 		for _, e := range result.Entities {
-			touched[e.FilePath] = true
+			// A refused path is never written, so there is nothing to restore.
+			if remote.CheckExportPath(e.FilePath) == nil {
+				touched[e.FilePath] = true
+			}
 		}
 		if rel, err := filepath.Rel(dirName, run.modulesFile); err == nil {
 			touched[filepath.ToSlash(rel)] = true
@@ -614,6 +618,9 @@ func replayHistory(ctx context.Context, run historyRun, touched map[string]bool)
 		if err := ctx.Err(); err != nil {
 			return fmt.Errorf("interrupted: %w", err)
 		}
+		if err := remote.CheckExportPath(c.FilePath); err != nil {
+			return err
+		}
 		touched[c.FilePath] = true
 		if err := writeFileContent(dirName, c.FilePath, c.Content); err != nil {
 			return err
@@ -661,8 +668,11 @@ func replayHistory(ctx context.Context, run historyRun, touched map[string]bool)
 	currentPaths := entityPathSet(result.Entities)
 	for p := range hist.SeenPaths {
 		if !currentPaths[p] {
-			touched[p] = true
 			// Entity deleted/renamed away: keep its history, drop it from HEAD.
+			if err := remote.CheckExportPath(p); err != nil {
+				return err
+			}
+			touched[p] = true
 			if err := runGit(dirName, "rm", "-q", "-f", "--ignore-unmatch", "--", p); err != nil {
 				return err
 			}
@@ -732,6 +742,9 @@ func restoreExport(dir, startHead string, touched map[string]bool) error {
 	}
 	var restore, remove []string
 	for p := range touched {
+		if !filepath.IsLocal(p) {
+			continue // never written: paths are checked before they are touched
+		}
 		if inHead[p] {
 			restore = append(restore, p)
 		} else {
@@ -824,12 +837,29 @@ func runGit(dir string, args ...string) error {
 	return nil
 }
 
-// runGitPaths runs a git command that takes the given paths as pathspecs,
-// passed on stdin so any number of them fits.
+// runGitPaths runs a git command that takes the given paths (relative to
+// dir) as pathspecs, passed on stdin so any number of them fits. It runs
+// from the top of the work tree with dir's prefix on each path: in a
+// subdirectory, some commands (git rm) add the current directory as a
+// pathspec of their own and then refuse --pathspec-from-file.
 func runGitPaths(dir string, paths []string, args ...string) error {
+	out, err := gitCmd(dir, "rev-parse", "--show-toplevel", "--show-prefix").Output()
+	if err != nil {
+		return wegerrors.Operation("git rev-parse", "could not locate the work tree of "+dir, err)
+	}
+	// --show-prefix prints an empty line at the top of the work tree.
+	lines := strings.SplitN(strings.TrimRight(string(out), "\n"), "\n", 2)
+	top, prefix := lines[0], ""
+	if len(lines) == 2 {
+		prefix = lines[1]
+	}
+	full := make([]string, len(paths))
+	for i, p := range paths {
+		full[i] = prefix + filepath.ToSlash(p)
+	}
 	args = append(args, "--pathspec-from-file=-", "--pathspec-file-nul")
-	cmd := gitCmd(dir, args...)
-	cmd.Stdin = strings.NewReader(strings.Join(paths, "\x00"))
+	cmd := gitCmd(top, args...)
+	cmd.Stdin = strings.NewReader(strings.Join(full, "\x00"))
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return wegerrors.Operation("git "+args[0], strings.TrimSpace(string(out)), err)
 	}
@@ -889,16 +919,20 @@ func gitCommitAuthored(dir, author, date, msg string, paths ...string) error {
 	return nil
 }
 
-// readCommittedFiles returns the JSON files committed at HEAD (path ->
-// content), outside .weg/ and the workspace. An unborn HEAD yields an empty
-// map. Reading HEAD rather than the working tree keeps uncommitted local
-// edits out of the replayed site history.
+// readCommittedFiles returns the JSON files committed at HEAD under dir (path
+// relative to dir -> content), outside .weg/ and the workspace. An unborn HEAD
+// yields an empty map. Reading HEAD rather than the working tree keeps
+// uncommitted local edits out of the replayed site history.
+//
+// The export may be a subdirectory of the repository (weg -C catalog), so
+// paths are listed relative to dir, the way every other git call here and
+// the entity file paths see them.
 func readCommittedFiles(dir string) (map[string][]byte, error) {
 	files := make(map[string][]byte)
 	if gitHead(dir) == "" {
 		return files, nil
 	}
-	ls := gitCmd(dir, "ls-tree", "-r", "-z", "--full-tree", "HEAD")
+	ls := gitCmd(dir, "ls-tree", "-r", "-z", "HEAD")
 	out, err := ls.Output()
 	if err != nil {
 		return nil, wegerrors.Operation("git ls-tree", "could not list HEAD", err)
@@ -1053,29 +1087,11 @@ func writeAllEntities(dirName string, entities []remote.Entity, modulesFile stri
 	return nil
 }
 
-// writeFileContent writes JSON content to a file path, formatted exactly like
-// remote.WriteEntity so a replayed file matches the exported one byte for byte.
+// writeFileContent writes JSON content to a file path through
+// remote.WriteEntity, so a replayed file matches the exported one byte for
+// byte and passes the same path check.
 func writeFileContent(baseDir, filePath string, content map[string]any) error {
-	fullPath := filepath.Join(baseDir, filePath)
-
-	// Create directory
-	dir := filepath.Dir(fullPath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return fmt.Errorf("failed to create directory %s: %w", dir, err)
-	}
-
-	// Marshal to JSON with indentation
-	data, err := json.MarshalIndent(content, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal content: %w", err)
-	}
-
-	// Write file
-	if err := os.WriteFile(fullPath, data, 0644); err != nil {
-		return fmt.Errorf("failed to write file %s: %w", fullPath, err)
-	}
-
-	return nil
+	return remote.WriteEntity(baseDir, remote.Entity{FilePath: filePath, Data: content})
 }
 
 // formatGitDate formats a replayed commit's time for git --date, keeping

@@ -7,7 +7,6 @@ package remote
 
 import (
 	"fmt"
-	"path/filepath"
 )
 
 // Fetcher handles fetching entities from a remote site
@@ -193,6 +192,12 @@ func (f *Fetcher) FetchAll() (*FetchResult, error) {
 		result.Entities = append(result.Entities, entities...)
 	}
 
+	// Paths come from site-controlled names: refuse the whole fetch rather
+	// than write (or later remove) anything outside the export.
+	if err := CheckEntityPaths(result.Entities); err != nil {
+		return nil, err
+	}
+
 	return result, nil
 }
 
@@ -228,7 +233,7 @@ func (f *Fetcher) fetchCustomDocTypes() ([]Entity, error) {
 			Name:     name,
 			Module:   module,
 			Data:     fullDoc,
-			FilePath: filepath.Join(toSnakeCase(module), "doctype", toSnakeCase(name), toSnakeCase(name)+".json"),
+			FilePath: buildFilePath(EntityDocType, name, module),
 		})
 	}
 
@@ -280,7 +285,7 @@ func (f *Fetcher) fetchCustomFields() ([]Entity, error) {
 			Name:     dt,
 			Module:   module,
 			Data:     combined,
-			FilePath: filepath.Join(toSnakeCase(module), "custom_field", toSnakeCase(dt)+".json"),
+			FilePath: buildFilePath(EntityCustomField, dt, module),
 		})
 	}
 
@@ -329,7 +334,7 @@ func (f *Fetcher) fetchPropertySetters() ([]Entity, error) {
 			Name:     dt,
 			Module:   module,
 			Data:     combined,
-			FilePath: filepath.Join(toSnakeCase(module), "property_setter", toSnakeCase(dt)+".json"),
+			FilePath: buildFilePath(EntityPropertySetter, dt, module),
 		})
 	}
 
@@ -374,7 +379,7 @@ func (f *Fetcher) fetchClientScripts() ([]Entity, error) {
 			Name:     name,
 			Module:   module,
 			Data:     fullDoc,
-			FilePath: filepath.Join(toSnakeCase(module), "client_script", toSnakeCase(name)+".json"),
+			FilePath: buildFilePath(EntityClientScript, name, module),
 		})
 	}
 
@@ -433,7 +438,7 @@ func (f *Fetcher) fetchServerScripts() ([]Entity, error) {
 			Name:     name,
 			Module:   module,
 			Data:     fullDoc,
-			FilePath: filepath.Join(toSnakeCase(module), "server_script", toSnakeCase(name)+".json"),
+			FilePath: buildFilePath(EntityServerScript, name, module),
 		})
 	}
 
@@ -479,7 +484,7 @@ func (f *Fetcher) fetchReports() ([]Entity, error) {
 			Name:     name,
 			Module:   module,
 			Data:     fullDoc,
-			FilePath: filepath.Join(toSnakeCase(module), "report", toSnakeCase(name), toSnakeCase(name)+".json"),
+			FilePath: buildFilePath(EntityReport, name, module),
 		})
 	}
 
@@ -525,7 +530,7 @@ func (f *Fetcher) fetchPrintFormats() ([]Entity, error) {
 			Name:     name,
 			Module:   module,
 			Data:     fullDoc,
-			FilePath: filepath.Join(toSnakeCase(module), "print_format", toSnakeCase(name)+".json"),
+			FilePath: buildFilePath(EntityPrintFormat, name, module),
 		})
 	}
 
@@ -569,7 +574,7 @@ func (f *Fetcher) fetchWorkflows() ([]Entity, error) {
 			Name:     name,
 			Module:   module,
 			Data:     fullDoc,
-			FilePath: filepath.Join(toSnakeCase(module), "workflow", toSnakeCase(name)+".json"),
+			FilePath: buildFilePath(EntityWorkflow, name, module),
 		})
 	}
 
@@ -613,7 +618,7 @@ func (f *Fetcher) fetchNotifications() ([]Entity, error) {
 			Name:     name,
 			Module:   module,
 			Data:     fullDoc,
-			FilePath: filepath.Join(toSnakeCase(module), "notification", toSnakeCase(name)+".json"),
+			FilePath: buildFilePath(EntityNotification, name, module),
 		})
 	}
 
@@ -647,7 +652,7 @@ func (f *Fetcher) fetchLetterHeads() ([]Entity, error) {
 			Name:     name,
 			Module:   module,
 			Data:     fullDoc,
-			FilePath: filepath.Join(toSnakeCase(module), "letter_head", toSnakeCase(name)+".json"),
+			FilePath: buildFilePath(EntityLetterHead, name, module),
 		})
 	}
 

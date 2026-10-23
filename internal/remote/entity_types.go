@@ -51,9 +51,13 @@ type FetchResult struct {
 	Apps      map[string]AppInfo
 }
 
-// WriteEntity writes an entity to disk
+// WriteEntity writes an entity to disk. It refuses a FilePath that
+// CheckExportPath rejects.
 func WriteEntity(baseDir string, entity Entity) error {
-	fullPath := filepath.Join(baseDir, entity.FilePath)
+	fullPath, err := ExportFilePath(baseDir, entity.FilePath)
+	if err != nil {
+		return err
+	}
 
 	// Create directory
 	dir := filepath.Dir(fullPath)

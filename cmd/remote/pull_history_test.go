@@ -129,18 +129,30 @@ func matchesFilters(v remote.VersionRecord, filters [][]any) bool {
 // historyRepo is a weg remote clone directory with one committed export.
 type historyRepo struct {
 	t      *testing.T
-	dir    string
+	root   string // repository root
+	dir    string // the export: root, or a subdirectory of it (weg -C)
 	site   *fakeHistorySite
 	config *remote.SiteConfig
 }
 
 func newHistoryRepo(t *testing.T, site *fakeHistorySite, lastSync time.Time, base []remote.Entity) *historyRepo {
 	t.Helper()
-	dir := t.TempDir()
-	gitRun(t, dir, "init", "-q", "-b", "main")
-	gitRun(t, dir, "config", "user.name", "weg-sync[bot]")
-	gitRun(t, dir, "config", "user.email", "bot@example.com")
-	gitRun(t, dir, "config", "commit.gpgsign", "false")
+	return newHistoryRepoIn(t, site, lastSync, base, "")
+}
+
+// newHistoryRepoIn is newHistoryRepo with the export in the subdirectory sub
+// of the repository, the layout `weg -C sub` works on.
+func newHistoryRepoIn(t *testing.T, site *fakeHistorySite, lastSync time.Time, base []remote.Entity, sub string) *historyRepo {
+	t.Helper()
+	root := t.TempDir()
+	dir := filepath.Join(root, sub)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	gitRun(t, root, "init", "-q", "-b", "main")
+	gitRun(t, root, "config", "user.name", "weg-sync[bot]")
+	gitRun(t, root, "config", "user.email", "bot@example.com")
+	gitRun(t, root, "config", "commit.gpgsign", "false")
 	cfg := remote.NewSiteConfig(site.server.URL, "test")
 	cfg.Sync.LastSync = lastSync
 	if err := cfg.Save(dir); err != nil {
@@ -154,7 +166,7 @@ func newHistoryRepo(t *testing.T, site *fakeHistorySite, lastSync time.Time, bas
 	}
 	gitRun(t, dir, "add", "-A")
 	gitRun(t, dir, "commit", "-q", "-m", "chore(sync): scheduled export")
-	return &historyRepo{t: t, dir: dir, site: site, config: cfg}
+	return &historyRepo{t: t, root: root, dir: dir, site: site, config: cfg}
 }
 
 // pull runs the history pipeline the way `weg remote pull` does.
@@ -189,7 +201,7 @@ func (r *historyRepo) log(since string) []loggedCommit {
 	var out []loggedCommit
 	for _, sha := range strings.Fields(gitRun(r.t, r.dir, "rev-list", "--reverse", since+"..HEAD")) {
 		meta := strings.Split(gitRun(r.t, r.dir, "log", "-1", "--format=%an%x00%aI%x00%cI%x00%s", sha), "\x00")
-		files := strings.Fields(gitRun(r.t, r.dir, "diff-tree", "-r", "--no-commit-id", "--name-only", sha+"^", sha))
+		files := strings.Fields(gitRun(r.t, r.dir, "diff-tree", "-r", "--relative", "--no-commit-id", "--name-only", sha+"^", sha))
 		out = append(out, loggedCommit{sha, meta[0], meta[1], meta[2], meta[3], files})
 	}
 	return out
@@ -197,7 +209,7 @@ func (r *historyRepo) log(since string) []loggedCommit {
 
 func (r *historyRepo) show(rev, path string) string {
 	r.t.Helper()
-	return gitRun(r.t, r.dir, "show", rev+":"+path)
+	return gitRun(r.t, r.dir, "show", rev+":./"+path)
 }
 
 func marshalExport(t *testing.T, data map[string]any) string {
