@@ -46,9 +46,9 @@ type fakeHistorySite struct {
 	// docs are the documents the site has, keyed "<doctype>/<name>"; any
 	// other document read answers 404, as for a deleted one.
 	docs map[string]map[string]any
-	// rows are the Custom Field and Property Setter rows the site has, per
-	// doctype, for the "does the site still have rows" check.
-	rows         map[string][]map[string]any
+	// docStatus, keyed like docs, is the status a document read answers
+	// with instead (403: the API user may not read it; 5xx: a failure).
+	docStatus    map[string]int
 	versionCalls atomic.Int32 // Version requests come in parallel
 	server       *httptest.Server
 }
@@ -124,21 +124,14 @@ func (s *fakeHistorySite) handle(w http.ResponseWriter, r *http.Request) {
 		}
 		reply(map[string]any{"data": s.deletedRows(q)})
 
-	case "/api/resource/Custom Field", "/api/resource/Property Setter":
-		doctype := strings.TrimPrefix(r.URL.Path, "/api/resource/")
-		var filters map[string]any
-		json.Unmarshal([]byte(q.Get("filters")), &filters)
-		var data []map[string]any
-		for _, row := range s.rows[doctype] {
-			if (filters["dt"] == nil || row["dt"] == filters["dt"]) && (filters["doc_type"] == nil || row["doc_type"] == filters["doc_type"]) {
-				data = append(data, row)
-			}
-		}
-		reply(map[string]any{"data": data})
-
 	default:
 		rest, ok := strings.CutPrefix(r.URL.Path, "/api/resource/")
 		if doctype, name, isDoc := strings.Cut(rest, "/"); ok && isDoc && r.Method == http.MethodGet {
+			if status := s.docStatus[doctype+"/"+name]; status != 0 {
+				w.WriteHeader(status)
+				reply(map[string]any{"exc_type": "PermissionError"})
+				return
+			}
 			if doc, found := s.docs[doctype+"/"+name]; found {
 				reply(map[string]any{"data": doc})
 				return
@@ -183,8 +176,6 @@ func (s *fakeHistorySite) deletedRows(q url.Values) []map[string]string {
 					in = in || v == got
 				}
 				ok = ok && in
-			case "=":
-				ok = ok && got == f[3].(string)
 			case ">":
 				ok = ok && got > f[3].(string)
 			case "<=":
@@ -197,16 +188,11 @@ func (s *fakeHistorySite) deletedRows(q url.Values) []map[string]string {
 			rows = append(rows, d)
 		}
 	}
-	desc := strings.HasPrefix(q.Get("order_by"), "creation desc")
 	sort.SliceStable(rows, func(i, j int) bool {
-		a, b := rows[i], rows[j]
-		if desc {
-			a, b = b, a
+		if rows[i]["creation"] != rows[j]["creation"] {
+			return rows[i]["creation"] < rows[j]["creation"]
 		}
-		if a["creation"] != b["creation"] {
-			return a["creation"] < b["creation"]
-		}
-		return a["name"] < b["name"]
+		return rows[i]["name"] < rows[j]["name"]
 	})
 	start, _ := strconv.Atoi(q.Get("limit_start"))
 	size, _ := strconv.Atoi(q.Get("limit_page_length"))

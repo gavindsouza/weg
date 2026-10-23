@@ -130,12 +130,12 @@ func TestPullReplaysDeletions(t *testing.T) {
 	}
 }
 
-// After the replay, the reconcile removes the committed files the site no
-// longer exports at all: the old path of a document that moved module, a
-// DocType that is no longer custom, a deletion with no trash row. Files of
-// an entity type that is not synced, of a module marked sync = false, files
-// weg does not lay out, and anything outside the export stay. A snapshot
-// pull removes the same files.
+// After the replay, the reconcile removes the committed files the site
+// confirms it no longer exports: the old path of a document the site places
+// in another module now, a DocType that is no longer custom, a pushed
+// document the site answers 404 for. Files of an entity type that is not
+// synced, of a module marked sync = false, files weg does not lay out, and
+// anything outside the export stay. A snapshot pull removes the same files.
 func TestPullRemovesWhatTheSiteNoLongerExports(t *testing.T) {
 	for _, mode := range []string{"history", "snapshot"} {
 		for _, sub := range []string{"", "catalog"} {
@@ -181,8 +181,11 @@ func TestPullRemovesWhatTheSiteNoLongerExports(t *testing.T) {
 				// Pushed as it is: Orphan, which the site no longer has and
 				// whose deletion it did not record, was on the site.
 				os.WriteFile(filepath.Join(repo.dir, ".weg", "last_push_commit"), []byte(baseSHA), 0o644)
-				// Thing is a standard DocType now.
-				site.docs = map[string]map[string]any{"DocType/Thing": copyDoc(thing, "custom", 0)}
+				site.docs = map[string]map[string]any{
+					"DocType/Thing":            copyDoc(thing, "custom", 0), // a standard DocType now
+					"Workflow/Flow":            flow,
+					"DocType/Teamplan Request": {"name": "Teamplan Request", "module": "Workplace"},
+				}
 
 				current := []remote.Entity{
 					entityAt(remote.EntityWorkflow, "Flow", "Workplace", paths["moved"], flow),
@@ -584,32 +587,33 @@ func TestPullKeepsUnreadableDocumentWithVersion(t *testing.T) {
 	}
 }
 
-// With no push baseline, as in a CI checkout, the list fetch alone removes
-// nothing the site might still need: a committed file the site has never
-// seen (made locally, not pushed yet) stays. A file goes when the site
-// records its deletion, at any time and in any module (a deletion from
-// before this pull's window is committed by who deleted it, dated when),
-// or when the site has the document but no longer exports it.
+// With no push baseline, as in a CI checkout, a 404 alone cannot tell a
+// deleted document from one made locally and not pushed yet: the file goes
+// only when the site recorded the deletion inside this pull's window (by
+// who deleted it). An older Deleted Document row proves nothing, since the
+// file may have been brought back since, and neither does a document the
+// site never had. A document the site no longer exports still goes.
 func TestPullWithoutPushBaseline(t *testing.T) {
 	site := newFakeHistorySite(t)
 	site.users = map[string]string{"alice@example.com": "Alice", "bob@example.com": "Bob"}
 	fresh := map[string]any{"doctype": "Server Script", "name": "Fresh", "script": "f = 1"}
-	dropped := map[string]any{"doctype": "Server Script", "name": "Dropped", "module": "Projects", "script": "d = 1"}
+	dropped := map[string]any{"doctype": "Server Script", "name": "Dropped", "script": "d = 1"}
+	gone := map[string]any{"doctype": "Server Script", "name": "Gone", "script": "g = 1"}
 	thing := map[string]any{"doctype": "DocType", "name": "Thing", "module": "Custom", "custom": 1}
 	keep := map[string]any{"doctype": "Server Script", "name": "Keep", "script": "k = 1"}
 	lead := map[string]any{"doctype": "Lead", "custom_fields": []any{
 		map[string]any{"name": "Lead-a", "dt": "Lead", "fieldname": "a"},
 		map[string]any{"name": "Lead-b", "dt": "Lead", "fieldname": "b"},
 	}}
-	freshPath, droppedPath := "custom/server_script/fresh.json", "projects/server_script/dropped.json"
+	freshPath, droppedPath, gonePath := "custom/server_script/fresh.json", "custom/server_script/dropped.json", "custom/server_script/gone.json"
 	thingPath, keepPath, leadPath := "custom/doctype/thing/thing.json", "custom/server_script/keep.json", "custom/custom_field/lead.json"
 	repo := newHistoryRepoIn(t, site, deletionsLastSync, []remote.Entity{
-		entityAt(remote.EntityServerScript, "Dropped", "Projects", droppedPath, dropped),
+		entityAt(remote.EntityServerScript, "Dropped", "Custom", droppedPath, dropped),
+		entityAt(remote.EntityServerScript, "Gone", "Custom", gonePath, gone),
 		entityAt(remote.EntityDocType, "Thing", "Custom", thingPath, thing),
 		entityAt(remote.EntityServerScript, "Keep", "Custom", keepPath, keep),
 		entityAt(remote.EntityCustomField, "Lead", "Custom", leadPath, lead),
 	}, "catalog")
-	repo.config.Modules["Projects"] = remote.ModuleInfo{App: "erpnext", Sync: false}
 	// Merged to main, not on the site yet.
 	os.WriteFile(filepath.Join(repo.dir, freshPath), []byte(marshalExport(t, fresh)), 0o644)
 	gitRun(t, repo.dir, "add", freshPath)
@@ -617,24 +621,197 @@ func TestPullWithoutPushBaseline(t *testing.T) {
 	baseSHA := gitRun(t, repo.dir, "rev-parse", "HEAD")
 
 	site.docs = map[string]map[string]any{"DocType/Thing": copyDoc(thing, "custom", 0)}
-	site.deleted = []map[string]string{ // all before the window
+	site.deleted = []map[string]string{
 		trashRow("d1", "Custom Field", "Lead-a", "alice@example.com", "2026-10-18 09:00:00.000000"),
 		trashRow("d2", "Server Script", "Dropped", "alice@example.com", "2026-10-19 09:00:00.000000"),
 		trashRow("d3", "Custom Field", "Lead-b", "bob@example.com", "2026-10-19 10:00:00.000000"),
+		trashRow("d4", "Server Script", "Gone", "bob@example.com", "2026-10-20 10:00:00.000000"), // in the window
 	}
 	if err := repo.pull(deletionsUntil, []remote.Entity{entityAt(remote.EntityServerScript, "Keep", "Custom", keepPath, keep)}); err != nil {
 		t.Fatalf("pull: %v", err)
 	}
 	got := repo.log(baseSHA)
-	want := []string{"Alice " + droppedPath, "Bob " + leadPath, "Weg .weg/site.toml," + thingPath + ",modules.txt"}
+	want := []string{"Bob " + gonePath, "Weg .weg/site.toml," + thingPath}
 	if strings.Join(summarize(got), "|") != strings.Join(want, "|") {
 		t.Fatalf("commits = %v, want %v", summarize(got), want)
 	}
-	if got[0].authorDate != "2026-10-19T09:00:00+02:00" || got[1].authorDate != "2026-10-19T10:00:00+02:00" {
-		t.Errorf("deletion commits dated %s, %s", got[0].authorDate, got[1].authorDate)
+	for _, p := range []string{freshPath, droppedPath, leadPath} {
+		if !repo.inHead("HEAD", p) {
+			t.Errorf("%s was removed without a push baseline or a deletion in the window", p)
+		}
 	}
-	if !repo.inHead("HEAD", freshPath) {
-		t.Errorf("%s, which the site has never had, was removed", freshPath)
+}
+
+// A file merged to main but not pushed yet, re-introducing a document the
+// site deleted long ago, stays in a CI checkout (no push baseline): the old
+// Deleted Document row does not remove it, nor credit it to that deleter.
+func TestPullWithoutBaselineKeepsReintroducedDocument(t *testing.T) {
+	site := newFakeHistorySite(t)
+	keep := map[string]any{"doctype": "Server Script", "name": "Keep", "script": "k = 1"}
+	keepPath := "custom/server_script/keep.json"
+	revived := map[string]any{"doctype": "Server Script", "name": "Revived", "script": "r = 1"}
+	revivedPath := "custom/server_script/revived.json"
+	repo := newHistoryRepo(t, site, deletionsLastSync, []remote.Entity{
+		entityAt(remote.EntityServerScript, "Keep", "Custom", keepPath, keep),
+	})
+	os.WriteFile(filepath.Join(repo.dir, revivedPath), []byte(marshalExport(t, revived)), 0o644)
+	gitRun(t, repo.dir, "add", revivedPath)
+	gitRun(t, repo.dir, "commit", "-q", "-m", "feat: bring Revived back")
+	site.deleted = []map[string]string{trashRow("d1", "Server Script", "Revived", "alice@example.com", "2025-03-01 10:00:00.000000")}
+	if err := repo.pull(deletionsUntil, []remote.Entity{entityAt(remote.EntityServerScript, "Keep", "Custom", keepPath, keep)}); err != nil {
+		t.Fatalf("pull: %v", err)
+	}
+	if !repo.inHead("HEAD", revivedPath) {
+		t.Errorf("%s (merged, not pushed, CI checkout) was removed on a 2025 trash row", revivedPath)
+	}
+}
+
+// With a push baseline, a pushed document the site answers 404 for goes,
+// but a Deleted Document row from before the window does not credit the
+// removal: the reconcile commit takes it.
+func TestPullCreditsOnlyDeletionsInWindow(t *testing.T) {
+	site := newFakeHistorySite(t)
+	site.users = map[string]string{"alice@example.com": "Alice"}
+	dropped := map[string]any{"doctype": "Server Script", "name": "Dropped", "script": "d = 1"}
+	droppedPath := "custom/server_script/dropped.json"
+	repo := newHistoryRepo(t, site, deletionsLastSync, []remote.Entity{
+		entityAt(remote.EntityServerScript, "Dropped", "Custom", droppedPath, dropped),
+	})
+	baseSHA := gitRun(t, repo.dir, "rev-parse", "HEAD")
+	os.WriteFile(filepath.Join(repo.dir, ".weg", "last_push_commit"), []byte(baseSHA), 0o644)
+	site.deleted = []map[string]string{trashRow("d1", "Server Script", "Dropped", "alice@example.com", "2026-10-19 09:00:00.000000")}
+	if err := repo.pull(deletionsUntil, nil); err != nil {
+		t.Fatalf("pull: %v", err)
+	}
+	got := repo.log(baseSHA)
+	if s := strings.Join(summarize(got), "|"); s != "Weg .weg/site.toml,"+droppedPath {
+		t.Fatalf("commits = %s, want the removal in the reconcile commit", s)
+	}
+}
+
+// A document deleted inside the window and restored (or created again)
+// since is not removed when the fetch misses it, whether the fetch could
+// not read it or its list came back short: the site still returns it.
+func TestPullKeepsRecordRestoredInWindow(t *testing.T) {
+	keep := map[string]any{"doctype": "Server Script", "name": "Keep", "script": "k = 1"}
+	keepPath := "custom/server_script/keep.json"
+	for _, tc := range []struct {
+		name     string
+		baseline bool
+		result   *remote.FetchResult
+	}{
+		{"incomplete fetch", true, &remote.FetchResult{Incomplete: map[remote.EntityType][]string{remote.EntityServerScript: {"Keep (API error (502): bad gateway)"}}}},
+		{"short list", false, &remote.FetchResult{}},
+		{"short list with baseline", true, &remote.FetchResult{}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			site := newFakeHistorySite(t)
+			repo := newHistoryRepo(t, site, deletionsLastSync, []remote.Entity{
+				entityAt(remote.EntityServerScript, "Keep", "Custom", keepPath, keep),
+			})
+			if tc.baseline {
+				os.WriteFile(filepath.Join(repo.dir, ".weg", "last_push_commit"), []byte(gitRun(t, repo.dir, "rev-parse", "HEAD")), 0o644)
+			}
+			site.deleted = []map[string]string{trashRow("d1", "Server Script", "Keep", "alice@example.com", "2026-10-20 10:00:00.000000")}
+			site.docs = map[string]map[string]any{"Server Script/Keep": keep}
+			if err := repo.pullResult(deletionsUntil, tc.result); err != nil {
+				t.Fatalf("pull: %v", err)
+			}
+			if !repo.inHead("HEAD", keepPath) {
+				t.Errorf("%s was removed although the site has it", keepPath)
+			}
+		})
+	}
+}
+
+// Each Custom Field row is asked for by name: a list narrowed by the API
+// user's permissions, or cut short, does not make live rows look gone. A
+// row the site still has, or cannot be asked about, stays in its file; a
+// row the site answers 404 for (the file was pushed) or no longer exports
+// goes.
+func TestPullAsksTheSiteForEachRow(t *testing.T) {
+	row := func(n string) map[string]any {
+		return map[string]any{"name": "Lead-" + n, "dt": "Lead", "fieldname": n}
+	}
+	t.Run("narrowed list", func(t *testing.T) {
+		site := newFakeHistorySite(t)
+		lead := map[string]any{"doctype": "Lead", "custom_fields": []any{row("a")}}
+		leadPath := "custom/custom_field/lead.json"
+		repo := newHistoryRepo(t, site, deletionsLastSync, []remote.Entity{
+			entityAt(remote.EntityCustomField, "Lead", "Custom", leadPath, lead),
+		})
+		os.WriteFile(filepath.Join(repo.dir, ".weg", "last_push_commit"), []byte(gitRun(t, repo.dir, "rev-parse", "HEAD")), 0o644)
+		site.docs = map[string]map[string]any{"Custom Field/Lead-a": row("a")}
+		if err := repo.pull(deletionsUntil, nil); err != nil {
+			t.Fatalf("pull: %v", err)
+		}
+		if !repo.inHead("HEAD", leadPath) {
+			t.Errorf("%s removed though GetDoc Custom Field/Lead-a answers 200", leadPath)
+		}
+	})
+	t.Run("short page", func(t *testing.T) {
+		site := newFakeHistorySite(t)
+		sys := copyDoc(row("e"), "is_system_generated", 1)
+		committed := map[string]any{"doctype": "Lead", "custom_fields": []any{row("a"), row("b"), row("c"), row("d"), row("e")}}
+		leadPath := "custom/custom_field/lead.json"
+		repo := newHistoryRepo(t, site, deletionsLastSync, []remote.Entity{
+			entityAt(remote.EntityCustomField, "Lead", "Custom", leadPath, committed),
+		})
+		os.WriteFile(filepath.Join(repo.dir, ".weg", "last_push_commit"), []byte(gitRun(t, repo.dir, "rev-parse", "HEAD")), 0o644)
+		site.docs = map[string]map[string]any{"Custom Field/Lead-b": row("b"), "Custom Field/Lead-e": sys}
+		site.docStatus = map[string]int{"Custom Field/Lead-d": http.StatusTooManyRequests}
+		current := []remote.Entity{entityAt(remote.EntityCustomField, "Lead", "Custom", leadPath,
+			map[string]any{"doctype": "Lead", "custom_fields": []map[string]any{row("a")}})}
+		if err := repo.pull(deletionsUntil, current); err != nil {
+			t.Fatalf("pull: %v", err)
+		}
+		want := map[string]any{"doctype": "Lead", "custom_fields": []any{row("a"), row("b"), row("d")}}
+		if s := repo.show("HEAD", leadPath); s != marshalExport(t, want) {
+			t.Errorf("%s =\n%s\nwant rows a (listed), b (the site has it), d (429)", leadPath, s)
+		}
+	})
+}
+
+// A document exported at another path now is a move only when the site's
+// own copy places it there: not when its DocType's module could not be
+// found (the fetch put it under "_"), nor when the site cannot be asked.
+func TestPullConfirmsModuleMoves(t *testing.T) {
+	site := newFakeHistorySite(t)
+	old := map[string]any{"doctype": "Client Script", "name": "Old", "dt": "Lost Type"}
+	flow := map[string]any{"doctype": "Workflow", "name": "Flow", "document_type": "Teamplan Request"}
+	report := map[string]any{"doctype": "Report", "name": "Hours", "ref_doctype": "Teamplan Request", "is_standard": "No"}
+	paths := map[string]string{
+		"old": "custom/client_script/old.json", "old.now": "_/client_script/old.json",
+		"flow": "custom/workflow/flow.json", "flow.now": "workplace/workflow/flow.json",
+		"report": "custom/report/hours/hours.json", "report.now": "workplace/report/hours/hours.json",
+	}
+	repo := newHistoryRepo(t, site, deletionsLastSync, []remote.Entity{
+		entityAt(remote.EntityClientScript, "Old", "Custom", paths["old"], old),
+		entityAt(remote.EntityWorkflow, "Flow", "Custom", paths["flow"], flow),
+		entityAt(remote.EntityReport, "Hours", "Custom", paths["report"], report),
+	})
+	os.WriteFile(filepath.Join(repo.dir, ".weg", "last_push_commit"), []byte(gitRun(t, repo.dir, "rev-parse", "HEAD")), 0o644)
+	site.docs = map[string]map[string]any{
+		"Client Script/Old":        old,
+		"Report/Hours":             report,
+		"DocType/Teamplan Request": {"name": "Teamplan Request", "module": "Workplace"},
+	}
+	site.docStatus = map[string]int{"Workflow/Flow": http.StatusForbidden}
+	current := []remote.Entity{
+		entityAt(remote.EntityClientScript, "Old", "_", paths["old.now"], old),
+		entityAt(remote.EntityWorkflow, "Flow", "Workplace", paths["flow.now"], flow),
+		entityAt(remote.EntityReport, "Hours", "Workplace", paths["report.now"], report),
+	}
+	if err := repo.pull(deletionsUntil, current); err != nil {
+		t.Fatalf("pull: %v", err)
+	}
+	for _, k := range []string{"old", "flow"} {
+		if !repo.inHead("HEAD", paths[k]) {
+			t.Errorf("%s was removed on an unconfirmed move", paths[k])
+		}
+	}
+	if repo.inHead("HEAD", paths["report"]) {
+		t.Errorf("%s stayed although the site places the report at %s", paths["report"], paths["report.now"])
 	}
 }
 
@@ -651,8 +828,7 @@ func TestPullKeepsWhatTheSiteStillHas(t *testing.T) {
 		entityAt(remote.EntityCustomField, "Lead", "Custom", leadPath, lead),
 	})
 	os.WriteFile(filepath.Join(repo.dir, ".weg", "last_push_commit"), []byte(gitRun(t, repo.dir, "rev-parse", "HEAD")), 0o644)
-	site.docs = map[string]map[string]any{"Server Script/Listed": listed}
-	site.rows = map[string][]map[string]any{"Custom Field": {{"name": "Lead-a", "dt": "Lead"}}}
+	site.docs = map[string]map[string]any{"Server Script/Listed": listed, "Custom Field/Lead-a": {"name": "Lead-a", "dt": "Lead"}}
 	for _, mode := range []string{"history", "snapshot"} {
 		var err error
 		if mode == "history" {

@@ -39,22 +39,30 @@ Deleted Document rows: each deletion of a document the export holds becomes a
 commit by the user who deleted it, removing its file (or its row from the
 per-DocType Custom Field / Property Setter file).
 
-A committed file the fetch no longer produces is then checked with the site
-before it goes, since a list can come back short:
-  - its document now lives at another path (a module move), or the site has
-    it but no longer exports it (a DocType that is no longer custom): it goes
-    in the reconcile commit;
-  - the site still has it and would export it: it stays;
-  - the site does not have it and records its deletion in a Deleted Document
-    row from before the window: it goes in a commit by who deleted it;
-  - the site does not have it and records no deletion: it goes only when a
-    Version in the window or the push baseline (.weg/last_push_commit) shows
-    the site had it. Without a baseline (a CI checkout) it may be local work
-    not pushed yet, so it stays, with a warning.
-Files with local work not yet pushed always stay. In modules marked
-sync = false only recorded deletions remove files, and files of entity types
-disabled in [sync.entities] are never removed. A snapshot pull (--no-history)
-removes the same files, all in its one commit.
+A list can come back short, so a committed file (or a Custom Field /
+Property Setter row) the fetch does not produce goes only when the site,
+asked for that record by name, confirms it:
+  - it answers 404 (not found), and the file held what the site had: the
+    site recorded the deletion in a Deleted Document row inside the window
+    (it goes in a commit by who deleted it, dated when), or the push
+    baseline (.weg/last_push_commit) shows the file has no local work (it
+    goes in the reconcile commit). Without a baseline (a CI checkout) and
+    with no deletion recorded in the window, the file may be local work not
+    pushed yet, so it stays, with a warning;
+  - the fetch exports the record at another path and the site's copy places
+    it there (a module move): the old file goes in the reconcile commit;
+  - the site returns the record but would not export it (a DocType that is
+    no longer custom, a Report or Print Format made standard, a
+    system-generated Custom Field): it goes in the reconcile commit.
+Anything else keeps the file, with a warning: any other answer (403, 429,
+5xx, a timeout), a record the site still has and would export, a move it
+does not confirm. A Deleted Document row is replayed only when the site
+confirms its record is gone (or exports it again), so a document restored
+since is never removed. Files with local work not yet pushed always stay,
+nothing goes when a DocType's module could not be read, in modules marked
+sync = false only deletions recorded in the window remove files, and files
+of entity types disabled in [sync.entities] are never removed. A snapshot
+pull (--no-history) removes the same files, all in its one commit.
 
 Frappe records times as wall-clock time in the site's time zone (System
 Settings, or Asia/Kolkata when unset), so commits carry that zone's UTC offset.
@@ -141,13 +149,14 @@ func runPull(cobraCmd *cobra.Command, args []string) error {
 		for _, e := range result.Entities {
 			output.Printf("  %s: %s", e.Type, e.Name)
 		}
-		removals, err := planStaleExport(".", result, fetcher, readLocalState("."), nil)
+		committed, err := readCommittedFiles(".")
 		if err != nil {
 			return err
 		}
-		if len(removals) > 0 {
-			output.Printf("\nWould remove %d files the site no longer has:", len(removals))
-			for _, r := range removals {
+		plan := planStaleExport(committed, result, fetcher, readLocalState("."), nil)
+		if len(plan.Removals) > 0 {
+			output.Printf("\nWould remove %d files the site no longer has:", len(plan.Removals))
+			for _, r := range plan.Removals {
 				output.Printf("  - %s (%s)", r.Path, r.Reason)
 			}
 		}
@@ -217,6 +226,13 @@ func advancePushBaseline(dir, startHead string, clean bool) {
 // commit (the --no-history path, and the pre-history default behavior).
 func pullSnapshot(config *remote.SiteConfig, fetcher *remote.Fetcher, result *remote.FetchResult, syncedAt time.Time) error {
 	local := readLocalState(".")
+	committed, err := readCommittedFiles(".")
+	if err != nil {
+		return err
+	}
+	// Drop only what the site confirms is gone, so a snapshot converges too;
+	// rows the site still has are kept in their files.
+	plan := planStaleExport(committed, result, fetcher, local, nil)
 	// Write entities
 	output.Infof("Updating %d entities...\n", len(result.Entities))
 	for _, entity := range result.Entities {
@@ -224,12 +240,7 @@ func pullSnapshot(config *remote.SiteConfig, fetcher *remote.Fetcher, result *re
 			output.Errorf("Failed to write %s: %v", entity.Name, err)
 		}
 	}
-	// Drop what the site no longer exports, so a snapshot converges too.
-	removals, err := planStaleExport(".", result, fetcher, local, nil)
-	if err != nil {
-		return err
-	}
-	if err := removeExportFiles(".", removals, nil); err != nil {
+	if err := removeExportFiles(".", plan.Removals, nil); err != nil {
 		return err
 	}
 
