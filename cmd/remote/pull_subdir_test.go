@@ -15,8 +15,8 @@ import (
 
 // With the export in a subdirectory of a larger repository (weg -C catalog),
 // a pull starts from the committed export: a Custom Field change keeps the
-// file's other rows, a document edited and then deleted on the site is
-// replayed at its real path and removed there, and the rest of the
+// file's other rows, a pushed document edited and then deleted on the site
+// is replayed at its real path and removed there, and the rest of the
 // repository (staged or not) stays out of every commit.
 func TestReconstructHistoryPullInSubdirectory(t *testing.T) {
 	site := newFakeHistorySite(t)
@@ -42,6 +42,7 @@ func TestReconstructHistoryPullInSubdirectory(t *testing.T) {
 	gitRun(t, repo.root, "add", "README.md")
 	gitRun(t, repo.root, "commit", "-q", "-m", "docs: readme")
 	baseSHA := gitRun(t, repo.root, "rev-parse", "HEAD")
+	os.WriteFile(filepath.Join(repo.dir, ".weg", "last_push_commit"), []byte(baseSHA), 0o644)
 	os.WriteFile(filepath.Join(repo.root, "README.md"), []byte("app, edited\n"), 0o644)
 	os.WriteFile(filepath.Join(repo.root, "notes.txt"), []byte("mine\n"), 0o644)
 	gitRun(t, repo.root, "add", "notes.txt")

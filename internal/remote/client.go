@@ -408,6 +408,10 @@ type VersionRecord struct {
 	// creation/owner fields (Frappe writes no Version on insert). Never set
 	// on records fetched from the site.
 	Synthetic bool `json:"weg_synthetic,omitempty"`
+
+	// Deleted marks a record built from a Deleted Document row: the
+	// document was deleted at Creation by Owner. Never set on Versions.
+	Deleted bool `json:"weg_deleted,omitempty"`
 }
 
 // UserInfo contains basic user information

@@ -562,6 +562,20 @@ func replayHistory(ctx context.Context, run historyRun, touched map[string]bool)
 	}
 	window := remote.HistoryWindow{Since: run.since, Until: run.until, Location: loc}
 
+	// What has local work not yet pushed is read before the replay commits
+	// anything, so the pull's own commits never count as local work.
+	// The committed export is read now too: what the pull removes is
+	// planned against it before the replay changes anything.
+	var local localState
+	var committed map[string][]byte
+	if run.fromCommitted {
+		local = readLocalState(dirName)
+		var err error
+		if committed, err = readCommittedFiles(dirName); err != nil {
+			return fmt.Errorf("failed to read the committed export: %w", err)
+		}
+	}
+
 	// Phase 1: fetch versions to disk in parallel, resuming from any cursors.
 	output.Print("Fetching version history...")
 	var mu sync.Mutex
@@ -582,7 +596,28 @@ func replayHistory(ctx context.Context, run historyRun, touched map[string]bool)
 	}
 	if err != nil {
 		touchExport()
-		return snapshotAfterHistoryFailure(run, err)
+		return snapshotAfterHistoryFailure(run, local, committed, err)
+	}
+
+	// Frappe writes no Version on delete; its Deleted Document rows say who
+	// deleted what, and when. They only credit and date a removal the site
+	// confirms: without them a confirmed deletion lands in the reconcile
+	// commit.
+	deletions, err := fetcher.FetchDeletions(window)
+	if err != nil {
+		output.Warningf("Could not read the site's Deleted Document rows (%v); deletions land in the reconcile commit instead of in commits by who deleted them", err)
+		deletions = nil
+	} else if len(deletions) > 0 {
+		output.Printf("  fetched %d deleted documents", len(deletions))
+	}
+
+	// A pull asks the site about every committed record the fetch does not
+	// reproduce before anything is replayed: a deletion is replayed only
+	// for a record the site confirms is gone (or exports again).
+	var plan *remote.StalePlan
+	if run.fromCommitted {
+		plan = planStaleExport(committed, result, fetcher, local, deletions)
+		deletions = plan.Deletions
 	}
 
 	// Phase 2: determine which DocType histories are in scope.
@@ -591,14 +626,7 @@ func replayHistory(ctx context.Context, run historyRun, touched map[string]bool)
 		return fmt.Errorf("failed to resolve custom doctypes: %w", err)
 	}
 
-	opts := remote.HistoryOptions{Window: window}
-	if run.fromCommitted {
-		baseline, err := readCommittedFiles(dirName)
-		if err != nil {
-			return fmt.Errorf("failed to read the committed export: %w", err)
-		}
-		opts.Baseline = baseline
-	}
+	opts := remote.HistoryOptions{Window: window, Deletions: deletions, Baseline: committed}
 
 	// Resolve author names so git blame shows who changed what.
 	users := func(emails []string) map[string]remote.UserInfo {
@@ -618,27 +646,16 @@ func replayHistory(ctx context.Context, run historyRun, touched map[string]bool)
 		if err := ctx.Err(); err != nil {
 			return fmt.Errorf("interrupted: %w", err)
 		}
-		if err := remote.CheckExportPath(c.FilePath); err != nil {
-			return err
+		for _, p := range c.Removed {
+			if local.changed[p] {
+				output.Warningf("%s was deleted on the site (%s), so the pull removes it, but it had local changes not yet pushed: uncommitted edits are gone from the working tree, committed ones stay in git history", p, c.Author)
+			}
 		}
-		touched[c.FilePath] = true
-		if err := writeFileContent(dirName, c.FilePath, c.Content); err != nil {
-			return err
+		committed, err := applyReplayedCommit(dirName, c, touched)
+		if committed {
+			commitCount++
 		}
-		if err := runGit(dirName, "add", "--", c.FilePath); err != nil {
-			return err
-		}
-		staged, err := gitHasStaged(dirName, c.FilePath)
-		if err != nil || !staged {
-			return err
-		}
-		// Commit only this file: anything else already staged must not be
-		// credited to the site user.
-		if err := gitCommitAuthored(dirName, c.Author, formatGitDate(c.When), c.Message, c.FilePath); err != nil {
-			return fmt.Errorf("commit %s (version %s): %w", c.FilePath, c.VersionName, err)
-		}
-		commitCount++
-		return nil
+		return err
 	})
 	if err != nil {
 		return fmt.Errorf("history replay stopped after %d commits, before the reconcile commit: %w", commitCount, err)
@@ -648,6 +665,12 @@ func replayHistory(ctx context.Context, run historyRun, touched map[string]bool)
 	}
 	if hist.Unexported > 0 {
 		output.Printf("Skipped %d version records of documents outside the export", hist.Unexported)
+	}
+	if hist.Deletions > 0 {
+		output.Printf("Replayed %d deletions", hist.Deletions)
+	}
+	if hist.DeletionsUnexported > 0 {
+		output.Printf("Skipped %d deletions of documents outside the export", hist.DeletionsUnexported)
 	}
 	if n := len(hist.Dropped); n > 0 {
 		output.Warningf("Dropped %d version records that cannot be replayed:", n)
@@ -660,15 +683,30 @@ func replayHistory(ctx context.Context, run historyRun, touched map[string]bool)
 		}
 	}
 
-	// Phase 4: reconcile to the authoritative current state.
+	// Phase 4: reconcile to the authoritative current state. A pull also
+	// removes the planned files the replay has not removed already: a
+	// confirmed deletion with no Deleted Document row in the window, a
+	// module move's old path, a DocType that is no longer custom.
 	touchExport()
 	if err := writeAllEntities(dirName, result.Entities, run.modulesFile); err != nil {
 		return err
 	}
-	currentPaths := entityPathSet(result.Entities)
-	for p := range hist.SeenPaths {
-		if !currentPaths[p] {
-			// Entity deleted/renamed away: keep its history, drop it from HEAD.
+	if run.fromCommitted {
+		if err := removeExportFiles(dirName, plan.Removals, touched); err != nil {
+			return err
+		}
+	} else if len(result.ModuleLookupFailed) == 0 {
+		// A clone holds only what its replay wrote: a document with history
+		// that the fetch no longer has was deleted or renamed away. Keep its
+		// history, drop it from HEAD, unless its type's fetch was incomplete.
+		currentPaths := entityPathSet(result.Entities)
+		for p := range hist.SeenPaths {
+			if currentPaths[p] {
+				continue
+			}
+			if et, ok := remote.EntityTypeOfPath(p); ok && len(result.Incomplete[et]) > 0 {
+				continue
+			}
 			if err := remote.CheckExportPath(p); err != nil {
 				return err
 			}
@@ -693,14 +731,186 @@ func replayHistory(ctx context.Context, run historyRun, touched map[string]bool)
 	return nil
 }
 
+// applyReplayedCommit writes or removes a replayed commit's files and
+// commits only those, with the commit's author and date: anything else
+// already staged must not be credited to the site user. Every path is
+// checked to stay inside the export before it is touched. It reports
+// whether a commit was made (none when the files were already as replayed).
+func applyReplayedCommit(dir string, c remote.ReconstructedCommit, touched map[string]bool) (bool, error) {
+	paths := append([]string(nil), c.Removed...)
+	if c.FilePath != "" {
+		paths = append(paths, c.FilePath)
+	}
+	if len(paths) == 0 {
+		return false, nil
+	}
+	for _, p := range paths {
+		if err := remote.CheckExportPath(p); err != nil {
+			return false, err
+		}
+	}
+	if len(c.Removed) > 0 {
+		for _, p := range c.Removed {
+			touched[p] = true
+		}
+		if err := runGit(dir, append([]string{"rm", "-q", "-f", "--ignore-unmatch", "--"}, c.Removed...)...); err != nil {
+			return false, err
+		}
+	}
+	if c.FilePath != "" {
+		touched[c.FilePath] = true
+		if err := writeFileContent(dir, c.FilePath, c.Content); err != nil {
+			return false, err
+		}
+		if err := runGit(dir, "add", "--", c.FilePath); err != nil {
+			return false, err
+		}
+	}
+	staged, err := gitHasStaged(dir, paths...)
+	if err != nil || !staged {
+		return false, err
+	}
+	if err := gitCommitAuthored(dir, c.Author, formatGitDate(c.When), c.Message, paths...); err != nil {
+		return false, fmt.Errorf("commit %s (%s): %w", strings.Join(paths, ", "), c.VersionName, err)
+	}
+	return true, nil
+}
+
+// removeExportFiles removes the given files from the index and the working
+// tree, recording them in touched (when given), and prints them. A file
+// already gone (a replayed deletion removed it) is skipped.
+func removeExportFiles(dir string, planned []remote.Removal, touched map[string]bool) error {
+	var removals []remote.Removal
+	for _, r := range planned {
+		if err := remote.CheckExportPath(r.Path); err != nil {
+			return err
+		}
+		if _, err := os.Lstat(filepath.Join(dir, r.Path)); err == nil {
+			removals = append(removals, r)
+		}
+	}
+	if len(removals) == 0 {
+		return nil
+	}
+	paths := make([]string, 0, len(removals))
+	for _, r := range removals {
+		paths = append(paths, r.Path)
+	}
+	for _, p := range paths {
+		if touched != nil {
+			touched[p] = true
+		}
+	}
+	if err := runGitPaths(dir, paths, "rm", "-q", "-f", "--ignore-unmatch"); err != nil {
+		return err
+	}
+	output.Printf("Removed %d files the site no longer has:", len(removals))
+	for _, r := range removals {
+		output.Printf("  - %s (%s)", r.Path, r.Reason)
+	}
+	return nil
+}
+
+// planStaleExport plans, with remote.Fetcher.PlanStale, what a pull removes
+// from the committed export (path -> content) and which of the window's
+// deletions it replays, and warns about what it keeps and why. Rows the
+// site still has are merged back into result.
+func planStaleExport(committed map[string][]byte, result *remote.FetchResult, fetcher *remote.Fetcher, local localState, deletions []remote.VersionRecord) *remote.StalePlan {
+	for et, docs := range result.Incomplete {
+		output.Warningf("Could not read %d %s documents, so no %s file is removed: %s",
+			len(docs), et, et, strings.Join(docs, "; "))
+	}
+	if n := len(result.ModuleLookupFailed); n > 0 {
+		output.Warningf("Could not read the module of %d DocTypes, so no file is removed: %s",
+			n, strings.Join(result.ModuleLookupFailed, "; "))
+	}
+	ev := remote.StaleEvidence{Committed: committed, Local: local.changed, HasBaseline: local.hasBaseline, Deletions: deletions}
+	if local.err != nil {
+		ev.Hold = local.err.Error() + ", so local work cannot be told apart"
+	}
+	plan := fetcher.PlanStale(result, ev)
+	if n := len(plan.Skipped); n > 0 {
+		output.Warningf("Not replaying %d deletions of records the site did not confirm are gone:", n)
+		for _, s := range plan.Skipped {
+			output.Warningf("  %s", s)
+		}
+	}
+	if n := len(plan.Kept); n > 0 {
+		output.Warningf("Kept %d files or rows the fetch did not produce:", n)
+		for _, k := range plan.Kept {
+			output.Warningf("  %s", k)
+		}
+	}
+	return plan
+}
+
+// localState is the export's local work a push has yet to send.
+type localState struct {
+	changed     map[string]bool // paths under the export dir, relative to it
+	hasBaseline bool            // .weg/last_push_commit names a commit here
+	err         error           // the local work cannot be told
+}
+
+// readLocalState returns the paths under dir (relative to it) with local
+// work a push has yet to send: changes not committed, and changes committed
+// since the push baseline (.weg/last_push_commit), when there is one. It
+// fails when the baseline is not a commit of this repository, since the
+// local work then cannot be told apart.
+func readLocalState(dir string) localState {
+	st := localState{changed: make(map[string]bool)}
+	if gitHead(dir) == "" {
+		return st
+	}
+	revs := [][]string{{"HEAD"}}
+	if data, err := os.ReadFile(filepath.Join(dir, ".weg", "last_push_commit")); err == nil {
+		if base := strings.TrimSpace(string(data)); base != "" {
+			if gitCmd(dir, "rev-parse", "--verify", "--quiet", base+"^{commit}").Run() != nil {
+				st.err = fmt.Errorf("the push baseline %s in .weg/last_push_commit is not a commit here", base)
+				return st
+			}
+			st.hasBaseline = true
+			revs = append(revs, []string{base, "HEAD"})
+		}
+	}
+	for _, r := range revs {
+		args := append(append([]string{"diff", "--name-only", "-z", "--relative"}, r...), "--", ".")
+		out, err := gitCmd(dir, args...).Output()
+		if err != nil {
+			st.err = wegerrors.Operation("git diff", "could not list local changes", err)
+			return st
+		}
+		for _, p := range strings.Split(string(out), "\x00") {
+			if p != "" {
+				st.changed[p] = true
+			}
+		}
+	}
+	return st
+}
+
+// outsideExport reports whether a path under the export directory is weg's
+// own state or the workspace rather than exported site content.
+func outsideExport(p string) bool {
+	return strings.HasPrefix(p, ".weg/") || strings.HasPrefix(p, workspace.WorkspaceDir+"/")
+}
+
 // snapshotAfterHistoryFailure commits the current state as one snapshot when
 // the version history could not be fetched, then returns an error so the run
 // still exits non-zero. The staged cache is kept for a resume.
-func snapshotAfterHistoryFailure(run historyRun, fetchErr error) error {
+func snapshotAfterHistoryFailure(run historyRun, local localState, committed map[string][]byte, fetchErr error) error {
 	dirName := run.dir
 	output.Warningf("history-fallback: version history could not be fetched: %v", fetchErr)
+	var plan *remote.StalePlan
+	if run.fromCommitted {
+		plan = planStaleExport(committed, run.result, run.fetcher, local, nil)
+	}
 	if err := writeAllEntities(dirName, run.result.Entities, run.modulesFile); err != nil {
 		return err
+	}
+	if plan != nil {
+		if err := removeExportFiles(dirName, plan.Removals, nil); err != nil {
+			return err
+		}
 	}
 	refreshWorkspaceAfterPull(dirName)
 
@@ -943,8 +1153,7 @@ func readCommittedFiles(dir string) (map[string][]byte, error) {
 	for _, entry := range bytes.Split(out, []byte{0}) {
 		// "<mode> <type> <sha>\t<path>"
 		meta, path, ok := strings.Cut(string(entry), "\t")
-		if !ok || !strings.HasSuffix(path, ".json") || !strings.Contains(meta, " blob ") ||
-			strings.HasPrefix(path, ".weg/") || strings.HasPrefix(path, workspace.WorkspaceDir+"/") {
+		if !ok || !strings.HasSuffix(path, ".json") || !strings.Contains(meta, " blob ") || outsideExport(path) {
 			continue
 		}
 		fields := strings.Fields(meta)

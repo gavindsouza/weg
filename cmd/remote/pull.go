@@ -6,7 +6,9 @@ package remote
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -31,6 +33,36 @@ Setter changes update their row in the per-DocType file, and a document
 created in the window is added in a commit by its creator. Any current-state
 changes that have no Version record land in a final "chore(sync): reconcile"
 commit, so nothing is dropped.
+
+Frappe writes no Version on delete, so deletions are replayed from the site's
+Deleted Document rows: each deletion of a document the export holds becomes a
+commit by the user who deleted it, removing its file (or its row from the
+per-DocType Custom Field / Property Setter file).
+
+A list can come back short, so a committed file (or a Custom Field /
+Property Setter row) the fetch does not produce goes only when the site,
+asked for that record by name, confirms it:
+  - it answers 404 (not found), and the file held what the site had: the
+    site recorded the deletion in a Deleted Document row inside the window
+    (it goes in a commit by who deleted it, dated when), or the push
+    baseline (.weg/last_push_commit) shows the file has no local work (it
+    goes in the reconcile commit). Without a baseline (a CI checkout) and
+    with no deletion recorded in the window, the file may be local work not
+    pushed yet, so it stays, with a warning;
+  - the fetch exports the record at another path and the site's copy places
+    it there (a module move): the old file goes in the reconcile commit;
+  - the site returns the record but would not export it (a DocType that is
+    no longer custom, a Report or Print Format made standard, a
+    system-generated Custom Field): it goes in the reconcile commit.
+Anything else keeps the file, with a warning: any other answer (403, 429,
+5xx, a timeout), a record the site still has and would export, a move it
+does not confirm. A Deleted Document row is replayed only when the site
+confirms its record is gone (or exports it again), so a document restored
+since is never removed. Files with local work not yet pushed always stay,
+nothing goes when a DocType's module could not be read, in modules marked
+sync = false only deletions recorded in the window remove files, and files
+of entity types disabled in [sync.entities] are never removed. A snapshot
+pull (--no-history) removes the same files, all in its one commit.
 
 Frappe records times as wall-clock time in the site's time zone (System
 Settings, or Asia/Kolkata when unset), so commits carry that zone's UTC offset.
@@ -117,26 +149,99 @@ func runPull(cobraCmd *cobra.Command, args []string) error {
 		for _, e := range result.Entities {
 			output.Printf("  %s: %s", e.Type, e.Name)
 		}
+		committed, err := readCommittedFiles(".")
+		if err != nil {
+			return err
+		}
+		plan := planStaleExport(committed, result, fetcher, readLocalState("."), nil)
+		if len(plan.Removals) > 0 {
+			output.Printf("\nWould remove %d files the site no longer has:", len(plan.Removals))
+			for _, r := range plan.Removals {
+				output.Printf("  - %s (%s)", r.Path, r.Reason)
+			}
+		}
 		return nil
 	}
 
 	// A custom commit message only makes sense for a single snapshot commit.
+	startHead, clean := gitHead("."), exportClean(".")
 	snapshotOnly := pullNoHistory || pullMessage != ""
 	if snapshotOnly {
-		return pullSnapshot(config, result, syncedAt)
+		err = pullSnapshot(config, fetcher, result, syncedAt)
+	} else {
+		err = pullWithHistory(cobraCmd.Context(), config, fetcher, result, syncedAt)
 	}
-	return pullWithHistory(cobraCmd.Context(), config, fetcher, result, syncedAt)
+	advancePushBaseline(".", startHead, clean)
+	return err
+}
+
+// exportClean reports whether the export has no uncommitted changes.
+func exportClean(dir string) bool {
+	out, err := gitCmd(dir, "status", "--porcelain", "--", ".").Output()
+	return err == nil && len(out) == 0
+}
+
+// advancePushBaseline moves the push baseline (.weg/last_push_commit) over
+// the commits a pull made, when it pointed at the commit the pull started
+// from and the export had no uncommitted changes (which the pull's final
+// commit would have taken in): those commits then hold only site state, and
+// a push must not send them back, least of all a removed file as a deletion
+// of the document on the site. Otherwise it stays, and any file the pull
+// removed is named, since the next push lists it as a deletion.
+func advancePushBaseline(dir, startHead string, clean bool) {
+	head := gitHead(dir)
+	if startHead == "" || head == "" || head == startHead {
+		return
+	}
+	path := filepath.Join(dir, ".weg", "last_push_commit")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return
+	}
+	if clean && strings.TrimSpace(string(data)) == startHead {
+		if err := os.WriteFile(path, []byte(head), 0o644); err != nil {
+			output.Warningf("Could not update the push baseline: %v", err)
+		}
+		return
+	}
+	out, err := gitCmd(dir, "diff", "--name-only", "-z", "--relative", "--diff-filter=D", startHead, head, "--", ".").Output()
+	if err != nil {
+		return
+	}
+	var removed []string
+	for _, p := range strings.Split(string(out), "\x00") {
+		if p != "" {
+			removed = append(removed, p)
+		}
+	}
+	if len(removed) > 0 {
+		output.Warningf("This pull removed %d files the site no longer has, but local changes are unpushed, so 'weg remote push' will list them as deletions; skip those when it asks:", len(removed))
+		for _, p := range removed {
+			output.Warningf("  - %s", p)
+		}
+	}
 }
 
 // pullSnapshot writes the current entity state and records it as a single git
 // commit (the --no-history path, and the pre-history default behavior).
-func pullSnapshot(config *remote.SiteConfig, result *remote.FetchResult, syncedAt time.Time) error {
+func pullSnapshot(config *remote.SiteConfig, fetcher *remote.Fetcher, result *remote.FetchResult, syncedAt time.Time) error {
+	local := readLocalState(".")
+	committed, err := readCommittedFiles(".")
+	if err != nil {
+		return err
+	}
+	// Drop only what the site confirms is gone, so a snapshot converges too;
+	// rows the site still has are kept in their files.
+	plan := planStaleExport(committed, result, fetcher, local, nil)
 	// Write entities
 	output.Infof("Updating %d entities...\n", len(result.Entities))
 	for _, entity := range result.Entities {
 		if err := remote.WriteEntity(".", entity); err != nil {
 			output.Errorf("Failed to write %s: %v", entity.Name, err)
 		}
+	}
+	if err := removeExportFiles(".", plan.Removals, nil); err != nil {
+		return err
 	}
 
 	// Keep the workspace in step with the freshly-written JSONs
@@ -148,15 +253,16 @@ func pullSnapshot(config *remote.SiteConfig, result *remote.FetchResult, syncedA
 		return wegerrors.Config("site.toml", "write", err)
 	}
 
-	// Check for changes and commit
-	gitStatus := exec.Command("git", "status", "--porcelain")
+	// Check for changes and commit. Only the export is staged: in a
+	// subdirectory (weg -C), the rest of the repository is not the site's.
+	gitStatus := exec.Command("git", "status", "--porcelain", "--", ".")
 	statusOutput, _ := gitStatus.Output()
 	if len(statusOutput) == 0 {
 		output.Print("Already up to date")
 		return nil
 	}
 
-	gitAdd := exec.Command("git", "add", "-A")
+	gitAdd := exec.Command("git", "add", "-A", "--", ".")
 	if err := gitAdd.Run(); err != nil {
 		return fmt.Errorf("failed to stage changes: %w", err)
 	}
@@ -166,7 +272,7 @@ func pullSnapshot(config *remote.SiteConfig, result *remote.FetchResult, syncedA
 		commitMsg = fmt.Sprintf("Pull from %s at %s",
 			config.Site.URL, time.Now().Format("2006-01-02 15:04"))
 	}
-	gitCommit := exec.Command("git", "commit", "-m", commitMsg)
+	gitCommit := exec.Command("git", "commit", "-m", commitMsg, "--", ".")
 	if out, err := gitCommit.CombinedOutput(); err != nil {
 		return wegerrors.Operation("git commit", strings.TrimSpace(string(out)), err)
 	}
