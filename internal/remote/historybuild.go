@@ -26,13 +26,14 @@ import (
 // ReconstructedCommit is one git commit's worth of reconstructed state, yielded
 // by StreamHistory for the caller to write and commit.
 type ReconstructedCommit struct {
-	FilePath    string         // relative path to write
+	FilePath    string         // relative path to write; "" when the commit only removes files
 	Content     map[string]any // the whole file's reconstructed state at this point
+	Removed     []string       // relative paths the commit removes (a replayed deletion)
 	Author      string         // "Full Name <email>" for git --author
 	Timestamp   string         // Version.creation as recorded (naive site time)
 	When        time.Time      // Timestamp in the site's time zone; zero if unparseable
 	Message     string         // conventional-commit message
-	VersionName string         // source Version docname; "" for a creation commit
+	VersionName string         // source Version (or Deleted Document) docname; "" for a creation commit
 }
 
 // HistoryOptions controls which Versions StreamHistory replays and what state
@@ -49,6 +50,14 @@ type HistoryOptions struct {
 	// creation commit by its owner, and Versions of documents that are
 	// neither committed nor exported now are dropped instead of committed.
 	Baseline map[string][]byte
+
+	// Deletions are the site's Deleted Document rows inside the window
+	// (FetchDeletions). A deletion of a document the replay holds at that
+	// point (committed, or written by an earlier replayed commit) removes
+	// its file, or its row from a Custom Field / Property Setter file, in a
+	// commit by the user who deleted it; any other deletion is counted in
+	// HistoryResult.DeletionsUnexported.
+	Deletions []VersionRecord
 }
 
 // HistoryResult summarises a StreamHistory run.
@@ -57,6 +66,9 @@ type HistoryResult struct {
 	OutsideWindow int             // Versions outside the window (already replayed by an earlier pull)
 	Unexported    int             // Versions of documents outside the export (system generated, deleted unseen)
 	Dropped       []string        // Versions whose data could not be parsed, one reason each
+
+	Deletions           int // deletions replayed as commits
+	DeletionsUnexported int // deletions of documents the export did not hold
 }
 
 // aggregatedRows names the row list of the entity types that are exported as
@@ -95,22 +107,32 @@ func (f *Fetcher) StreamHistory(
 		customDoctypes: customDoctypes,
 		index:          h,
 		window:         opts.Window,
+		deletions:      opts.Deletions,
 	}
+	lastDeletion := lastDeletions(opts.Deletions)
 	if !h.clone {
-		w.synthetic = h.creations(opts.Window)
+		w.synthetic = h.creations(opts.Window, lastDeletion)
+		w.skipUntil = h.unknownBeforeDeletion(lastDeletion)
 	}
 
 	// Pass 1: find each document's last change, the owners to resolve, and
-	// the changes needed to rebuild uncommitted documents backwards.
+	// the changes needed to rebuild uncommitted documents backwards. A
+	// document deleted in the window and created again is rebuilt from its
+	// current state with only the changes after the deletion undone.
 	last := make(map[string]string)
 	undo := make(map[string][]map[string]any)
 	owners := make(map[string]bool)
+	recreated := make(map[string]bool)
 	if _, err := w.walk(func(ev historyEvent) error {
 		last[ev.ref.unit] = ev.id()
 		if ev.rec.Owner != "" {
 			owners[ev.rec.Owner] = true
 		}
-		if !ev.created && h.rebuildsBackwards(ev.ref) {
+		switch {
+		case ev.deleted:
+			delete(undo, ev.ref.unit)
+			recreated[ev.ref.unit] = true
+		case !ev.created && (h.rebuildsBackwards(ev.ref) || recreated[ev.ref.unit]):
 			undo[ev.ref.unit] = append(undo[ev.ref.unit], ev.data)
 		}
 		return nil
@@ -133,11 +155,37 @@ func (f *Fetcher) StreamHistory(
 	// Pass 2: replay.
 	result := &HistoryResult{SeenPaths: make(map[string]bool)}
 	files := make(map[string]map[string]any)
+	// present holds the export paths the replay has at this point: the
+	// committed ones, plus those written and not removed since. removed
+	// holds the files a replayed deletion took away.
+	present := make(map[string]bool, len(opts.Baseline))
+	for p := range opts.Baseline {
+		present[p] = true
+	}
+	removed := make(map[string]bool)
+	r := &deletionReplay{h: h, files: files, present: present, removed: removed,
+		result: result, userInfo: userInfo, emit: emit}
+	unknownAfterDeletion := 0
 	stats, err := w.walk(func(ev historyEvent) error {
 		ref := ev.ref
+		if ev.deleted {
+			return r.apply(ev)
+		}
 		state, ok := files[ref.file]
 		if !ok {
-			state = h.initialFile(ref, undo)
+			if removed[ref.file] {
+				_, agg := aggregatedRows[ref.et]
+				if _, cur := h.current[ref.file]; !cur && !agg && !h.clone {
+					// Created again after its deletion, and gone again
+					// now: the pull never sees what it held in between.
+					unknownAfterDeletion++
+					return nil
+				}
+				state = h.restartFile(ref, undo)
+			} else {
+				state = h.initialFile(ref, undo)
+			}
+			delete(removed, ref.file)
 		}
 		isLast := last[ref.unit] == ev.id()
 
@@ -177,6 +225,7 @@ func (f *Fetcher) StreamHistory(
 
 		filePath := h.path(ref)
 		result.SeenPaths[filePath] = true
+		present[filePath] = true
 
 		action := ""
 		if ev.created || isInsertVersion(ev.data) {
@@ -206,9 +255,129 @@ func (f *Fetcher) StreamHistory(
 		})
 	})
 	result.OutsideWindow = stats.outsideWindow
-	result.Unexported = stats.unexported
+	result.Unexported = stats.unexported + unknownAfterDeletion
+	result.DeletionsUnexported += stats.unexportedDeletions
 	result.Dropped = stats.dropped
 	return result, err
+}
+
+// deletionReplay replays Deleted Document rows against the replay's state.
+type deletionReplay struct {
+	h        *historyIndex
+	files    map[string]map[string]any // file key -> replayed content
+	present  map[string]bool           // export paths the replay holds
+	removed  map[string]bool           // file keys removed by a deletion
+	result   *HistoryResult
+	userInfo map[string]UserInfo
+	emit     func(ReconstructedCommit) error
+}
+
+// heldPaths returns the paths a file is held at now: where the replay writes
+// it and where it was committed, when those differ (a module move).
+func (r *deletionReplay) heldPaths(ref unitRef) []string {
+	var paths []string
+	for _, p := range []string{r.h.path(ref), r.h.basePath[ref.file]} {
+		if p != "" && r.present[p] && (len(paths) == 0 || paths[0] != p) {
+			paths = append(paths, p)
+		}
+	}
+	return paths
+}
+
+// state returns a file's content as the replay holds it, or nil if the
+// replay does not hold the file.
+func (r *deletionReplay) state(ref unitRef) map[string]any {
+	if state, ok := r.files[ref.file]; ok {
+		return state
+	}
+	if doc, ok := r.h.baseDoc[ref.file]; ok && !r.removed[ref.file] {
+		return deepCopyMap(doc)
+	}
+	return nil
+}
+
+// apply replays one deletion: the document's file is removed, or for a
+// Custom Field / Property Setter its row is dropped from the DocType file
+// (and the file removed once it has no rows left). A deletion of something
+// the replay does not hold is only counted.
+func (r *deletionReplay) apply(ev historyEvent) error {
+	ref := ev.ref
+	state := r.state(ref)
+	paths := r.heldPaths(ref)
+	if state == nil || len(paths) == 0 {
+		r.result.DeletionsUnexported++
+		return nil
+	}
+
+	deleted := state
+	write := ""
+	if rowsKey, agg := aggregatedRows[ref.et]; agg {
+		row := findRow(state[rowsKey], ref.docname)
+		if row == nil {
+			r.result.DeletionsUnexported++
+			return nil
+		}
+		deleted = row
+		rows := removeRowFromTable(anyRows(state[rowsKey]), row)
+		if len(rows) > 0 {
+			state[rowsKey] = rows
+			write = r.h.path(ref)
+		}
+	}
+
+	c := ReconstructedCommit{
+		Author:      formatAuthor(ev.rec.Owner, r.userInfo),
+		Timestamp:   ev.rec.Creation,
+		When:        ev.when,
+		VersionName: ev.rec.Name,
+	}
+	if write != "" {
+		r.files[ref.file] = state
+		r.present[write] = true
+		r.result.SeenPaths[write] = true
+		c.FilePath, c.Content = write, deepCopyMap(state)
+	} else {
+		delete(r.files, ref.file)
+		r.removed[ref.file] = true
+		for _, p := range paths {
+			r.present[p] = false
+		}
+		c.Removed = paths
+	}
+	filePath := write
+	if filePath == "" {
+		filePath = paths[0]
+	}
+	c.Message = generateCommitMessage(HistoryEntry{
+		Timestamp:   ev.rec.Creation,
+		Author:      ev.rec.Owner,
+		DocType:     ev.rec.RefDoctype,
+		DocName:     ref.docname,
+		Action:      "delete",
+		VersionName: ev.rec.Name,
+		EntityType:  ref.et,
+		Module:      r.h.module(ref),
+		FilePath:    filePath,
+		EntityData:  deleted,
+	})
+	r.result.Deletions++
+	return r.emit(c)
+}
+
+// lastDeletions maps each deleted unit to its latest deletion record.
+func lastDeletions(deletions []VersionRecord) map[string]VersionRecord {
+	last := make(map[string]VersionRecord)
+	for _, d := range deletions {
+		et, ok := DoctypeToEntityType[d.RefDoctype]
+		if !ok {
+			continue
+		}
+		unit := entityKey(et, d.Docname)
+		if prev, ok := last[unit]; !ok || lessVersion(prev, d) {
+			last[unit] = d
+		}
+	}
+	return last
 }
 
 // historyEvent is one Version (or a synthesized creation) resolved to the
@@ -219,12 +388,16 @@ type historyEvent struct {
 	ref     unitRef
 	when    time.Time
 	created bool // synthesized from the document's own creation/owner
+	deleted bool // a Deleted Document row: the document was deleted
 }
 
 // id identifies the event among a document's changes.
 func (ev historyEvent) id() string {
-	if ev.created {
+	switch {
+	case ev.created:
 		return "+created"
+	case ev.deleted:
+		return "-" + ev.rec.Name
 	}
 	return ev.rec.Name
 }
@@ -242,9 +415,10 @@ type unitRef struct {
 func entityKey(et EntityType, name string) string { return string(et) + ":" + name }
 
 type walkStats struct {
-	outsideWindow int
-	unexported    int
-	dropped       []string
+	outsideWindow       int
+	unexported          int
+	unexportedDeletions int
+	dropped             []string
 }
 
 // historyWalker merges the staged Version streams (plus any synthesized
@@ -256,6 +430,12 @@ type historyWalker struct {
 	index          *historyIndex
 	window         HistoryWindow
 	synthetic      []VersionRecord
+	deletions      []VersionRecord // Deleted Document rows, oldest first
+
+	// skipUntil maps a document the pull cannot start from (neither
+	// committed nor held before its deletion) to its last deletion: its
+	// changes up to and including that deletion are skipped.
+	skipUntil map[string]string
 }
 
 func (w *historyWalker) walk(fn func(historyEvent) error) (walkStats, error) {
@@ -279,9 +459,12 @@ func (w *historyWalker) walk(fn func(historyEvent) error) (walkStats, error) {
 		readers = append(readers, file)
 		closers = append(closers, file)
 	}
-	if len(w.synthetic) > 0 {
+	for _, recs := range [][]VersionRecord{w.synthetic, w.deletions} {
+		if len(recs) == 0 {
+			continue
+		}
 		var buf bytes.Buffer
-		for _, rec := range w.synthetic {
+		for _, rec := range recs {
 			line, err := json.Marshal(rec)
 			if err != nil {
 				return stats, err
@@ -291,6 +474,10 @@ func (w *historyWalker) walk(fn func(historyEvent) error) (walkStats, error) {
 		}
 		readers = append(readers, &buf)
 	}
+	skipUntil := make(map[string]string, len(w.skipUntil))
+	for k, v := range w.skipUntil {
+		skipUntil[k] = v
+	}
 
 	err := mergeVersions(readers, func(v VersionRecord) error {
 		et, ok := DoctypeToEntityType[v.RefDoctype]
@@ -299,20 +486,39 @@ func (w *historyWalker) walk(fn func(historyEvent) error) (walkStats, error) {
 		}
 		// DocType history is dominated by framework churn; keep only the
 		// docnames confirmed custom (current custom set + confirmed-deleted).
-		if et == EntityDocType && !w.customDoctypes[v.Docname] {
+		// A deletion needs no such vouching: it only removes what the
+		// replay holds.
+		if et == EntityDocType && !v.Deleted && !w.customDoctypes[v.Docname] {
 			return nil
 		}
 
 		when, hasWhen := w.window.ParseSiteTime(v.Creation)
 		if !v.Synthetic && hasWhen && !w.window.Contains(when) {
-			stats.outsideWindow++
+			if !v.Deleted {
+				stats.outsideWindow++
+			}
 			return nil
 		}
 
 		ref, ok := w.index.resolve(et, v.Docname)
+		if ok {
+			if until, skip := skipUntil[ref.unit]; skip {
+				if v.Deleted && v.Name == until {
+					delete(skipUntil, ref.unit)
+				}
+				ok = false
+			}
+		}
 		if !ok {
-			stats.unexported++
+			if v.Deleted {
+				stats.unexportedDeletions++
+			} else {
+				stats.unexported++
+			}
 			return nil
+		}
+		if v.Deleted {
+			return fn(historyEvent{rec: v, ref: ref, when: when, deleted: true})
 		}
 
 		var data map[string]any
@@ -504,6 +710,39 @@ func (h *historyIndex) initialFile(ref unitRef, undo map[string][]map[string]any
 	return map[string]any{}
 }
 
+// restartFile is a file's state when a document comes back after a
+// replayed deletion removed its file: the document as it is now with the
+// changes since the deletion undone, or an empty DocType file for a row.
+func (h *historyIndex) restartFile(ref unitRef, undo map[string][]map[string]any) map[string]any {
+	if rowsKey, agg := aggregatedRows[ref.et]; agg {
+		target := strings.TrimPrefix(ref.file, string(ref.et)+":")
+		return map[string]any{"doctype": target, rowsKey: []any{}}
+	}
+	if cur, ok := h.current[ref.file]; ok {
+		return undoChanges(cur.Data, undo[ref.unit])
+	}
+	return map[string]any{}
+}
+
+// unknownBeforeDeletion returns, for a pull, the documents deleted in the
+// window that the committed export does not hold, mapped to their last
+// deletion: the pull has no state to replay their earlier changes or that
+// deletion against. Whatever they are now starts after it.
+func (h *historyIndex) unknownBeforeDeletion(lastDeletion map[string]VersionRecord) map[string]string {
+	skip := make(map[string]string)
+	for unit, d := range lastDeletion {
+		et := EntityType(strings.SplitN(unit, ":", 2)[0])
+		held := h.baseRows[unit]
+		if _, agg := aggregatedRows[et]; !agg {
+			_, held = h.basePath[unit]
+		}
+		if !held {
+			skip[unit] = d.Name
+		}
+	}
+	return skip
+}
+
 // initialRow is a Custom Field / Property Setter row's state before its first
 // replayed change, for a row its file does not hold yet.
 func (h *historyIndex) initialRow(ref unitRef, undo map[string][]map[string]any) map[string]any {
@@ -514,16 +753,22 @@ func (h *historyIndex) initialRow(ref unitRef, undo map[string][]map[string]any)
 }
 
 // creations synthesizes a creation record for every document (or row)
-// exported now, missing from the baseline, and created inside the window.
+// exported now, created inside the window, and either missing from the
+// baseline or created again after a deletion in the window (lastDeletion).
 // Frappe writes no Version on insert, so without these a new document would
 // first appear in whichever later change touched it, credited to that editor.
-func (h *historyIndex) creations(window HistoryWindow) []VersionRecord {
+func (h *historyIndex) creations(window HistoryWindow, lastDeletion map[string]VersionRecord) []VersionRecord {
 	var recs []VersionRecord
 	add := func(et EntityType, docname string, doc map[string]any) {
 		creation := getString(doc, "creation")
 		t, ok := window.ParseSiteTime(creation)
 		if !ok || (!window.Since.IsZero() && !t.After(window.Since)) {
 			return
+		}
+		if d, ok := lastDeletion[entityKey(et, docname)]; ok {
+			if dt, ok := window.ParseSiteTime(d.Creation); ok && !t.After(dt) {
+				return // this document predates its deletion: it is not a new one
+			}
 		}
 		recs = append(recs, VersionRecord{
 			RefDoctype: entityTypeDoctype(et),
@@ -537,12 +782,12 @@ func (h *historyIndex) creations(window HistoryWindow) []VersionRecord {
 		if _, agg := aggregatedRows[e.Type]; agg || entityTypeDoctype(e.Type) == "" {
 			continue
 		}
-		if _, base := h.basePath[key]; !base {
+		if _, base := h.basePath[key]; !base || hasDeletion(lastDeletion, key) {
 			add(e.Type, e.Name, e.Data)
 		}
 	}
 	for unit, row := range h.currentRows {
-		if !h.baseRows[unit] {
+		if !h.baseRows[unit] || hasDeletion(lastDeletion, unit) {
 			add(h.current[h.rowFile[unit]].Type, getString(row, "name"), row)
 		}
 	}
@@ -553,6 +798,11 @@ func (h *historyIndex) creations(window HistoryWindow) []VersionRecord {
 		return recs[i].RefDoctype+recs[i].Docname < recs[j].RefDoctype+recs[j].Docname
 	})
 	return recs
+}
+
+func hasDeletion(lastDeletion map[string]VersionRecord, unit string) bool {
+	_, ok := lastDeletion[unit]
+	return ok
 }
 
 // stampCreation sets a document rebuilt for its creation commit to how it

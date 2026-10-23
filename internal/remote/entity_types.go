@@ -49,6 +49,16 @@ type FetchResult struct {
 	Modules   map[string]ModuleInfo
 	FrappeVer string
 	Apps      map[string]AppInfo
+
+	// Incomplete names, per entity type, the documents that were listed
+	// but could not be read (with the error), so they are missing from
+	// Entities although the site has them.
+	Incomplete map[EntityType][]string
+
+	// ModuleLookupFailed names the DocTypes whose module could not be read
+	// (with the error): what belongs to them was placed under the catch-all
+	// module "_" instead of its own, so file paths are not where they would be.
+	ModuleLookupFailed []string
 }
 
 // WriteEntity writes an entity to disk. It refuses a FilePath that

@@ -14,6 +14,19 @@ type Fetcher struct {
 	Client         *Client
 	Config         *SiteConfig
 	docTypeModules map[string]string // Cache of doctype -> module mappings
+	incomplete     map[EntityType][]string
+	// moduleLookupFailed names the DocTypes whose module could not be read;
+	// what belongs to them was placed under the catch-all module.
+	moduleLookupFailed []string
+}
+
+// skip records a document the fetch listed but could not read: the fetch of
+// its entity type is incomplete, so its absence proves nothing.
+func (f *Fetcher) skip(et EntityType, name string, err error) {
+	if f.incomplete == nil {
+		f.incomplete = make(map[EntityType][]string)
+	}
+	f.incomplete[et] = append(f.incomplete[et], fmt.Sprintf("%s (%v)", name, err))
 }
 
 // NewFetcher creates a new entity fetcher
@@ -40,6 +53,7 @@ func (f *Fetcher) getDocTypeModule(doctype string) string {
 	modules, err := f.Client.GetDocTypeModules([]string{doctype})
 	if err != nil {
 		f.docTypeModules[doctype] = "_"
+		f.moduleLookupFailed = append(f.moduleLookupFailed, fmt.Sprintf("%s (%v)", doctype, err))
 		return "_"
 	}
 
@@ -75,6 +89,8 @@ func (f *Fetcher) FetchAll() (*FetchResult, error) {
 		Modules:  make(map[string]ModuleInfo),
 		Apps:     make(map[string]AppInfo),
 	}
+
+	f.incomplete, f.moduleLookupFailed = nil, nil
 
 	// Get Frappe version
 	version, err := f.Client.GetFrappeVersion()
@@ -197,6 +213,8 @@ func (f *Fetcher) FetchAll() (*FetchResult, error) {
 	if err := CheckEntityPaths(result.Entities); err != nil {
 		return nil, err
 	}
+	result.Incomplete = f.incomplete
+	result.ModuleLookupFailed = f.moduleLookupFailed
 
 	return result, nil
 }
@@ -220,6 +238,7 @@ func (f *Fetcher) fetchCustomDocTypes() ([]Entity, error) {
 		// Get full document
 		fullDoc, err := f.Client.GetDoc("DocType", name)
 		if err != nil {
+			f.skip(EntityDocType, name, err)
 			continue // Skip on error
 		}
 
@@ -367,6 +386,7 @@ func (f *Fetcher) fetchClientScripts() ([]Entity, error) {
 		// Get full document
 		fullDoc, err := f.Client.GetDoc("Client Script", name)
 		if err != nil {
+			f.skip(EntityClientScript, name, err)
 			continue
 		}
 
@@ -414,6 +434,7 @@ func (f *Fetcher) fetchServerScripts() ([]Entity, error) {
 
 		fullDoc, err := f.Client.GetDoc("Server Script", name)
 		if err != nil {
+			f.skip(EntityServerScript, name, err)
 			continue
 		}
 
@@ -472,6 +493,7 @@ func (f *Fetcher) fetchReports() ([]Entity, error) {
 
 		fullDoc, err := f.Client.GetDoc("Report", name)
 		if err != nil {
+			f.skip(EntityReport, name, err)
 			continue
 		}
 
@@ -518,6 +540,7 @@ func (f *Fetcher) fetchPrintFormats() ([]Entity, error) {
 
 		fullDoc, err := f.Client.GetDoc("Print Format", name)
 		if err != nil {
+			f.skip(EntityPrintFormat, name, err)
 			continue
 		}
 
@@ -562,6 +585,7 @@ func (f *Fetcher) fetchWorkflows() ([]Entity, error) {
 
 		fullDoc, err := f.Client.GetDoc("Workflow", name)
 		if err != nil {
+			f.skip(EntityWorkflow, name, err)
 			continue
 		}
 
@@ -606,6 +630,7 @@ func (f *Fetcher) fetchNotifications() ([]Entity, error) {
 
 		fullDoc, err := f.Client.GetDoc("Notification", name)
 		if err != nil {
+			f.skip(EntityNotification, name, err)
 			continue
 		}
 
@@ -641,6 +666,7 @@ func (f *Fetcher) fetchLetterHeads() ([]Entity, error) {
 
 		fullDoc, err := f.Client.GetDoc("Letter Head", name)
 		if err != nil {
+			f.skip(EntityLetterHead, name, err)
 			continue
 		}
 

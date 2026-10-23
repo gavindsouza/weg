@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -23,13 +24,19 @@ import (
 
 // fakeHistorySite serves what the history pipeline reads from Frappe: the
 // System Settings time zone, Version rows (honouring the list filters,
-// ordering and paging weg sends), users and the DocType trash.
+// ordering and paging weg sends), users and the trash (Deleted Document).
 type fakeHistorySite struct {
 	t           *testing.T
 	timeZone    string
 	versions    []remote.VersionRecord
 	users       map[string]string // email -> full name
 	failVersion bool
+	// deleted are the site's Deleted Document rows: name, deleted_doctype,
+	// deleted_name, owner, creation and (optionally) data.
+	deleted []map[string]string
+	// deletedStatus, when set, is the status Deleted Document reads answer
+	// with (403: the API user may not read the trash).
+	deletedStatus int
 	// timeZoneStatus, when set, is the status the System Settings read
 	// answers with (403: the API user may not read System Settings).
 	timeZoneStatus int
@@ -104,12 +111,74 @@ func (s *fakeHistorySite) handle(w http.ResponseWriter, r *http.Request) {
 		reply(map[string]any{"data": data})
 
 	case "/api/resource/Deleted Document":
-		reply(map[string]any{"data": []any{}})
+		if s.deletedStatus != 0 {
+			w.WriteHeader(s.deletedStatus)
+			reply(map[string]any{"exc_type": "PermissionError"})
+			return
+		}
+		reply(map[string]any{"data": s.deletedRows(q)})
 
 	default:
 		s.t.Errorf("unexpected request %s %s", r.Method, r.URL)
 		w.WriteHeader(http.StatusNotFound)
 	}
+}
+
+// deletedRows answers a Deleted Document list request: a filter list (the
+// replay: deleted_doctype "in", creation bounds; ordered and paged) or a
+// filter dict (the custom DocType check: deleted_doctype only).
+func (s *fakeHistorySite) deletedRows(q url.Values) []map[string]string {
+	var list [][]any
+	var dict map[string]any
+	if err := json.Unmarshal([]byte(q.Get("filters")), &list); err != nil {
+		if err := json.Unmarshal([]byte(q.Get("filters")), &dict); err != nil {
+			s.t.Errorf("Deleted Document filters: %v", err)
+		}
+		var rows []map[string]string
+		for _, d := range s.deleted {
+			if dict["deleted_doctype"] == nil || d["deleted_doctype"] == dict["deleted_doctype"] {
+				rows = append(rows, d)
+			}
+		}
+		return rows
+	}
+	var rows []map[string]string
+	for _, d := range s.deleted {
+		ok := true
+		for _, f := range list {
+			field, op := f[1].(string), f[2].(string)
+			got := d[field]
+			switch op {
+			case "in":
+				in := false
+				for _, v := range f[3].([]any) {
+					in = in || v == got
+				}
+				ok = ok && in
+			case ">":
+				ok = ok && got > f[3].(string)
+			case "<=":
+				ok = ok && got <= f[3].(string)
+			default:
+				s.t.Errorf("unexpected Deleted Document filter %v", f)
+			}
+		}
+		if ok {
+			rows = append(rows, d)
+		}
+	}
+	sort.SliceStable(rows, func(i, j int) bool {
+		if rows[i]["creation"] != rows[j]["creation"] {
+			return rows[i]["creation"] < rows[j]["creation"]
+		}
+		return rows[i]["name"] < rows[j]["name"]
+	})
+	start, _ := strconv.Atoi(q.Get("limit_start"))
+	size, _ := strconv.Atoi(q.Get("limit_page_length"))
+	if start > len(rows) {
+		start = len(rows)
+	}
+	return rows[start:min(start+size, len(rows))]
 }
 
 // matchesFilters applies [doctype, field, op, value] filters the way the

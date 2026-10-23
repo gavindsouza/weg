@@ -54,22 +54,9 @@ func VersionedDoctypes() []string {
 // enabled in the site config, so disabled entities (e.g. notifications, off by
 // default) are neither fetched nor replayed into history.
 func (f *Fetcher) enabledVersionedDoctypes() []string {
-	e := f.Config.Sync.Entities
-	enabled := map[string]bool{
-		"DocType":         e.DocType,
-		"Custom Field":    e.CustomField,
-		"Property Setter": e.PropertySetter,
-		"Client Script":   e.ClientScript,
-		"Server Script":   e.ServerScript,
-		"Report":          e.Report,
-		"Print Format":    e.PrintFormat,
-		"Workflow":        e.Workflow,
-		"Notification":    e.Notification,
-		"Letter Head":     e.LetterHead,
-	}
 	var result []string
 	for _, dt := range VersionedDoctypes() {
-		if enabled[dt] {
+		if f.Config.Sync.Entities.Enabled(DoctypeToEntityType[dt]) {
 			result = append(result, dt)
 		}
 	}

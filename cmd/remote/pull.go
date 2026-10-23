@@ -32,6 +32,16 @@ created in the window is added in a commit by its creator. Any current-state
 changes that have no Version record land in a final "chore(sync): reconcile"
 commit, so nothing is dropped.
 
+Frappe writes no Version on delete, so deletions are replayed from the site's
+Deleted Document rows: each deletion of a document the export holds becomes a
+commit by the user who deleted it, removing its file (or its row from the
+per-DocType Custom Field / Property Setter file). The reconcile commit then
+removes the committed files the site no longer exports at all: a deletion
+without a trash row, the old path of a document that moved to another module,
+a DocType that is no longer custom. Files of entity types disabled in
+[sync.entities] and of modules marked sync = false are never removed. A
+snapshot pull (--no-history) removes the same files.
+
 Frappe records times as wall-clock time in the site's time zone (System
 Settings, or Asia/Kolkata when unset), so commits carry that zone's UTC offset.
 If System Settings cannot be read (the API user needs read access on it), pull
@@ -117,6 +127,16 @@ func runPull(cobraCmd *cobra.Command, args []string) error {
 		for _, e := range result.Entities {
 			output.Printf("  %s: %s", e.Type, e.Name)
 		}
+		stale, err := planStaleExport(".", result, config)
+		if err != nil {
+			return err
+		}
+		if len(stale) > 0 {
+			output.Printf("\nWould remove %d files the site no longer exports:", len(stale))
+			for _, p := range stale {
+				output.Printf("  - %s", p)
+			}
+		}
 		return nil
 	}
 
@@ -138,6 +158,10 @@ func pullSnapshot(config *remote.SiteConfig, result *remote.FetchResult, syncedA
 			output.Errorf("Failed to write %s: %v", entity.Name, err)
 		}
 	}
+	// Drop what the site no longer exports, so a snapshot converges too.
+	if _, err := pruneStaleExport(".", result, config, nil); err != nil {
+		return err
+	}
 
 	// Keep the workspace in step with the freshly-written JSONs
 	refreshWorkspaceAfterPull(".")
@@ -148,15 +172,16 @@ func pullSnapshot(config *remote.SiteConfig, result *remote.FetchResult, syncedA
 		return wegerrors.Config("site.toml", "write", err)
 	}
 
-	// Check for changes and commit
-	gitStatus := exec.Command("git", "status", "--porcelain")
+	// Check for changes and commit. Only the export is staged: in a
+	// subdirectory (weg -C), the rest of the repository is not the site's.
+	gitStatus := exec.Command("git", "status", "--porcelain", "--", ".")
 	statusOutput, _ := gitStatus.Output()
 	if len(statusOutput) == 0 {
 		output.Print("Already up to date")
 		return nil
 	}
 
-	gitAdd := exec.Command("git", "add", "-A")
+	gitAdd := exec.Command("git", "add", "-A", "--", ".")
 	if err := gitAdd.Run(); err != nil {
 		return fmt.Errorf("failed to stage changes: %w", err)
 	}
@@ -166,7 +191,7 @@ func pullSnapshot(config *remote.SiteConfig, result *remote.FetchResult, syncedA
 		commitMsg = fmt.Sprintf("Pull from %s at %s",
 			config.Site.URL, time.Now().Format("2006-01-02 15:04"))
 	}
-	gitCommit := exec.Command("git", "commit", "-m", commitMsg)
+	gitCommit := exec.Command("git", "commit", "-m", commitMsg, "--", ".")
 	if out, err := gitCommit.CombinedOutput(); err != nil {
 		return wegerrors.Operation("git commit", strings.TrimSpace(string(out)), err)
 	}
