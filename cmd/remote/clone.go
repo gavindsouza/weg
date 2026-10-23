@@ -448,9 +448,11 @@ type historyRun struct {
 	recordSync func() (restore func(), err error)
 }
 
-// commitFinal writes the new sync state, stages everything and commits it
-// with the given author and message. If staging or the commit fails, the sync
-// state is restored, so the next run covers the same window again.
+// commitFinal writes the new sync state, stages everything under run.dir and
+// commits it with the given author and message. Only run.dir is staged and
+// committed: when the export is a subdirectory of a larger repository, the
+// rest of that repository is left as it was. If staging or the commit fails,
+// the sync state is restored, so the next run covers the same window again.
 func commitFinal(run historyRun, author, msg string) error {
 	restore := func() {}
 	if run.recordSync != nil {
@@ -461,14 +463,14 @@ func commitFinal(run historyRun, author, msg string) error {
 		restore = r
 	}
 	err := func() error {
-		if err := runGit(run.dir, "add", "-A"); err != nil {
+		if err := runGit(run.dir, "add", "-A", "--", "."); err != nil {
 			return err
 		}
-		staged, err := gitHasStaged(run.dir)
+		staged, err := gitHasStaged(run.dir, ".")
 		if err != nil || !staged {
 			return err
 		}
-		return gitCommitAuthored(run.dir, author, "", msg)
+		return gitCommitAuthored(run.dir, author, "", msg, ".")
 	}()
 	if err != nil {
 		restore()
@@ -889,16 +891,20 @@ func gitCommitAuthored(dir, author, date, msg string, paths ...string) error {
 	return nil
 }
 
-// readCommittedFiles returns the JSON files committed at HEAD (path ->
-// content), outside .weg/ and the workspace. An unborn HEAD yields an empty
-// map. Reading HEAD rather than the working tree keeps uncommitted local
-// edits out of the replayed site history.
+// readCommittedFiles returns the JSON files committed at HEAD under dir (path
+// relative to dir -> content), outside .weg/ and the workspace. An unborn HEAD
+// yields an empty map. Reading HEAD rather than the working tree keeps
+// uncommitted local edits out of the replayed site history.
+//
+// The export may be a subdirectory of the repository (weg -C catalog), so
+// paths are listed relative to dir, the way every other git call here and
+// the entity file paths see them.
 func readCommittedFiles(dir string) (map[string][]byte, error) {
 	files := make(map[string][]byte)
 	if gitHead(dir) == "" {
 		return files, nil
 	}
-	ls := gitCmd(dir, "ls-tree", "-r", "-z", "--full-tree", "HEAD")
+	ls := gitCmd(dir, "ls-tree", "-r", "-z", "HEAD")
 	out, err := ls.Output()
 	if err != nil {
 		return nil, wegerrors.Operation("git ls-tree", "could not list HEAD", err)
