@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -409,6 +410,42 @@ func TestPullWithoutTrashAccess(t *testing.T) {
 	}
 }
 
+// The push baseline follows a pull that started from it on a clean export,
+// so the next push does not send the pull's removals back as deletions;
+// with unpushed local commits, or uncommitted changes the pull's commit
+// took in, it stays.
+func TestAdvancePushBaseline(t *testing.T) {
+	dir := t.TempDir()
+	gitRun(t, dir, "init", "-q")
+	os.MkdirAll(filepath.Join(dir, ".weg"), 0o755)
+	os.WriteFile(filepath.Join(dir, "a.json"), []byte("{}"), 0o644)
+	gitRun(t, dir, "add", "a.json")
+	gitRun(t, dir, "commit", "-q", "-m", "base")
+	start := gitRun(t, dir, "rev-parse", "HEAD")
+	gitRun(t, dir, "rm", "-q", "a.json")
+	gitRun(t, dir, "commit", "-q", "-m", "chore(sync): reconcile")
+	head := gitRun(t, dir, "rev-parse", "HEAD")
+	baseline := filepath.Join(dir, ".weg", "last_push_commit")
+	read := func() string { b, _ := os.ReadFile(baseline); return string(b) }
+
+	os.WriteFile(baseline, []byte(start), 0o644)
+	advancePushBaseline(dir, start, false)
+	if read() != start {
+		t.Errorf("baseline moved over uncommitted changes the pull committed")
+	}
+	advancePushBaseline(dir, start, true)
+	if read() != head {
+		t.Errorf("baseline = %s, want %s", read(), head)
+	}
+
+	other := "0000000000000000000000000000000000000000"
+	os.WriteFile(baseline, []byte(other), 0o644)
+	advancePushBaseline(dir, start, true)
+	if read() != other {
+		t.Errorf("baseline moved over unpushed commits: %s", read())
+	}
+}
+
 // A committed file the site does not export but that has local work not
 // yet pushed (committed since the push baseline, or edited) is kept: it may
 // be a document made locally for the next push.
@@ -443,6 +480,53 @@ func TestPullKeepsUnpushedLocalFiles(t *testing.T) {
 	}
 	if b, err := os.ReadFile(filepath.Join(repo.dir, editedPath)); err != nil || !strings.Contains(string(b), "e = 2") {
 		t.Errorf("the local edit of %s was lost: %s, %v", editedPath, b, err)
+	}
+}
+
+// A file that moved to another path still holds its document, so push
+// does not delete that document on the site; a file whose document is gone
+// from the export is still a deletion.
+func TestFindDeletedEntitiesSkipsMovedDocuments(t *testing.T) {
+	dir := t.TempDir()
+	gitRun(t, dir, "init", "-q")
+	write := func(p, s string) {
+		os.MkdirAll(filepath.Dir(filepath.Join(dir, p)), 0o755)
+		os.WriteFile(filepath.Join(dir, p), []byte(s), 0o644)
+	}
+	write("custom/workflow/flow.json", `{"name": "Flow"}`)
+	write("custom/server_script/gone.json", `{"name": "Gone"}`)
+	write("custom/custom_field/lead.json", `{"doctype": "Lead", "custom_fields": []}`)
+	write("custom/client_script/local.json", `{"name": "Local"}`)
+	gitRun(t, dir, "add", "-A")
+	gitRun(t, dir, "commit", "-q", "-m", "base")
+	os.MkdirAll(filepath.Join(dir, ".weg"), 0o755)
+	os.WriteFile(filepath.Join(dir, ".weg", "last_push_commit"), []byte(gitRun(t, dir, "rev-parse", "HEAD")), 0o644)
+	gitRun(t, dir, "rm", "-q", "custom/workflow/flow.json", "custom/server_script/gone.json", "custom/custom_field/lead.json")
+	write("workplace/workflow/flow.json", `{"name": "Flow"}`)
+	write("workplace/custom_field/lead.json", `{"doctype": "Lead", "custom_fields": []}`)
+	gitRun(t, dir, "add", "-A")
+	gitRun(t, dir, "commit", "-q", "-m", "chore(sync): reconcile")
+	// Deleted in the working tree only: HEAD still has it.
+	os.Remove(filepath.Join(dir, "custom", "client_script", "local.json"))
+
+	got, err := findDeletedEntities(dir, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].name != "Gone" {
+		t.Fatalf("deleted = %+v, want only Gone", got)
+	}
+	got, err = findDeletedEntities(dir, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, e := range got {
+		names = append(names, e.name)
+	}
+	sort.Strings(names)
+	if strings.Join(names, ",") != "Gone,Local" {
+		t.Fatalf("deleted with uncommitted = %v, want Gone,Local", names)
 	}
 }
 

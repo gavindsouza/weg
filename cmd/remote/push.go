@@ -396,6 +396,20 @@ func findDeletedEntities(baseDir string, includeUncommitted bool) ([]localEntity
 		}
 	}
 
+	// A document still committed at another path (it moved module, or its
+	// path was renamed) was not deleted: only its old file went away. The
+	// deleted files themselves may still be in HEAD (an uncommitted
+	// deletion), so they do not count.
+	var live map[string]bool
+	if len(deletedFiles) > 0 {
+		if committed, err := readCommittedFiles(baseDir); err == nil {
+			for _, f := range deletedFiles {
+				delete(committed, f)
+			}
+			live = committedDocs(committed)
+		}
+	}
+
 	// Dedupe and process
 	seen := make(map[string]bool)
 	for _, filePath := range deletedFiles {
@@ -429,6 +443,14 @@ func findDeletedEntities(baseDir string, includeUncommitted bool) ([]localEntity
 			name = strings.TrimSuffix(filepath.Base(filePath), ".json")
 		}
 
+		key := typeName + ":" + name
+		if typeName == "custom_field" || typeName == "property_setter" {
+			key = typeName + ":" + filepath.Base(filePath)
+		}
+		if live[key] {
+			continue
+		}
+
 		entities = append(entities, localEntity{
 			filePath:   filePath,
 			entityType: typeName,
@@ -438,6 +460,38 @@ func findDeletedEntities(baseDir string, includeUncommitted bool) ([]localEntity
 	}
 
 	return entities, nil
+}
+
+// committedDocs returns "<entity type>:<name>" for every document file in
+// committed (path -> content). A Custom Field or Property Setter file holds
+// a DocType's rows and has no name of its own, so it is listed by file name
+// ("custom_field:sales_invoice.json").
+func committedDocs(committed map[string][]byte) map[string]bool {
+	docs := make(map[string]bool, len(committed))
+	for p, content := range committed {
+		typeName := ""
+		for _, part := range strings.Split(p, "/") {
+			if isEntityType(part) {
+				typeName = part
+				break
+			}
+		}
+		switch typeName {
+		case "":
+			continue
+		case "custom_field", "property_setter":
+			docs[typeName+":"+filepath.Base(p)] = true
+			continue
+		}
+		var doc map[string]any
+		if json.Unmarshal(content, &doc) != nil {
+			continue
+		}
+		if name, _ := doc["name"].(string); name != "" {
+			docs[typeName+":"+name] = true
+		}
+	}
+	return docs
 }
 
 // docNameFromGit reads a file's JSON content at the given revision and returns

@@ -6,7 +6,9 @@ package remote
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -141,11 +143,62 @@ func runPull(cobraCmd *cobra.Command, args []string) error {
 	}
 
 	// A custom commit message only makes sense for a single snapshot commit.
+	startHead, clean := gitHead("."), exportClean(".")
 	snapshotOnly := pullNoHistory || pullMessage != ""
 	if snapshotOnly {
-		return pullSnapshot(config, result, syncedAt)
+		err = pullSnapshot(config, result, syncedAt)
+	} else {
+		err = pullWithHistory(cobraCmd.Context(), config, fetcher, result, syncedAt)
 	}
-	return pullWithHistory(cobraCmd.Context(), config, fetcher, result, syncedAt)
+	advancePushBaseline(".", startHead, clean)
+	return err
+}
+
+// exportClean reports whether the export has no uncommitted changes.
+func exportClean(dir string) bool {
+	out, err := gitCmd(dir, "status", "--porcelain", "--", ".").Output()
+	return err == nil && len(out) == 0
+}
+
+// advancePushBaseline moves the push baseline (.weg/last_push_commit) over
+// the commits a pull made, when it pointed at the commit the pull started
+// from and the export had no uncommitted changes (which the pull's final
+// commit would have taken in): those commits then hold only site state, and
+// a push must not send them back, least of all a removed file as a deletion
+// of the document on the site. Otherwise it stays, and any file the pull
+// removed is named, since the next push lists it as a deletion.
+func advancePushBaseline(dir, startHead string, clean bool) {
+	head := gitHead(dir)
+	if startHead == "" || head == "" || head == startHead {
+		return
+	}
+	path := filepath.Join(dir, ".weg", "last_push_commit")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return
+	}
+	if clean && strings.TrimSpace(string(data)) == startHead {
+		if err := os.WriteFile(path, []byte(head), 0o644); err != nil {
+			output.Warningf("Could not update the push baseline: %v", err)
+		}
+		return
+	}
+	out, err := gitCmd(dir, "diff", "--name-only", "-z", "--relative", "--diff-filter=D", startHead, head, "--", ".").Output()
+	if err != nil {
+		return
+	}
+	var removed []string
+	for _, p := range strings.Split(string(out), "\x00") {
+		if p != "" {
+			removed = append(removed, p)
+		}
+	}
+	if len(removed) > 0 {
+		output.Warningf("This pull removed %d files the site no longer has, but local changes are unpushed, so 'weg remote push' will list them as deletions; skip those when it asks:", len(removed))
+		for _, p := range removed {
+			output.Warningf("  - %s", p)
+		}
+	}
 }
 
 // pullSnapshot writes the current entity state and records it as a single git
