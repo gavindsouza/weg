@@ -43,6 +43,12 @@ type fakeHistorySite struct {
 	// userTimeZone is what frappe.client.get_time_zone answers: the API
 	// user's own "time_zone" default, which shadows the site's.
 	userTimeZone string
+	// docs are the documents the site has, keyed "<doctype>/<name>"; any
+	// other document read answers 404, as for a deleted one.
+	docs map[string]map[string]any
+	// rows are the Custom Field and Property Setter rows the site has, per
+	// doctype, for the "does the site still have rows" check.
+	rows         map[string][]map[string]any
 	versionCalls atomic.Int32 // Version requests come in parallel
 	server       *httptest.Server
 }
@@ -118,7 +124,29 @@ func (s *fakeHistorySite) handle(w http.ResponseWriter, r *http.Request) {
 		}
 		reply(map[string]any{"data": s.deletedRows(q)})
 
+	case "/api/resource/Custom Field", "/api/resource/Property Setter":
+		doctype := strings.TrimPrefix(r.URL.Path, "/api/resource/")
+		var filters map[string]any
+		json.Unmarshal([]byte(q.Get("filters")), &filters)
+		var data []map[string]any
+		for _, row := range s.rows[doctype] {
+			if (filters["dt"] == nil || row["dt"] == filters["dt"]) && (filters["doc_type"] == nil || row["doc_type"] == filters["doc_type"]) {
+				data = append(data, row)
+			}
+		}
+		reply(map[string]any{"data": data})
+
 	default:
+		rest, ok := strings.CutPrefix(r.URL.Path, "/api/resource/")
+		if doctype, name, isDoc := strings.Cut(rest, "/"); ok && isDoc && r.Method == http.MethodGet {
+			if doc, found := s.docs[doctype+"/"+name]; found {
+				reply(map[string]any{"data": doc})
+				return
+			}
+			w.WriteHeader(http.StatusNotFound)
+			reply(map[string]any{"exc_type": "DoesNotExistError"})
+			return
+		}
 		s.t.Errorf("unexpected request %s %s", r.Method, r.URL)
 		w.WriteHeader(http.StatusNotFound)
 	}
@@ -155,6 +183,8 @@ func (s *fakeHistorySite) deletedRows(q url.Values) []map[string]string {
 					in = in || v == got
 				}
 				ok = ok && in
+			case "=":
+				ok = ok && got == f[3].(string)
 			case ">":
 				ok = ok && got > f[3].(string)
 			case "<=":
@@ -167,11 +197,16 @@ func (s *fakeHistorySite) deletedRows(q url.Values) []map[string]string {
 			rows = append(rows, d)
 		}
 	}
+	desc := strings.HasPrefix(q.Get("order_by"), "creation desc")
 	sort.SliceStable(rows, func(i, j int) bool {
-		if rows[i]["creation"] != rows[j]["creation"] {
-			return rows[i]["creation"] < rows[j]["creation"]
+		a, b := rows[i], rows[j]
+		if desc {
+			a, b = b, a
 		}
-		return rows[i]["name"] < rows[j]["name"]
+		if a["creation"] != b["creation"] {
+			return a["creation"] < b["creation"]
+		}
+		return a["name"] < b["name"]
 	})
 	start, _ := strconv.Atoi(q.Get("limit_start"))
 	size, _ := strconv.Atoi(q.Get("limit_page_length"))
@@ -241,6 +276,12 @@ func newHistoryRepoIn(t *testing.T, site *fakeHistorySite, lastSync time.Time, b
 // pull runs the history pipeline the way `weg remote pull` does.
 func (r *historyRepo) pull(until time.Time, current []remote.Entity) error {
 	r.t.Helper()
+	return r.pullResult(until, &remote.FetchResult{Entities: current})
+}
+
+// pullResult is pull with the whole fetch result given.
+func (r *historyRepo) pullResult(until time.Time, result *remote.FetchResult) error {
+	r.t.Helper()
 	client := remote.NewClient(r.site.server.URL, "key", "secret")
 	cfg := r.config
 	return reconstructHistory(context.Background(), historyRun{
@@ -248,7 +289,7 @@ func (r *historyRepo) pull(until time.Time, current []remote.Entity) error {
 		siteURL:       cfg.Site.URL,
 		modulesFile:   filepath.Join(r.dir, "modules.txt"),
 		fetcher:       remote.NewFetcher(client, cfg),
-		result:        &remote.FetchResult{Entities: current},
+		result:        result,
 		since:         cfg.Sync.LastSync,
 		until:         until,
 		fromCommitted: true,

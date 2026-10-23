@@ -37,12 +37,24 @@ commit, so nothing is dropped.
 Frappe writes no Version on delete, so deletions are replayed from the site's
 Deleted Document rows: each deletion of a document the export holds becomes a
 commit by the user who deleted it, removing its file (or its row from the
-per-DocType Custom Field / Property Setter file). The reconcile commit then
-removes the committed files the site no longer exports at all: a deletion
-without a trash row, the old path of a document that moved to another module,
-a DocType that is no longer custom. Files of entity types disabled in
-[sync.entities] and of modules marked sync = false are never removed. A
-snapshot pull (--no-history) removes the same files.
+per-DocType Custom Field / Property Setter file).
+
+A committed file the fetch no longer produces is then checked with the site
+before it goes, since a list can come back short:
+  - its document now lives at another path (a module move), or the site has
+    it but no longer exports it (a DocType that is no longer custom): it goes
+    in the reconcile commit;
+  - the site still has it and would export it: it stays;
+  - the site does not have it and records its deletion in a Deleted Document
+    row from before the window: it goes in a commit by who deleted it;
+  - the site does not have it and records no deletion: it goes only when a
+    Version in the window or the push baseline (.weg/last_push_commit) shows
+    the site had it. Without a baseline (a CI checkout) it may be local work
+    not pushed yet, so it stays, with a warning.
+Files with local work not yet pushed always stay. In modules marked
+sync = false only recorded deletions remove files, and files of entity types
+disabled in [sync.entities] are never removed. A snapshot pull (--no-history)
+removes the same files, all in its one commit.
 
 Frappe records times as wall-clock time in the site's time zone (System
 Settings, or Asia/Kolkata when unset), so commits carry that zone's UTC offset.
@@ -129,14 +141,14 @@ func runPull(cobraCmd *cobra.Command, args []string) error {
 		for _, e := range result.Entities {
 			output.Printf("  %s: %s", e.Type, e.Name)
 		}
-		stale, err := planStaleExport(".", result, config)
+		removals, err := planStaleExport(".", result, fetcher, readLocalState("."), nil)
 		if err != nil {
 			return err
 		}
-		if len(stale) > 0 {
-			output.Printf("\nWould remove %d files the site no longer exports:", len(stale))
-			for _, p := range stale {
-				output.Printf("  - %s", p)
+		if len(removals) > 0 {
+			output.Printf("\nWould remove %d files the site no longer has:", len(removals))
+			for _, r := range removals {
+				output.Printf("  - %s (%s)", r.Path, r.Reason)
 			}
 		}
 		return nil
@@ -146,7 +158,7 @@ func runPull(cobraCmd *cobra.Command, args []string) error {
 	startHead, clean := gitHead("."), exportClean(".")
 	snapshotOnly := pullNoHistory || pullMessage != ""
 	if snapshotOnly {
-		err = pullSnapshot(config, result, syncedAt)
+		err = pullSnapshot(config, fetcher, result, syncedAt)
 	} else {
 		err = pullWithHistory(cobraCmd.Context(), config, fetcher, result, syncedAt)
 	}
@@ -203,7 +215,8 @@ func advancePushBaseline(dir, startHead string, clean bool) {
 
 // pullSnapshot writes the current entity state and records it as a single git
 // commit (the --no-history path, and the pre-history default behavior).
-func pullSnapshot(config *remote.SiteConfig, result *remote.FetchResult, syncedAt time.Time) error {
+func pullSnapshot(config *remote.SiteConfig, fetcher *remote.Fetcher, result *remote.FetchResult, syncedAt time.Time) error {
+	local := readLocalState(".")
 	// Write entities
 	output.Infof("Updating %d entities...\n", len(result.Entities))
 	for _, entity := range result.Entities {
@@ -212,7 +225,11 @@ func pullSnapshot(config *remote.SiteConfig, result *remote.FetchResult, syncedA
 		}
 	}
 	// Drop what the site no longer exports, so a snapshot converges too.
-	if _, err := pruneStaleExport(".", result, config, nil); err != nil {
+	removals, err := planStaleExport(".", result, fetcher, local, nil)
+	if err != nil {
+		return err
+	}
+	if err := removeExportFiles(".", removals, nil); err != nil {
 		return err
 	}
 

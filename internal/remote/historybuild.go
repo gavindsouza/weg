@@ -827,6 +827,10 @@ func undoChanges(doc map[string]any, diffs []map[string]any) map[string]any {
 	return state
 }
 
+// EntityTypeOfPath returns the entity type of an exported entity file, by
+// its layout (see entityTypeOfPath).
+func EntityTypeOfPath(p string) (EntityType, bool) { return entityTypeOfPath(p) }
+
 // entityTypeOfPath recognises an exported entity file by its layout:
 // <module>/<type>/<name>.json, or <module>/<type>/<name>/<name>.json for
 // DocTypes and Reports.

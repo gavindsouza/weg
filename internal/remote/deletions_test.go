@@ -90,8 +90,9 @@ func TestFetchDeletionsPages(t *testing.T) {
 	}
 }
 
-// Only files weg lays out, of synced entity types and modules, that the
-// fetch no longer produces are stale.
+// Only files weg lays out, of synced entity types, that the fetch no
+// longer produces are stale; those of a module marked sync = false are
+// flagged.
 func TestStaleExportFiles(t *testing.T) {
 	cfg := NewSiteConfig("https://example.com", "test")
 	cfg.Modules["Selling"] = ModuleInfo{App: "erpnext", Sync: false}
@@ -111,12 +112,24 @@ func TestStaleExportFiles(t *testing.T) {
 		"weg_workspace/custom/server_script/a.py", // the workspace
 	}
 	result := &FetchResult{Entities: []Entity{{Type: EntityWorkflow, Name: "Flow", Module: "Workplace", FilePath: "workplace/workflow/flow.json"}}}
-	got := StaleExportFiles(committed, result, cfg)
+	paths := func(files []StaleFile) []string {
+		var out []string
+		for _, f := range files {
+			p := f.Path
+			if f.Unsynced {
+				p += " (unsynced)"
+			}
+			out = append(out, p)
+		}
+		return out
+	}
+	got := paths(StaleExportFiles(committed, result, cfg))
 	want := []string{
 		"_/server_script/orphan.json",
 		"custom/doctype/thing/thing.json",
 		"custom/workflow/flow.json",
 		"projects/server_script/calc.json",
+		"selling/client_script/old.json (unsynced)",
 	}
 	if strings.Join(got, ",") != strings.Join(want, ",") {
 		t.Errorf("stale = %v\nwant    %v", got, want)
@@ -124,7 +137,7 @@ func TestStaleExportFiles(t *testing.T) {
 
 	// A Server Script the fetch could not read may be any of them.
 	result.Incomplete = map[EntityType][]string{EntityServerScript: {"Calc (502)"}}
-	for _, p := range StaleExportFiles(committed, result, cfg) {
+	for _, p := range paths(StaleExportFiles(committed, result, cfg)) {
 		if strings.Contains(p, "/server_script/") {
 			t.Errorf("%s is stale although the server script fetch was incomplete", p)
 		}
@@ -137,7 +150,7 @@ func TestStaleExportFiles(t *testing.T) {
 	}
 
 	cfg.Sync.Entities.Workflow = false
-	for _, p := range StaleExportFiles(committed, result, cfg) {
+	for _, p := range paths(StaleExportFiles(committed, result, cfg)) {
 		if strings.Contains(p, "/workflow/") {
 			t.Errorf("%s is stale with workflows not synced", p)
 		}
